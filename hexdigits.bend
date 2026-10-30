@@ -4,6 +4,19 @@ def is_hex_digit(+c: Char) -> Bool:
   +code = Char.to_u32(c)
   Char.is_digit(c) || Bool.and(U32.is_ge(code, 65), U32.is_le(code, 70))
 
+# A reusable character packaged with live evidence that it is a hex digit.
+type HexDigitChar is Data:
+  HexDigitChar{char: Char, valid: {is_hex_digit(char) == True{} : Bool}}
+
+def HexDigitChar.char(digit: HexDigitChar) -> Char:
+  match digit:
+    case HexDigitChar{c, valid}:
+      c
+
+# Key equality compares characters; proof fields do not participate.
+def HexDigitChar.is_eq(a: HexDigitChar, b: HexDigitChar) -> Bool:
+  Char.is_eq(HexDigitChar.char(a), HexDigitChar.char(b))
+
 # Four-bit words use least-significant-bit-first WCon fields.
 def word4_from_u32(n: U32) -> Word(4n):
   match n:
@@ -13,11 +26,13 @@ def word4_from_u32(n: U32) -> Word(4n):
 def word4_to_u32(d: Word(4n)) -> U32:
   U32.from_nat(Word.to_nat(4n, d))
 
-# A validity proof lets callers receive a four-bit value directly.
-def decode(+c: Char, valid: {is_hex_digit(c) == True{} : Bool}) -> Word(4n):
-  +code = Char.to_u32(c)
-  word4_from_u32(Bool.pick(U32, Char.is_digit(c),
-    U32.sub(code, 48), U32.sub(code, 55)))
+# The input type carries all evidence needed for a direct four-bit result.
+def decode(digit: HexDigitChar) -> Word(4n):
+  match digit:
+    case HexDigitChar{+c, valid}:
+      +code = Char.to_u32(c)
+      word4_from_u32(Bool.pick(U32, Char.is_digit(c),
+        U32.sub(code, 48), U32.sub(code, 55)))
 
 def is_valid_hex_u32(+s: String) -> Bool:
   Nat.is_eq(String.length(s), 8n) &&
@@ -94,14 +109,14 @@ def hex_u32.combine(
 ) -> U32:
   match proofs:
     case (p1, p2, p3, p4, p5, p6, p7, p8):
-      d1 = decode(c1, p1)
-      d2 = decode(c2, p2)
-      d3 = decode(c3, p3)
-      d4 = decode(c4, p4)
-      d5 = decode(c5, p5)
-      d6 = decode(c6, p6)
-      d7 = decode(c7, p7)
-      d8 = decode(c8, p8)
+      d1 = decode(HexDigitChar{c1, p1})
+      d2 = decode(HexDigitChar{c2, p2})
+      d3 = decode(HexDigitChar{c3, p3})
+      d4 = decode(HexDigitChar{c4, p4})
+      d5 = decode(HexDigitChar{c5, p5})
+      d6 = decode(HexDigitChar{c6, p6})
+      d7 = decode(HexDigitChar{c7, p7})
+      d8 = decode(HexDigitChar{c8, p8})
       (word4_to_u32(d1) * U32.pow(16, 7n) +
        word4_to_u32(d2) * U32.pow(16, 6n) +
        word4_to_u32(d3) * U32.pow(16, 5n) +
