@@ -1,5 +1,6 @@
 import Base
 import ./hexdigits.bend as H
+import ./binary.bend as B
 
 # A "nibble" is half of a byte, a four-bit numeral, which can be
 # represented by a single hexadecimal digit.
@@ -88,3 +89,46 @@ law hex_u32:
 
 law example_zero:
   {H.hex_u32("00000000", {==}) == 0 : U32}
+
+def valid_utf8_one_byte(b1: U32) -> Bool:
+  U32.is_lt(b1, 128)
+
+# def valid_utf8_two_bytes(b1: U32, b2: U32) -> Bool:
+
+# The complete set of accepted binary characters.
+def binary_digits() -> +List<Char>:
+  ['0', '1']
+
+law is_binary_digit:
+  for +c: Char
+  {B.is_binary_digit(c) == List.contains(~Char, ~Char.is_eq, binary_digits(), c) : Bool}
+
+law is_valid_binary_byte_input:
+  for +s: String
+  {B.is_valid_binary_byte(s) == (
+    Nat.is_eq(String.length(s), 8n) &&
+    List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s))
+  ) : Bool}
+
+# Bool represents a single binary digit: False is '0', True is '1'.
+def bits_to_string(bits: +List<Bool>) -> String:
+  match bits:
+    case Nil{}:
+      SNil{}
+    case Con{bit, rest}:
+      SCon{B.bit_to_char(bit), bits_to_string(rest)}
+
+# Read the bits most significant first, as in "10000000" = 128.
+def bit_list_value(bits: +List<Bool>) -> U32:
+  List.foldl(~&2, ~Bool, ~U32,
+    ~(acc => bit => (acc * 2 + Bool.to_u32(bit) : U32)), bits, 0)
+
+# A valid input spells exactly eight bits and yields their byte value.
+law binary_byte:
+  for +s: String
+  for valid: {B.is_valid_binary_byte(s) == True{} : Bool}
+  exs bits: +List<Bool>
+  {List.length(&2, Bool, bits) == 8n : Nat} &
+  {s == bits_to_string(bits) : String} &
+  {B.binary_byte(s, valid) == bit_list_value(bits) : U32} &
+  {U32.is_le(B.binary_byte(s, valid), 255) == True{} : Bool}
