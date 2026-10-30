@@ -75,19 +75,23 @@ def hex_u32_value(
    U32.from_nat(Word.to_nat(4n, n7)) * U32.pow(16, 1n) +
    U32.from_nat(Word.to_nat(4n, n8)) * U32.pow(16, 0n) : U32)
 
-# A valid input decomposes into eight proof-carrying hexadecimal characters.
-# The first character is the most significant: "12345678" represents 0x12345678.
-law hex_u32:
-  for +s: String
-  for valid: {H.is_valid_hex_u32(s) == True{} : Bool}
-  exs c1: H.HexDigitChar
-  exs c2: H.HexDigitChar
-  exs c3: H.HexDigitChar
-  exs c4: H.HexDigitChar
-  exs c5: H.HexDigitChar
-  exs c6: H.HexDigitChar
-  exs c7: H.HexDigitChar
-  exs c8: H.HexDigitChar
+# The eight validated characters spell the original input string.
+def HexCharsSpell(
+  +s: String,
+  c1: H.HexDigitChar, c2: H.HexDigitChar, c3: H.HexDigitChar, c4: H.HexDigitChar,
+  c5: H.HexDigitChar, c6: H.HexDigitChar, c7: H.HexDigitChar, c8: H.HexDigitChar
+) -> Type:
+  {s == SCon{H.HexDigitChar.char(c1), SCon{H.HexDigitChar.char(c2),
+        SCon{H.HexDigitChar.char(c3), SCon{H.HexDigitChar.char(c4),
+        SCon{H.HexDigitChar.char(c5), SCon{H.HexDigitChar.char(c6),
+        SCon{H.HexDigitChar.char(c7), SCon{H.HexDigitChar.char(c8), SNil{}}}}}}}}} : String}
+
+# Decoding those characters gives the stated result, most significant first.
+def HexDigitsValue(
+  result: U32,
+  c1: H.HexDigitChar, c2: H.HexDigitChar, c3: H.HexDigitChar, c4: H.HexDigitChar,
+  c5: H.HexDigitChar, c6: H.HexDigitChar, c7: H.HexDigitChar, c8: H.HexDigitChar
+) -> Type:
   n1 = H.decode(c1)
   n2 = H.decode(c2)
   n3 = H.decode(c3)
@@ -96,5 +100,24 @@ law hex_u32:
   n6 = H.decode(c6)
   n7 = H.decode(c7)
   n8 = H.decode(c8)
-  {s == SCon{H.HexDigitChar.char(c1), SCon{H.HexDigitChar.char(c2), SCon{H.HexDigitChar.char(c3), SCon{H.HexDigitChar.char(c4), SCon{H.HexDigitChar.char(c5), SCon{H.HexDigitChar.char(c6), SCon{H.HexDigitChar.char(c7), SCon{H.HexDigitChar.char(c8), SNil{}}}}}}}}} : String} &
-  {H.hex_u32(s, valid) == hex_u32_value(n1, n2, n3, n4, n5, n6, n7, n8) : U32}
+  {result == hex_u32_value(n1, n2, n3, n4, n5, n6, n7, n8) : U32}
+
+# Both properties share the same eight character witnesses.
+def HexU32Result(+s: String, result: U32) -> Type:
+  &c1: H.HexDigitChar ->
+  &c2: H.HexDigitChar ->
+  &c3: H.HexDigitChar ->
+  &c4: H.HexDigitChar ->
+  &c5: H.HexDigitChar ->
+  &c6: H.HexDigitChar ->
+  &c7: H.HexDigitChar ->
+  &c8: H.HexDigitChar ->
+  HexCharsSpell(s, c1, c2, c3, c4, c5, c6, c7, c8) &
+  HexDigitsValue(result, c1, c2, c3, c4, c5, c6, c7, c8)
+
+# A valid input decomposes into eight proof-carrying hexadecimal characters.
+# The first character is the most significant: "12345678" represents 0x12345678.
+law hex_u32:
+  for +s: String
+  for valid: {H.is_valid_hex_u32(s) == True{} : Bool}
+  HexU32Result(s, H.hex_u32(s, valid))
