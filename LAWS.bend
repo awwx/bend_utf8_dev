@@ -60,21 +60,22 @@ law is_valid_hex_u32_input:
     List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s))
   ) : Bool}
 
-# Project the validated characters back to their original string.
-def hex_digit_chars(digits: +List<H.HexDigitChar>) -> String:
+# Convert a list of hex digits to a string of those digit characters.
+
+def digits_to_string(digits: +List<H.HexDigitChar>) -> String:
   match digits:
     case Nil{}:
       SNil{}
     case Con{digit, rest}:
-      SCon{H.HexDigitChar.char(digit), hex_digit_chars(rest)}
+      SCon{H.HexDigitChar.char(digit), digits_to_string(rest)}
 
 # Derive one nibble for each validated character, preserving order and length.
-def hex_digit_nibbles(digits: +List<H.HexDigitChar>) -> +List<Nibble>:
+def digits_to_nibbles(digits: +List<H.HexDigitChar>) -> +List<Nibble>:
   match digits:
     case Nil{}:
       Nil{}
     case Con{digit, rest}:
-      H.decode(digit) <> hex_digit_nibbles(rest)
+      H.decode(digit) <> digits_to_nibbles(rest)
 
 # Accumulate hexadecimal digits from most significant to least significant.
 def hex_u32_value(nibbles: +List<Nibble>) -> U32:
@@ -82,19 +83,15 @@ def hex_u32_value(nibbles: +List<Nibble>) -> U32:
     ~(acc => n => (acc * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)),
     nibbles, 0)
 
-# The validated character list spells the original input string.
-def HexCharsSpell(+s: String, digits: +List<H.HexDigitChar>) -> Type:
-  {s == hex_digit_chars(digits) : String}
-
 # The derived nibble list has the stated numeric value.
 def HexDigitsValue(result: U32, digits: +List<H.HexDigitChar>) -> Type:
-  {result == hex_u32_value(hex_digit_nibbles(digits)) : U32}
+  {result == hex_u32_value(digits_to_nibbles(digits)) : U32}
 
 # One list of exactly eight characters witnesses both spelling and value.
 def HexU32Result(+s: String, result: U32) -> Type:
   &digits: +List<H.HexDigitChar> ->
   {List.length(&2, H.HexDigitChar, digits) == 8n : Nat} &
-  HexCharsSpell(s, digits) &
+  {s == digits_to_string(digits) : String} &
   HexDigitsValue(result, digits)
 
 # A valid input decomposes into a list of eight validated hexadecimal characters.
