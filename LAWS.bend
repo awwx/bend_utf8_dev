@@ -6,29 +6,40 @@ def hex_digits() -> +List<Char>:
   ['0', '1', '2', '3', '4', '5', '6', '7',
    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F']
 
-# A character is hexadecimal exactly when it occurs in hex_digits.
+# A character is a hexadecimal digit when it is present in the hex_digits list.
 law is_hex_digit:
   for +c: Char
   {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, hex_digits(), c) : Bool}
 
-# Construct a four-bit numeral; the table below uses only 0n through 15n.
-def word4(n: Nat) -> Word(4n):
+# A "nibble" is half of a byte, a four-bit numeral.
+def nibble(n: Nat) -> Word(4n):
   match n:
     case 0n:
       Word.zero(4n)
     case 1n+p:
-      Word.inc(4n, word4(p))
+      Word.inc(4n, nibble(p))
 
-# Every table key is itself a validated hexadecimal character.
+# Specify the conversion of a hex digit character to the corresponding
+# value.  A bit verbose with the types, but seems like the most
+# straightforward way of describing the mapping.
+
 def hex_digit_values() -> List<(H.HexDigitChar & Word(4n))>:
-  [(H.HexDigitChar{'0', {==}}, word4(0n)), (H.HexDigitChar{'1', {==}}, word4(1n)),
-   (H.HexDigitChar{'2', {==}}, word4(2n)), (H.HexDigitChar{'3', {==}}, word4(3n)),
-   (H.HexDigitChar{'4', {==}}, word4(4n)), (H.HexDigitChar{'5', {==}}, word4(5n)),
-   (H.HexDigitChar{'6', {==}}, word4(6n)), (H.HexDigitChar{'7', {==}}, word4(7n)),
-   (H.HexDigitChar{'8', {==}}, word4(8n)), (H.HexDigitChar{'9', {==}}, word4(9n)),
-   (H.HexDigitChar{'A', {==}}, word4(10n)), (H.HexDigitChar{'B', {==}}, word4(11n)),
-   (H.HexDigitChar{'C', {==}}, word4(12n)), (H.HexDigitChar{'D', {==}}, word4(13n)),
-   (H.HexDigitChar{'E', {==}}, word4(14n)), (H.HexDigitChar{'F', {==}}, word4(15n))]
+  [(H.HexDigitChar{'0', {==}}, nibble(0n)),
+   (H.HexDigitChar{'1', {==}}, nibble(1n)),
+   (H.HexDigitChar{'2', {==}}, nibble(2n)),
+   (H.HexDigitChar{'3', {==}}, nibble(3n)),
+   (H.HexDigitChar{'4', {==}}, nibble(4n)),
+   (H.HexDigitChar{'5', {==}}, nibble(5n)),
+   (H.HexDigitChar{'6', {==}}, nibble(6n)),
+   (H.HexDigitChar{'7', {==}}, nibble(7n)),
+   (H.HexDigitChar{'8', {==}}, nibble(8n)),
+   (H.HexDigitChar{'9', {==}}, nibble(9n)),
+   (H.HexDigitChar{'A', {==}}, nibble(10n)),
+   (H.HexDigitChar{'B', {==}}, nibble(11n)),
+   (H.HexDigitChar{'C', {==}}, nibble(12n)),
+   (H.HexDigitChar{'D', {==}}, nibble(13n)),
+   (H.HexDigitChar{'E', {==}}, nibble(14n)),
+   (H.HexDigitChar{'F', {==}}, nibble(15n))]
 
 # Arbitrary tables may omit a key, so generic lookup remains optional.
 def lookup_hex_digit_value(
