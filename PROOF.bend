@@ -336,7 +336,10 @@ def Laws.is_valid_hex_u32_input(s):
   {==}
 
 def HexU32Spec(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
-  Laws.HexU32Result(s, H.hex_u32(s, valid))
+  &digits: +List<H.HexDigitChar> ->
+  {List.length(&2, H.HexDigitChar, digits) == 8n : Nat} &
+  {s == Laws.digits_to_string(digits) : String} &
+  {H.hex_u32(s, valid) == Laws.nibble_list_value(Laws.digits_to_nibbles(digits)) : U32}
 
 def hex_u32_complete(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
