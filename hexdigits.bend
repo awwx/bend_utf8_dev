@@ -13,10 +13,6 @@ def HexDigitChar.char(digit: HexDigitChar) -> Char:
     case HexDigitChar{c, valid}:
       c
 
-# Key equality compares characters; proof fields do not participate.
-def HexDigitChar.is_eq(a: HexDigitChar, b: HexDigitChar) -> Bool:
-  Char.is_eq(HexDigitChar.char(a), HexDigitChar.char(b))
-
 # Four-bit words use least-significant-bit-first WCon fields.
 def word4_from_u32(n: U32) -> Word(4n):
   match n:

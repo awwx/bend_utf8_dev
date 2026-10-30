@@ -1,6 +1,19 @@
 import Base
 import ./hexdigits.bend as H
 
+# A "nibble" is half of a byte, a four-bit numeral, which can be
+# represented by a single hexadecimal digit.
+
+def Nibble() -> Data:
+  Word(4n)
+
+def nibble(n: Nat) -> Nibble:
+  match n:
+    case 0n:
+      Word.zero(4n)
+    case 1n+p:
+      Word.inc(4n, nibble(p))
+
 # The complete set of accepted hexadecimal characters.
 def hex_digits() -> +List<Char>:
   ['0', '1', '2', '3', '4', '5', '6', '7',
@@ -11,60 +24,35 @@ law is_hex_digit:
   for +c: Char
   {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, hex_digits(), c) : Bool}
 
-# A "nibble" is half of a byte, a four-bit numeral.
-def nibble(n: Nat) -> Word(4n):
-  match n:
-    case 0n:
-      Word.zero(4n)
-    case 1n+p:
-      Word.inc(4n, nibble(p))
+# The specification for decoding a hexadecimal digit character to a
+# nibble value.  A bit verbose, but as far as I can tell the most
+# straightforward way to specficy which nibble value a hexadecimal
+# digit character represents.
 
-# Specify the conversion of a hex digit character to the corresponding
-# value.  A bit verbose with the types, but seems like the most
-# straightforward way of describing the mapping.
-
-def hex_digit_values() -> List<(H.HexDigitChar & Word(4n))>:
-  [(H.HexDigitChar{'0', {==}}, nibble(0n)),
-   (H.HexDigitChar{'1', {==}}, nibble(1n)),
-   (H.HexDigitChar{'2', {==}}, nibble(2n)),
-   (H.HexDigitChar{'3', {==}}, nibble(3n)),
-   (H.HexDigitChar{'4', {==}}, nibble(4n)),
-   (H.HexDigitChar{'5', {==}}, nibble(5n)),
-   (H.HexDigitChar{'6', {==}}, nibble(6n)),
-   (H.HexDigitChar{'7', {==}}, nibble(7n)),
-   (H.HexDigitChar{'8', {==}}, nibble(8n)),
-   (H.HexDigitChar{'9', {==}}, nibble(9n)),
-   (H.HexDigitChar{'A', {==}}, nibble(10n)),
-   (H.HexDigitChar{'B', {==}}, nibble(11n)),
-   (H.HexDigitChar{'C', {==}}, nibble(12n)),
-   (H.HexDigitChar{'D', {==}}, nibble(13n)),
-   (H.HexDigitChar{'E', {==}}, nibble(14n)),
-   (H.HexDigitChar{'F', {==}}, nibble(15n))]
-
-# Arbitrary tables may omit a key, so generic lookup remains optional.
-def lookup_hex_digit_value(
-  entries: List<(H.HexDigitChar & Word(4n))>, +digit: H.HexDigitChar
-) -> Maybe<Word(4n)>:
-  match entries:
-    case Nil{}:
-      None{}
-    case Con{(key, value), rest}:
-      Bool.pick(Maybe<Word(4n)>, H.HexDigitChar.is_eq(digit, key),
-        Some{value}, lookup_hex_digit_value(rest, digit))
-
-# The decoder's direct result must be present in the fixed table.
 law decode:
   for +digit: H.HexDigitChar
-  {lookup_hex_digit_value(hex_digit_values(), digit) ==
-    Some{H.decode(digit)} : Maybe<Word(4n)>}
+  c = H.HexDigitChar.char(digit)
+  d = H.decode(digit)
+  ({c == '0' : Char} & {d == nibble(0n) : Nibble}) |
+  ({c == '1' : Char} & {d == nibble(1n) : Nibble}) |
+  ({c == '2' : Char} & {d == nibble(2n) : Nibble}) |
+  ({c == '3' : Char} & {d == nibble(3n) : Nibble}) |
+  ({c == '4' : Char} & {d == nibble(4n) : Nibble}) |
+  ({c == '5' : Char} & {d == nibble(5n) : Nibble}) |
+  ({c == '6' : Char} & {d == nibble(6n) : Nibble}) |
+  ({c == '7' : Char} & {d == nibble(7n) : Nibble}) |
+  ({c == '8' : Char} & {d == nibble(8n) : Nibble}) |
+  ({c == '9' : Char} & {d == nibble(9n) : Nibble}) |
+  ({c == 'A' : Char} & {d == nibble(10n) : Nibble}) |
+  ({c == 'B' : Char} & {d == nibble(11n) : Nibble}) |
+  ({c == 'C' : Char} & {d == nibble(12n) : Nibble}) |
+  ({c == 'D' : Char} & {d == nibble(13n) : Nibble}) |
+  ({c == 'E' : Char} & {d == nibble(14n) : Nibble}) |
+  ({c == 'F' : Char} & {d == nibble(15n) : Nibble})
 
-# Every validated hexadecimal character has an entry in the fixed table.
-law hex_digit_values_complete:
-  for +digit: H.HexDigitChar
-  exs value: Word(4n)
-  {lookup_hex_digit_value(hex_digit_values(), digit) == Some{value} : Maybe<Word(4n)>}
+# A valid input to hex_u32 is exactly eight characters, each a valid
+# hexadecimal digit.
 
-# Exactly eight characters, all uppercase hexadecimal digits.
 law is_valid_hex_u32_input:
   for +s: String
   {H.is_valid_hex_u32(s) == (
@@ -72,10 +60,11 @@ law is_valid_hex_u32_input:
     List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s))
   ) : Bool}
 
-# Combine eight four-bit digit values, most significant first.
+# Eight nibbles is four bytes, which exactly covers a U32.
+
 def hex_u32_value(
-  d1: Word(4n), d2: Word(4n), d3: Word(4n), d4: Word(4n),
-  d5: Word(4n), d6: Word(4n), d7: Word(4n), d8: Word(4n)
+  d1: Nibble, d2: Nibble, d3: Nibble, d4: Nibble,
+  d5: Nibble, d6: Nibble, d7: Nibble, d8: Nibble
 ) -> U32:
   (U32.from_nat(Word.to_nat(4n, d1)) * U32.pow(16, 7n) +
    U32.from_nat(Word.to_nat(4n, d2)) * U32.pow(16, 6n) +
