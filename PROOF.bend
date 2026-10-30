@@ -336,26 +336,7 @@ def Laws.is_valid_hex_u32_input(s):
   {==}
 
 def HexU32Spec(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
-  &c1: H.HexDigitChar ->
-  &c2: H.HexDigitChar ->
-  &c3: H.HexDigitChar ->
-  &c4: H.HexDigitChar ->
-  &c5: H.HexDigitChar ->
-  &c6: H.HexDigitChar ->
-  &c7: H.HexDigitChar ->
-  &c8: H.HexDigitChar ->
-  (
-    d1 = H.decode(c1)
-    d2 = H.decode(c2)
-    d3 = H.decode(c3)
-    d4 = H.decode(c4)
-    d5 = H.decode(c5)
-    d6 = H.decode(c6)
-    d7 = H.decode(c7)
-    d8 = H.decode(c8)
-    {s == SCon{H.HexDigitChar.char(c1), SCon{H.HexDigitChar.char(c2), SCon{H.HexDigitChar.char(c3), SCon{H.HexDigitChar.char(c4), SCon{H.HexDigitChar.char(c5), SCon{H.HexDigitChar.char(c6), SCon{H.HexDigitChar.char(c7), SCon{H.HexDigitChar.char(c8), SNil{}}}}}}}}} : String} &
-    {H.hex_u32(s, valid) == Laws.hex_u32_value(d1, d2, d3, d4, d5, d6, d7, d8) : U32}
-  )
+  Laws.HexU32Result(s, H.hex_u32(s, valid))
 
 def hex_u32_complete(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
@@ -364,7 +345,8 @@ def hex_u32_complete(
 ) -> HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
   match proofs:
     case (p1, p2, p3, p4, p5, p6, p7, p8):
-      (H.HexDigitChar{c1, p1}, H.HexDigitChar{c2, p2}, H.HexDigitChar{c3, p3}, H.HexDigitChar{c4, p4}, H.HexDigitChar{c5, p5}, H.HexDigitChar{c6, p6}, H.HexDigitChar{c7, p7}, H.HexDigitChar{c8, p8}, ({==}, {==}))
+      ([H.HexDigitChar{c1, p1}, H.HexDigitChar{c2, p2}, H.HexDigitChar{c3, p3}, H.HexDigitChar{c4, p4}, H.HexDigitChar{c5, p5}, H.HexDigitChar{c6, p6}, H.HexDigitChar{c7, p7}, H.HexDigitChar{c8, p8}],
+       ({==}, {==}, {==}))
 
 def Laws.hex_u32(s, valid):
   match s:

@@ -99,28 +99,29 @@ def hex_u32.digit_proofs(
   p8 = hex_u32.head_true(is_hex_digit(c8), List.all(~&2, ~Char, ~(c => is_hex_digit(c)), []), e7)
   (p1, p2, p3, p4, p5, p6, p7, p8)
 
+# Fold the validated digits in the same order as the specification.
+def hex_u32.fold_digits(digits: +List<HexDigitChar>, acc: U32) -> U32:
+  match digits:
+    case Nil{}:
+      acc
+    case Con{digit, rest}:
+      hex_u32.fold_digits(rest, (acc * 16 + word4_to_u32(decode(digit)) : U32))
+
 def hex_u32.combine(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
   proofs: {is_hex_digit(c1) == True{} : Bool} & {is_hex_digit(c2) == True{} : Bool} & {is_hex_digit(c3) == True{} : Bool} & {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}
 ) -> U32:
   match proofs:
     case (p1, p2, p3, p4, p5, p6, p7, p8):
-      d1 = decode(HexDigitChar{c1, p1})
-      d2 = decode(HexDigitChar{c2, p2})
-      d3 = decode(HexDigitChar{c3, p3})
-      d4 = decode(HexDigitChar{c4, p4})
-      d5 = decode(HexDigitChar{c5, p5})
-      d6 = decode(HexDigitChar{c6, p6})
-      d7 = decode(HexDigitChar{c7, p7})
-      d8 = decode(HexDigitChar{c8, p8})
-      (word4_to_u32(d1) * U32.pow(16, 7n) +
-       word4_to_u32(d2) * U32.pow(16, 6n) +
-       word4_to_u32(d3) * U32.pow(16, 5n) +
-       word4_to_u32(d4) * U32.pow(16, 4n) +
-       word4_to_u32(d5) * U32.pow(16, 3n) +
-       word4_to_u32(d6) * U32.pow(16, 2n) +
-       word4_to_u32(d7) * U32.pow(16, 1n) +
-       word4_to_u32(d8) * U32.pow(16, 0n) : U32)
+      hex_u32.fold_digits([
+        HexDigitChar{c1, p1},
+        HexDigitChar{c2, p2},
+        HexDigitChar{c3, p3},
+        HexDigitChar{c4, p4},
+        HexDigitChar{c5, p5},
+        HexDigitChar{c6, p6},
+        HexDigitChar{c7, p7},
+        HexDigitChar{c8, p8}], 0)
 
 def hex_u32(+s: String, valid: {is_valid_hex_u32(s) == True{} : Bool}) -> U32:
   match s:

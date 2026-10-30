@@ -60,62 +60,44 @@ law is_valid_hex_u32_input:
     List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s))
   ) : Bool}
 
-# Eight nibbles is four bytes, which exactly covers a U32.
+# Project the validated characters back to their original string.
+def hex_digit_chars(digits: +List<H.HexDigitChar>) -> String:
+  match digits:
+    case Nil{}:
+      SNil{}
+    case Con{digit, rest}:
+      SCon{H.HexDigitChar.char(digit), hex_digit_chars(rest)}
 
-def hex_u32_value(
-  n1: Nibble, n2: Nibble, n3: Nibble, n4: Nibble,
-  n5: Nibble, n6: Nibble, n7: Nibble, n8: Nibble
-) -> U32:
-  (U32.from_nat(Word.to_nat(4n, n1)) * U32.pow(16, 7n) +
-   U32.from_nat(Word.to_nat(4n, n2)) * U32.pow(16, 6n) +
-   U32.from_nat(Word.to_nat(4n, n3)) * U32.pow(16, 5n) +
-   U32.from_nat(Word.to_nat(4n, n4)) * U32.pow(16, 4n) +
-   U32.from_nat(Word.to_nat(4n, n5)) * U32.pow(16, 3n) +
-   U32.from_nat(Word.to_nat(4n, n6)) * U32.pow(16, 2n) +
-   U32.from_nat(Word.to_nat(4n, n7)) * U32.pow(16, 1n) +
-   U32.from_nat(Word.to_nat(4n, n8)) * U32.pow(16, 0n) : U32)
+# Derive one nibble for each validated character, preserving order and length.
+def hex_digit_nibbles(digits: +List<H.HexDigitChar>) -> +List<Nibble>:
+  match digits:
+    case Nil{}:
+      Nil{}
+    case Con{digit, rest}:
+      H.decode(digit) <> hex_digit_nibbles(rest)
 
-# The eight validated characters spell the original input string.
-def HexCharsSpell(
-  +s: String,
-  c1: H.HexDigitChar, c2: H.HexDigitChar, c3: H.HexDigitChar, c4: H.HexDigitChar,
-  c5: H.HexDigitChar, c6: H.HexDigitChar, c7: H.HexDigitChar, c8: H.HexDigitChar
-) -> Type:
-  {s == SCon{H.HexDigitChar.char(c1), SCon{H.HexDigitChar.char(c2),
-        SCon{H.HexDigitChar.char(c3), SCon{H.HexDigitChar.char(c4),
-        SCon{H.HexDigitChar.char(c5), SCon{H.HexDigitChar.char(c6),
-        SCon{H.HexDigitChar.char(c7), SCon{H.HexDigitChar.char(c8), SNil{}}}}}}}}} : String}
+# Accumulate hexadecimal digits from most significant to least significant.
+def hex_u32_value(nibbles: +List<Nibble>) -> U32:
+  List.foldl(~&2, ~Nibble, ~U32,
+    ~(acc => n => (acc * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)),
+    nibbles, 0)
 
-# Decoding those characters gives the stated result, most significant first.
-def HexDigitsValue(
-  result: U32,
-  c1: H.HexDigitChar, c2: H.HexDigitChar, c3: H.HexDigitChar, c4: H.HexDigitChar,
-  c5: H.HexDigitChar, c6: H.HexDigitChar, c7: H.HexDigitChar, c8: H.HexDigitChar
-) -> Type:
-  n1 = H.decode(c1)
-  n2 = H.decode(c2)
-  n3 = H.decode(c3)
-  n4 = H.decode(c4)
-  n5 = H.decode(c5)
-  n6 = H.decode(c6)
-  n7 = H.decode(c7)
-  n8 = H.decode(c8)
-  {result == hex_u32_value(n1, n2, n3, n4, n5, n6, n7, n8) : U32}
+# The validated character list spells the original input string.
+def HexCharsSpell(+s: String, digits: +List<H.HexDigitChar>) -> Type:
+  {s == hex_digit_chars(digits) : String}
 
-# Both properties share the same eight character witnesses.
+# The derived nibble list has the stated numeric value.
+def HexDigitsValue(result: U32, digits: +List<H.HexDigitChar>) -> Type:
+  {result == hex_u32_value(hex_digit_nibbles(digits)) : U32}
+
+# One list of exactly eight characters witnesses both spelling and value.
 def HexU32Result(+s: String, result: U32) -> Type:
-  &c1: H.HexDigitChar ->
-  &c2: H.HexDigitChar ->
-  &c3: H.HexDigitChar ->
-  &c4: H.HexDigitChar ->
-  &c5: H.HexDigitChar ->
-  &c6: H.HexDigitChar ->
-  &c7: H.HexDigitChar ->
-  &c8: H.HexDigitChar ->
-  HexCharsSpell(s, c1, c2, c3, c4, c5, c6, c7, c8) &
-  HexDigitsValue(result, c1, c2, c3, c4, c5, c6, c7, c8)
+  &digits: +List<H.HexDigitChar> ->
+  {List.length(&2, H.HexDigitChar, digits) == 8n : Nat} &
+  HexCharsSpell(s, digits) &
+  HexDigitsValue(result, digits)
 
-# A valid input decomposes into eight proof-carrying hexadecimal characters.
+# A valid input decomposes into a list of eight validated hexadecimal characters.
 # The first character is the most significant: "12345678" represents 0x12345678.
 law hex_u32:
   for +s: String
