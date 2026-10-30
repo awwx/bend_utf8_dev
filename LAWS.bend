@@ -50,8 +50,8 @@ law decode:
   ({c == 'E' : Char} & {d == nibble(14n) : Nibble}) |
   ({c == 'F' : Char} & {d == nibble(15n) : Nibble})
 
-# A valid input to hex_u32 is exactly eight characters, each a valid
-# hexadecimal digit.
+# A valid input to hex_u32 is a string of exactly eight characters,
+# each of which is a valid hexadecimal digit.
 
 law is_valid_hex_u32_input:
   for +s: String
