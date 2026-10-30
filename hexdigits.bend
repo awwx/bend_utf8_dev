@@ -4,23 +4,20 @@ def is_hex_digit(+c: Char) -> Bool:
   +code = Char.to_u32(c)
   Char.is_digit(c) || Bool.and(U32.is_ge(code, 65), U32.is_le(code, 70))
 
-def decode(+c: Char, valid: {is_hex_digit(c) == True{} : Bool}) -> U32:
-  Bool.pick(U32, Char.is_eq(c, '0'), 0,
-  Bool.pick(U32, Char.is_eq(c, '1'), 1,
-  Bool.pick(U32, Char.is_eq(c, '2'), 2,
-  Bool.pick(U32, Char.is_eq(c, '3'), 3,
-  Bool.pick(U32, Char.is_eq(c, '4'), 4,
-  Bool.pick(U32, Char.is_eq(c, '5'), 5,
-  Bool.pick(U32, Char.is_eq(c, '6'), 6,
-  Bool.pick(U32, Char.is_eq(c, '7'), 7,
-  Bool.pick(U32, Char.is_eq(c, '8'), 8,
-  Bool.pick(U32, Char.is_eq(c, '9'), 9,
-  Bool.pick(U32, Char.is_eq(c, 'A'), 10,
-  Bool.pick(U32, Char.is_eq(c, 'B'), 11,
-  Bool.pick(U32, Char.is_eq(c, 'C'), 12,
-  Bool.pick(U32, Char.is_eq(c, 'D'), 13,
-  Bool.pick(U32, Char.is_eq(c, 'E'), 14,
-  15)))))))))))))))
+# Four-bit words use least-significant-bit-first WCon fields.
+def word4_from_u32(n: U32) -> Word(4n):
+  match n:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, rest}}}}}:
+      WCon{b0, WCon{b1, WCon{b2, WCon{b3, WNil{}}}}}
+
+def word4_to_u32(d: Word(4n)) -> U32:
+  U32.from_nat(Word.to_nat(4n, d))
+
+# A validity proof lets callers receive a four-bit value directly.
+def decode(+c: Char, valid: {is_hex_digit(c) == True{} : Bool}) -> Word(4n):
+  +code = Char.to_u32(c)
+  word4_from_u32(Bool.pick(U32, Char.is_digit(c),
+    U32.sub(code, 48), U32.sub(code, 55)))
 
 def is_valid_hex_u32(+s: String) -> Bool:
   Nat.is_eq(String.length(s), 8n) &&
@@ -97,22 +94,22 @@ def hex_u32.combine(
 ) -> U32:
   match proofs:
     case (p1, p2, p3, p4, p5, p6, p7, p8):
-      h1 = decode(c1, p1)
-      h2 = decode(c2, p2)
-      h3 = decode(c3, p3)
-      h4 = decode(c4, p4)
-      h5 = decode(c5, p5)
-      h6 = decode(c6, p6)
-      h7 = decode(c7, p7)
-      h8 = decode(c8, p8)
-      (h1 * U32.pow(16, 7n) +
-       h2 * U32.pow(16, 6n) +
-       h3 * U32.pow(16, 5n) +
-       h4 * U32.pow(16, 4n) +
-       h5 * U32.pow(16, 3n) +
-       h6 * U32.pow(16, 2n) +
-       h7 * U32.pow(16, 1n) +
-       h8 * U32.pow(16, 0n) : U32)
+      d1 = decode(c1, p1)
+      d2 = decode(c2, p2)
+      d3 = decode(c3, p3)
+      d4 = decode(c4, p4)
+      d5 = decode(c5, p5)
+      d6 = decode(c6, p6)
+      d7 = decode(c7, p7)
+      d8 = decode(c8, p8)
+      (word4_to_u32(d1) * U32.pow(16, 7n) +
+       word4_to_u32(d2) * U32.pow(16, 6n) +
+       word4_to_u32(d3) * U32.pow(16, 5n) +
+       word4_to_u32(d4) * U32.pow(16, 4n) +
+       word4_to_u32(d5) * U32.pow(16, 3n) +
+       word4_to_u32(d6) * U32.pow(16, 2n) +
+       word4_to_u32(d7) * U32.pow(16, 1n) +
+       word4_to_u32(d8) * U32.pow(16, 0n) : U32)
 
 def hex_u32(+s: String, valid: {is_valid_hex_u32(s) == True{} : Bool}) -> U32:
   match s:
