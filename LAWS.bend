@@ -1,5 +1,4 @@
 import Base
-import ./hexdigits.bend as H
 
 law example:
-  {U32.is_lt(H.ascii_0, H.ascii_9) == True{} : Bool}
+  {U32.is_lt(Char.to_u32('0'), Char.to_u32('9')) == True{} : Bool}
