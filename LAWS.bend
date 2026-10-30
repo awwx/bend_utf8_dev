@@ -75,16 +75,12 @@ def nibble_list_value(nibbles: +List<Nibble>) -> U32:
     ~(acc => n => (acc * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)),
     nibbles, 0)
 
-# The derived nibble list has the stated numeric value.
-def HexDigitsValue(result: U32, digits: +List<H.HexDigitChar>) -> Type:
-  {result == nibble_list_value(digits_to_nibbles(digits)) : U32}
-
 # One list of exactly eight characters witnesses both spelling and value.
 def HexU32Result(+s: String, result: U32) -> Type:
   &digits: +List<H.HexDigitChar> ->
   {List.length(&2, H.HexDigitChar, digits) == 8n : Nat} &
   {s == digits_to_string(digits) : String} &
-  HexDigitsValue(result, digits)
+  {result == nibble_list_value(digits_to_nibbles(digits)) : U32}
 
 # A valid input decomposes into a list of eight validated hexadecimal characters.
 # The first character is the most significant: "12345678" represents 0x12345678.
