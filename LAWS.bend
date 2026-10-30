@@ -63,17 +63,17 @@ law is_valid_hex_u32_input:
 # Eight nibbles is four bytes, which exactly covers a U32.
 
 def hex_u32_value(
-  d1: Nibble, d2: Nibble, d3: Nibble, d4: Nibble,
-  d5: Nibble, d6: Nibble, d7: Nibble, d8: Nibble
+  n1: Nibble, n2: Nibble, n3: Nibble, n4: Nibble,
+  n5: Nibble, n6: Nibble, n7: Nibble, n8: Nibble
 ) -> U32:
-  (U32.from_nat(Word.to_nat(4n, d1)) * U32.pow(16, 7n) +
-   U32.from_nat(Word.to_nat(4n, d2)) * U32.pow(16, 6n) +
-   U32.from_nat(Word.to_nat(4n, d3)) * U32.pow(16, 5n) +
-   U32.from_nat(Word.to_nat(4n, d4)) * U32.pow(16, 4n) +
-   U32.from_nat(Word.to_nat(4n, d5)) * U32.pow(16, 3n) +
-   U32.from_nat(Word.to_nat(4n, d6)) * U32.pow(16, 2n) +
-   U32.from_nat(Word.to_nat(4n, d7)) * U32.pow(16, 1n) +
-   U32.from_nat(Word.to_nat(4n, d8)) * U32.pow(16, 0n) : U32)
+  (U32.from_nat(Word.to_nat(4n, n1)) * U32.pow(16, 7n) +
+   U32.from_nat(Word.to_nat(4n, n2)) * U32.pow(16, 6n) +
+   U32.from_nat(Word.to_nat(4n, n3)) * U32.pow(16, 5n) +
+   U32.from_nat(Word.to_nat(4n, n4)) * U32.pow(16, 4n) +
+   U32.from_nat(Word.to_nat(4n, n5)) * U32.pow(16, 3n) +
+   U32.from_nat(Word.to_nat(4n, n6)) * U32.pow(16, 2n) +
+   U32.from_nat(Word.to_nat(4n, n7)) * U32.pow(16, 1n) +
+   U32.from_nat(Word.to_nat(4n, n8)) * U32.pow(16, 0n) : U32)
 
 # A valid input decomposes into eight proof-carrying hexadecimal characters.
 # The first character is the most significant: "12345678" represents 0x12345678.
@@ -88,13 +88,13 @@ law hex_u32:
   exs c6: H.HexDigitChar
   exs c7: H.HexDigitChar
   exs c8: H.HexDigitChar
-  d1 = H.decode(c1)
-  d2 = H.decode(c2)
-  d3 = H.decode(c3)
-  d4 = H.decode(c4)
-  d5 = H.decode(c5)
-  d6 = H.decode(c6)
-  d7 = H.decode(c7)
-  d8 = H.decode(c8)
+  n1 = H.decode(c1)
+  n2 = H.decode(c2)
+  n3 = H.decode(c3)
+  n4 = H.decode(c4)
+  n5 = H.decode(c5)
+  n6 = H.decode(c6)
+  n7 = H.decode(c7)
+  n8 = H.decode(c8)
   {s == SCon{H.HexDigitChar.char(c1), SCon{H.HexDigitChar.char(c2), SCon{H.HexDigitChar.char(c3), SCon{H.HexDigitChar.char(c4), SCon{H.HexDigitChar.char(c5), SCon{H.HexDigitChar.char(c6), SCon{H.HexDigitChar.char(c7), SCon{H.HexDigitChar.char(c8), SNil{}}}}}}}}} : String} &
-  {H.hex_u32(s, valid) == hex_u32_value(d1, d2, d3, d4, d5, d6, d7, d8) : U32}
+  {H.hex_u32(s, valid) == hex_u32_value(n1, n2, n3, n4, n5, n6, n7, n8) : U32}
