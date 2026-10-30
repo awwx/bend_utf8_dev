@@ -7,13 +7,6 @@ import ./hexdigits.bend as H
 def Nibble() -> Data:
   Word(4n)
 
-def nibble(n: Nat) -> Nibble:
-  match n:
-    case 0n:
-      Word.zero(4n)
-    case 1n+p:
-      Word.inc(4n, nibble(p))
-
 # The complete set of accepted hexadecimal characters.
 def hex_digits() -> +List<Char>:
   ['0', '1', '2', '3', '4', '5', '6', '7',
@@ -24,31 +17,29 @@ law is_hex_digit:
   for +c: Char
   {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, hex_digits(), c) : Bool}
 
-# The specification for decoding a hexadecimal digit character to a
-# nibble value.  A bit verbose, but as far as I can tell the most
-# straightforward way to specficy which nibble value a hexadecimal
-# digit character represents.
+# For each valid input hexadecimal digit character, directly specify
+# the output nibble value.
 
 law decode:
   for +digit: H.HexDigitChar
   c = H.HexDigitChar.char(digit)
-  d = H.decode(digit)
-  ({c == '0' : Char} & {d == nibble(0n) : Nibble}) |
-  ({c == '1' : Char} & {d == nibble(1n) : Nibble}) |
-  ({c == '2' : Char} & {d == nibble(2n) : Nibble}) |
-  ({c == '3' : Char} & {d == nibble(3n) : Nibble}) |
-  ({c == '4' : Char} & {d == nibble(4n) : Nibble}) |
-  ({c == '5' : Char} & {d == nibble(5n) : Nibble}) |
-  ({c == '6' : Char} & {d == nibble(6n) : Nibble}) |
-  ({c == '7' : Char} & {d == nibble(7n) : Nibble}) |
-  ({c == '8' : Char} & {d == nibble(8n) : Nibble}) |
-  ({c == '9' : Char} & {d == nibble(9n) : Nibble}) |
-  ({c == 'A' : Char} & {d == nibble(10n) : Nibble}) |
-  ({c == 'B' : Char} & {d == nibble(11n) : Nibble}) |
-  ({c == 'C' : Char} & {d == nibble(12n) : Nibble}) |
-  ({c == 'D' : Char} & {d == nibble(13n) : Nibble}) |
-  ({c == 'E' : Char} & {d == nibble(14n) : Nibble}) |
-  ({c == 'F' : Char} & {d == nibble(15n) : Nibble})
+  v = Word.to_nat(4n, H.decode(digit))
+  ({c == '0' : Char} & {v == 0n : Nat}) |
+  ({c == '1' : Char} & {v == 1n : Nat}) |
+  ({c == '2' : Char} & {v == 2n : Nat}) |
+  ({c == '3' : Char} & {v == 3n : Nat}) |
+  ({c == '4' : Char} & {v == 4n : Nat}) |
+  ({c == '5' : Char} & {v == 5n : Nat}) |
+  ({c == '6' : Char} & {v == 6n : Nat}) |
+  ({c == '7' : Char} & {v == 7n : Nat}) |
+  ({c == '8' : Char} & {v == 8n : Nat}) |
+  ({c == '9' : Char} & {v == 9n : Nat}) |
+  ({c == 'A' : Char} & {v == 10n : Nat}) |
+  ({c == 'B' : Char} & {v == 11n : Nat}) |
+  ({c == 'C' : Char} & {v == 12n : Nat}) |
+  ({c == 'D' : Char} & {v == 13n : Nat}) |
+  ({c == 'E' : Char} & {v == 14n : Nat}) |
+  ({c == 'F' : Char} & {v == 15n : Nat})
 
 # A valid input to hex_u32 is a string of exactly eight characters,
 # each of which is a valid hexadecimal digit.
@@ -69,7 +60,9 @@ def digits_to_string(digits: +List<H.HexDigitChar>) -> String:
     case Con{digit, rest}:
       SCon{H.HexDigitChar.char(digit), digits_to_string(rest)}
 
-# Derive one nibble for each validated character, preserving order and length.
+# Convert a list of hexadecimal digit characters to a list of their
+# associated nibble values.
+
 def digits_to_nibbles(digits: +List<H.HexDigitChar>) -> +List<Nibble>:
   match digits:
     case Nil{}:
@@ -77,7 +70,6 @@ def digits_to_nibbles(digits: +List<H.HexDigitChar>) -> +List<Nibble>:
     case Con{digit, rest}:
       H.decode(digit) <> digits_to_nibbles(rest)
 
-# Accumulate hexadecimal digits from most significant to least significant.
 def hex_u32_value(nibbles: +List<Nibble>) -> U32:
   List.foldl(~&2, ~Nibble, ~U32,
     ~(acc => n => (acc * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)),

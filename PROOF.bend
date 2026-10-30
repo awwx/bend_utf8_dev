@@ -164,23 +164,23 @@ def Laws.is_hex_digit(c):
 # The decode law directly enumerates the possible character/value cases.
 def EnumeratedDecodeSpec(+digit: H.HexDigitChar) -> Type:
   c = H.HexDigitChar.char(digit)
-  d = H.decode(digit)
-  ({c == '0' : Char} & {d == Laws.nibble(0n) : Word(4n)}) |
-  ({c == '1' : Char} & {d == Laws.nibble(1n) : Word(4n)}) |
-  ({c == '2' : Char} & {d == Laws.nibble(2n) : Word(4n)}) |
-  ({c == '3' : Char} & {d == Laws.nibble(3n) : Word(4n)}) |
-  ({c == '4' : Char} & {d == Laws.nibble(4n) : Word(4n)}) |
-  ({c == '5' : Char} & {d == Laws.nibble(5n) : Word(4n)}) |
-  ({c == '6' : Char} & {d == Laws.nibble(6n) : Word(4n)}) |
-  ({c == '7' : Char} & {d == Laws.nibble(7n) : Word(4n)}) |
-  ({c == '8' : Char} & {d == Laws.nibble(8n) : Word(4n)}) |
-  ({c == '9' : Char} & {d == Laws.nibble(9n) : Word(4n)}) |
-  ({c == 'A' : Char} & {d == Laws.nibble(10n) : Word(4n)}) |
-  ({c == 'B' : Char} & {d == Laws.nibble(11n) : Word(4n)}) |
-  ({c == 'C' : Char} & {d == Laws.nibble(12n) : Word(4n)}) |
-  ({c == 'D' : Char} & {d == Laws.nibble(13n) : Word(4n)}) |
-  ({c == 'E' : Char} & {d == Laws.nibble(14n) : Word(4n)}) |
-  ({c == 'F' : Char} & {d == Laws.nibble(15n) : Word(4n)})
+  v = Word.to_nat(4n, H.decode(digit))
+  ({c == '0' : Char} & {v == 0n : Nat}) |
+  ({c == '1' : Char} & {v == 1n : Nat}) |
+  ({c == '2' : Char} & {v == 2n : Nat}) |
+  ({c == '3' : Char} & {v == 3n : Nat}) |
+  ({c == '4' : Char} & {v == 4n : Nat}) |
+  ({c == '5' : Char} & {v == 5n : Nat}) |
+  ({c == '6' : Char} & {v == 6n : Nat}) |
+  ({c == '7' : Char} & {v == 7n : Nat}) |
+  ({c == '8' : Char} & {v == 8n : Nat}) |
+  ({c == '9' : Char} & {v == 9n : Nat}) |
+  ({c == 'A' : Char} & {v == 10n : Nat}) |
+  ({c == 'B' : Char} & {v == 11n : Nat}) |
+  ({c == 'C' : Char} & {v == 12n : Nat}) |
+  ({c == 'D' : Char} & {v == 13n : Nat}) |
+  ({c == 'E' : Char} & {v == 14n : Nat}) |
+  ({c == 'F' : Char} & {v == 15n : Nat})
 
 # Bit-level case analysis proves the enumerated decode law.
 def DecodeSpec(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) -> Type:
