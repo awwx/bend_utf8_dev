@@ -375,3 +375,6 @@ def Laws.hex_u32(s, valid):
         H.hex_u32.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, v))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
       Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), H.hex_u32.false_true(valid))
+
+def Laws.example_zero():
+  {==}

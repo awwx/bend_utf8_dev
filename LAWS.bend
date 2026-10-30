@@ -85,3 +85,6 @@ law hex_u32:
   {List.length(&2, H.HexDigitChar, digits) == 8n : Nat} &
   {s == digits_to_string(digits) : String} &
   {H.hex_u32(s, valid) == nibble_list_value(digits_to_nibbles(digits)) : U32}
+
+law example_zero:
+  {H.hex_u32("00000000", {==}) == 0 : U32}
