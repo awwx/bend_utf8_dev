@@ -70,14 +70,14 @@ def digits_to_nibbles(digits: +List<H.HexDigitChar>) -> +List<Nibble>:
     case Con{digit, rest}:
       H.decode(digit) <> digits_to_nibbles(rest)
 
-def hex_u32_value(nibbles: +List<Nibble>) -> U32:
+def nibble_list_value(nibbles: +List<Nibble>) -> U32:
   List.foldl(~&2, ~Nibble, ~U32,
     ~(acc => n => (acc * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)),
     nibbles, 0)
 
 # The derived nibble list has the stated numeric value.
 def HexDigitsValue(result: U32, digits: +List<H.HexDigitChar>) -> Type:
-  {result == hex_u32_value(digits_to_nibbles(digits)) : U32}
+  {result == nibble_list_value(digits_to_nibbles(digits)) : U32}
 
 # One list of exactly eight characters witnesses both spelling and value.
 def HexU32Result(+s: String, result: U32) -> Type:
