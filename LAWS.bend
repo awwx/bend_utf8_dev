@@ -2,7 +2,7 @@ import Base
 import ./hexdigits.bend as H
 
 # The complete set of accepted hexadecimal characters.
-def hex_digits() -> List<&2, Char>:
+def hex_digits() -> +List<Char>:
   ['0', '1', '2', '3', '4', '5', '6', '7',
    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F']
 
