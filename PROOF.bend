@@ -2,26 +2,9 @@ import Base
 import ./LAWS.bend as Laws
 import ./hexdigits.bend as H
 
-# State the enumerated specification as a type for the bit-level lemma.
+# State the membership specification as a type for the bit-level lemma.
 def HexDigitSpec(+c: Char) -> Type:
-  {H.is_hex_digit(c) == (
-    Char.is_eq(c, '0') ||
-    Char.is_eq(c, '1') ||
-    Char.is_eq(c, '2') ||
-    Char.is_eq(c, '3') ||
-    Char.is_eq(c, '4') ||
-    Char.is_eq(c, '5') ||
-    Char.is_eq(c, '6') ||
-    Char.is_eq(c, '7') ||
-    Char.is_eq(c, '8') ||
-    Char.is_eq(c, '9') ||
-    Char.is_eq(c, 'A') ||
-    Char.is_eq(c, 'B') ||
-    Char.is_eq(c, 'C') ||
-    Char.is_eq(c, 'D') ||
-    Char.is_eq(c, 'E') ||
-    Char.is_eq(c, 'F')
-  ) : Bool}
+  {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, Laws.hex_digits(), c) : Bool}
 
 # Most-significant bits come first, matching Bend's binder order.
 def char_from_bits(
@@ -173,7 +156,7 @@ def hex_digit_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b
         case True{} True{} _ _ _ _ _:
           {==}
 
-def Laws.is_hex_digit_spec(c):
+def Laws.is_hex_digit(c):
   match c:
     case Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       hex_digit_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)

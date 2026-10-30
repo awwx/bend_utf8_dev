@@ -1,27 +1,15 @@
 import Base
 import ./hexdigits.bend as H
 
-# Exactly the sixteen uppercase hexadecimal digits are accepted.
-law is_hex_digit_spec:
+# The complete set of accepted hexadecimal characters.
+def hex_digits() -> List<&2, Char>:
+  ['0', '1', '2', '3', '4', '5', '6', '7',
+   '8', '9', 'A', 'B', 'C', 'D', 'E', 'F']
+
+# A character is hexadecimal exactly when it occurs in hex_digits.
+law is_hex_digit:
   for +c: Char
-  {H.is_hex_digit(c) == (
-    Char.is_eq(c, '0') ||
-    Char.is_eq(c, '1') ||
-    Char.is_eq(c, '2') ||
-    Char.is_eq(c, '3') ||
-    Char.is_eq(c, '4') ||
-    Char.is_eq(c, '5') ||
-    Char.is_eq(c, '6') ||
-    Char.is_eq(c, '7') ||
-    Char.is_eq(c, '8') ||
-    Char.is_eq(c, '9') ||
-    Char.is_eq(c, 'A') ||
-    Char.is_eq(c, 'B') ||
-    Char.is_eq(c, 'C') ||
-    Char.is_eq(c, 'D') ||
-    Char.is_eq(c, 'E') ||
-    Char.is_eq(c, 'F')
-  ) : Bool}
+  {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, hex_digits(), c) : Bool}
 
 # Bool.pick(U32, condition, yes, no) expresses each conditional.
 # With valid input, the final else branch can only be 'F', whose value is 15.
