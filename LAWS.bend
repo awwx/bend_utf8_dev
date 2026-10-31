@@ -128,11 +128,6 @@ law binary_byte:
   {B.binary_byte(s, valid) == bit_list_value(bits) : U32} &
   {U32.is_le(B.binary_byte(s, valid), 255) == True{} : Bool}
 
-def valid_utf8_one_byte(b1: U32) -> Bool:
-  U32.is_lt(b1, 128)
-
-# def valid_utf8_two_bytes(b1: U32, b2: U32) -> Bool:
-
 # A well-formed mask contains exactly eight symbols from this alphabet.
 law is_valid_byte_mask:
   for +mask: String
@@ -175,3 +170,11 @@ law byte_mask_examples:
   {B.byte_mask("xxxxxxxx", 256, {==}) == False{} : Bool} &
   {B.byte_mask("10000001", 129, {==}) == True{} : Bool} &
   {B.byte_mask("10000001", 128, {==}) == False{} : Bool}
+
+def valid_utf8_one_byte(b1: U32) -> Bool:
+  B.byte_mask("0xxxxxxx", b1, {==})
+
+law valid_utf8_one_byte_examples:
+  {valid_utf8_one_byte(0) == True{} : Bool}
+
+# def valid_utf8_two_bytes(b1: U32, b2: U32) -> Bool:

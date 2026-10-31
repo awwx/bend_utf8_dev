@@ -897,3 +897,6 @@ def Laws.byte_mask(mask, byte, valid):
 
 def Laws.byte_mask_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==})
+
+def Laws.valid_utf8_one_byte_examples():
+  {==}
