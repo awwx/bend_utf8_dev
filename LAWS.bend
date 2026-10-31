@@ -175,6 +175,8 @@ def valid_utf8_one_byte(b1: U32) -> Bool:
   B.byte_mask("0xxxxxxx", b1, {==})
 
 law valid_utf8_one_byte_examples:
-  {valid_utf8_one_byte(0) == True{} : Bool}
+  {valid_utf8_one_byte(0) == True{} : Bool} &
+  {valid_utf8_one_byte(127) == True{} : Bool} &
+  {valid_utf8_one_byte(128) == False{} : Bool}
 
 # def valid_utf8_two_bytes(b1: U32, b2: U32) -> Bool:
