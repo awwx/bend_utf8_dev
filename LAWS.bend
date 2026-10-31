@@ -90,11 +90,6 @@ law hex_u32:
 law example_zero:
   {H.hex_u32("00000000", {==}) == 0 : U32}
 
-def valid_utf8_one_byte(b1: U32) -> Bool:
-  U32.is_lt(b1, 128)
-
-# def valid_utf8_two_bytes(b1: U32, b2: U32) -> Bool:
-
 # The complete set of accepted binary characters.
 def binary_digits() -> +List<Char>:
   ['0', '1']
@@ -132,3 +127,8 @@ law binary_byte:
   {s == bits_to_string(bits) : String} &
   {B.binary_byte(s, valid) == bit_list_value(bits) : U32} &
   {U32.is_le(B.binary_byte(s, valid), 255) == True{} : Bool}
+
+def valid_utf8_one_byte(b1: U32) -> Bool:
+  U32.is_lt(b1, 128)
+
+# def valid_utf8_two_bytes(b1: U32, b2: U32) -> Bool:
