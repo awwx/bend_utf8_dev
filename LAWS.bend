@@ -132,3 +132,46 @@ def valid_utf8_one_byte(b1: U32) -> Bool:
   U32.is_lt(b1, 128)
 
 # def valid_utf8_two_bytes(b1: U32, b2: U32) -> Bool:
+
+# A well-formed mask contains exactly eight symbols from this alphabet.
+law is_valid_byte_mask:
+  for +mask: String
+  {B.is_valid_byte_mask(mask) == (
+    Nat.is_eq(String.length(mask), 8n) &&
+    List.all(~&2, ~Char,
+      ~(c => Char.is_eq(c, '0') || Char.is_eq(c, '1') || Char.is_eq(c, 'x')),
+      String.to_list(mask))) : Bool}
+
+# Independent specification: pair each textual position with its bit weight.
+# Both sequences must end together. An x accepts either bit value, while a
+# literal accepts precisely its requested value. No implementation helpers used.
+def mask_positions(mask: String, weights: +List<U32>, +byte: U32) -> Bool:
+  match mask weights:
+    case SNil{} Nil{}:
+      True{}
+    case SCon{+c, rest} Con{+weight, tail}:
+      (Char.is_eq(c, 'x') ||
+       (Char.is_eq(c, '0') && U32.is_eq(U32.and(byte, weight), 0)) ||
+       (Char.is_eq(c, '1') && U32.is_eq(U32.and(byte, weight), weight))) &&
+      mask_positions(rest, tail, byte)
+    case _ _:
+      False{}
+
+# This specifies the result for every well-formed mask and every U32 byte
+# argument, including rejection of out-of-range numbers. First position = bit 7.
+law byte_mask:
+  for +mask: String
+  for +byte: U32
+  for valid: {B.is_valid_byte_mask(mask) == True{} : Bool}
+  {B.byte_mask(mask, byte, valid) ==
+    (U32.is_le(byte, 255) &&
+     mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
+
+law byte_mask_examples:
+  {B.byte_mask("01xxxxxx", 64, {==}) == True{} : Bool} &
+  {B.byte_mask("01xxxxxx", 127, {==}) == True{} : Bool} &
+  {B.byte_mask("01xxxxxx", 128, {==}) == False{} : Bool} &
+  {B.byte_mask("xxxxxxxx", 255, {==}) == True{} : Bool} &
+  {B.byte_mask("xxxxxxxx", 256, {==}) == False{} : Bool} &
+  {B.byte_mask("10000001", 129, {==}) == True{} : Bool} &
+  {B.byte_mask("10000001", 128, {==}) == False{} : Bool}
