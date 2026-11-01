@@ -13,34 +13,51 @@ def hex_digits() -> +List<Char>:
   ['0', '1', '2', '3', '4', '5', '6', '7',
    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F']
 
-# A character is a hexadecimal digit when it is present in the hex_digits list.
+# Independent character domain and hexadecimal decoding table.
+def is_hex_digit_spec(c: Char) -> Bool:
+  List.contains(~Char, ~Char.is_eq, hex_digits(), c)
+
 law is_hex_digit:
   for +c: Char
-  {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, hex_digits(), c) : Bool}
+  {H.is_hex_digit(c) == is_hex_digit_spec(c) : Bool}
 
-# For each valid input hexadecimal digit character, directly specify
-# the output nibble value.
+# The low four bits represent a nibble, least significant bit first.
+def nibble_spec(value: U32) -> Nibble():
+  match value:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, rest}}}}}:
+      WCon{b0, WCon{b1, WCon{b2, WCon{b3, WNil{}}}}}
 
+def decode_spec(c: Char) -> Maybe<&2, Nibble()>:
+  match c:
+    case '0': Some{nibble_spec(0)}
+    case '1': Some{nibble_spec(1)}
+    case '2': Some{nibble_spec(2)}
+    case '3': Some{nibble_spec(3)}
+    case '4': Some{nibble_spec(4)}
+    case '5': Some{nibble_spec(5)}
+    case '6': Some{nibble_spec(6)}
+    case '7': Some{nibble_spec(7)}
+    case '8': Some{nibble_spec(8)}
+    case '9': Some{nibble_spec(9)}
+    case 'A': Some{nibble_spec(10)}
+    case 'B': Some{nibble_spec(11)}
+    case 'C': Some{nibble_spec(12)}
+    case 'D': Some{nibble_spec(13)}
+    case 'E': Some{nibble_spec(14)}
+    case 'F': Some{nibble_spec(15)}
+    case _: None{}
+
+# Used only for valid digits in the multi-digit reference calculation.
+def decode_value_spec(c: Char) -> Nibble():
+  Maybe.default(&2, Nibble(), decode_spec(c), Word.zero(4n))
+
+# Every character accepted by the specification must be accepted and decoded
+# correctly by the implementation, regardless of its packaged input type.
 law decode:
-  for +digit: H.HexDigitChar
-  c = H.HexDigitChar.char(digit)
-  v = Word.to_nat(4n, H.decode(digit))
-  ({c == '0' : Char} & {v == 0n : Nat}) |
-  ({c == '1' : Char} & {v == 1n : Nat}) |
-  ({c == '2' : Char} & {v == 2n : Nat}) |
-  ({c == '3' : Char} & {v == 3n : Nat}) |
-  ({c == '4' : Char} & {v == 4n : Nat}) |
-  ({c == '5' : Char} & {v == 5n : Nat}) |
-  ({c == '6' : Char} & {v == 6n : Nat}) |
-  ({c == '7' : Char} & {v == 7n : Nat}) |
-  ({c == '8' : Char} & {v == 8n : Nat}) |
-  ({c == '9' : Char} & {v == 9n : Nat}) |
-  ({c == 'A' : Char} & {v == 10n : Nat}) |
-  ({c == 'B' : Char} & {v == 11n : Nat}) |
-  ({c == 'C' : Char} & {v == 12n : Nat}) |
-  ({c == 'D' : Char} & {v == 13n : Nat}) |
-  ({c == 'E' : Char} & {v == 14n : Nat}) |
-  ({c == 'F' : Char} & {v == 15n : Nat})
+  for +c: Char
+  for valid: {is_hex_digit_spec(c) == True{} : Bool}
+  exs accepted: {H.is_hex_digit(c) == True{} : Bool}
+  {Some{H.decode(H.HexDigitChar{c, accepted})} == decode_spec(c) : Maybe<&2, Nibble()>}
 
 # A valid input to hex_u32 is a string of exactly eight characters,
 # each of which is a valid hexadecimal digit.
@@ -68,8 +85,8 @@ def digits_to_nibbles(digits: +List<H.HexDigitChar>) -> +List<Nibble>:
   match digits:
     case Nil{}:
       Nil{}
-    case Con{digit, rest}:
-      H.decode(digit) <> digits_to_nibbles(rest)
+    case Con{H.HexDigitChar{c, valid}, rest}:
+      decode_value_spec(c) <> digits_to_nibbles(rest)
 
 def nibble_list_value(nibbles: +List<Nibble>) -> U32:
   List.foldl(~&2, ~Nibble, ~U32,

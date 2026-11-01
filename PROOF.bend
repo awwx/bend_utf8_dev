@@ -243,30 +243,9 @@ def Laws.is_hex_digit(c):
     case Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       hex_digit_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
 
-# The decode law directly enumerates the possible character/value cases.
-def EnumeratedDecodeSpec(+digit: H.HexDigitChar) -> Type:
-  c = H.HexDigitChar.char(digit)
-  v = Word.to_nat(4n, H.decode(digit))
-  ({c == '0' : Char} & {v == 0n : Nat}) |
-  ({c == '1' : Char} & {v == 1n : Nat}) |
-  ({c == '2' : Char} & {v == 2n : Nat}) |
-  ({c == '3' : Char} & {v == 3n : Nat}) |
-  ({c == '4' : Char} & {v == 4n : Nat}) |
-  ({c == '5' : Char} & {v == 5n : Nat}) |
-  ({c == '6' : Char} & {v == 6n : Nat}) |
-  ({c == '7' : Char} & {v == 7n : Nat}) |
-  ({c == '8' : Char} & {v == 8n : Nat}) |
-  ({c == '9' : Char} & {v == 9n : Nat}) |
-  ({c == 'A' : Char} & {v == 10n : Nat}) |
-  ({c == 'B' : Char} & {v == 11n : Nat}) |
-  ({c == 'C' : Char} & {v == 12n : Nat}) |
-  ({c == 'D' : Char} & {v == 13n : Nat}) |
-  ({c == 'E' : Char} & {v == 14n : Nat}) |
-  ({c == 'F' : Char} & {v == 15n : Nat})
-
-# Bit-level case analysis proves the enumerated decode law.
+# Compare every implemented digit conversion with the independent table.
 def DecodeSpec(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) -> Type:
-  EnumeratedDecodeSpec(H.HexDigitChar{c, valid})
+  {Some{H.decode(H.HexDigitChar{c, valid})} == Laws.decode_spec(c) : Maybe<&2, Laws.Nibble()>}
 
 law decode_bits:
   for +b31: Bool
@@ -363,25 +342,25 @@ def decode_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19,
         case False{} True{} False{} _ _ _ _:
           Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
         case False{} True{} True{} False{} False{} False{} False{}:
-          Inl{({==}, {==})}
+          {==}
         case False{} True{} True{} False{} False{} False{} True{}:
-          Inr{Inl{({==}, {==})}}
+          {==}
         case False{} True{} True{} False{} False{} True{} False{}:
-          Inr{Inr{Inl{({==}, {==})}}}
+          {==}
         case False{} True{} True{} False{} False{} True{} True{}:
-          Inr{Inr{Inr{Inl{({==}, {==})}}}}
+          {==}
         case False{} True{} True{} False{} True{} False{} False{}:
-          Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}
+          {==}
         case False{} True{} True{} False{} True{} False{} True{}:
-          Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}
+          {==}
         case False{} True{} True{} False{} True{} True{} False{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}
+          {==}
         case False{} True{} True{} False{} True{} True{} True{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}
+          {==}
         case False{} True{} True{} True{} False{} False{} False{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}}
+          {==}
         case False{} True{} True{} True{} False{} False{} True{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}}}
+          {==}
         case False{} True{} True{} True{} False{} True{} _:
           Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
         case False{} True{} True{} True{} True{} _ _:
@@ -389,17 +368,17 @@ def decode_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19,
         case True{} False{} False{} False{} False{} False{} False{}:
           Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
         case True{} False{} False{} False{} False{} False{} True{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}}}}
+          {==}
         case True{} False{} False{} False{} False{} True{} False{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}}}}}
+          {==}
         case True{} False{} False{} False{} False{} True{} True{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}}}}}}
+          {==}
         case True{} False{} False{} False{} True{} False{} False{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}}}}}}}
+          {==}
         case True{} False{} False{} False{} True{} False{} True{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inl{({==}, {==})}}}}}}}}}}}}}}}
+          {==}
         case True{} False{} False{} False{} True{} True{} False{}:
-          Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{Inr{({==}, {==})}}}}}}}}}}}}}}}
+          {==}
         case True{} False{} False{} False{} True{} True{} True{}:
           Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
         case True{} False{} False{} True{} _ _ _:
@@ -409,10 +388,20 @@ def decode_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19,
         case True{} True{} _ _ _ _ _:
           Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
 
-def Laws.decode(digit):
-  match digit:
-    case H.HexDigitChar{Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, valid}:
+def decode_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) -> DecodeSpec(c, valid):
+  match c:
+    case Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       decode_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
+
+def Laws.decode(c, valid):
+  +accepted = Equal.trans(Bool, H.is_hex_digit(c), Laws.is_hex_digit_spec(c), True{}, Laws.is_hex_digit(c), valid)
+  (accepted, decode_agrees(c, accepted))
+
+def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) ->
+  {H.decode(H.HexDigitChar{c, valid}) == Laws.decode_value_spec(c) : Laws.Nibble()}:
+  Equal.cong(Maybe<&2, Laws.Nibble()>, Laws.Nibble(),
+    result => Maybe.default(&2, Laws.Nibble(), result, Word.zero(4n)),
+    Some{H.decode(H.HexDigitChar{c, valid})}, Laws.decode_spec(c), decode_agrees(c, valid))
 
 def Laws.is_valid_hex_u32_input(s):
   {==}
@@ -423,15 +412,32 @@ def HexU32Spec(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> T
   {s == Laws.digits_to_string(digits) : String} &
   {H.hex_u32(s, valid) == Laws.nibble_list_value(Laws.digits_to_nibbles(digits)) : U32}
 
+
+def hex_u32.reference_values(+c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
+  valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
+  proofs: {H.is_hex_digit(c1) == True{} : Bool} & {H.is_hex_digit(c2) == True{} : Bool} & {H.is_hex_digit(c3) == True{} : Bool} & {H.is_hex_digit(c4) == True{} : Bool} & {H.is_hex_digit(c5) == True{} : Bool} & {H.is_hex_digit(c6) == True{} : Bool} & {H.is_hex_digit(c7) == True{} : Bool} & {H.is_hex_digit(c8) == True{} : Bool}) ->
+  {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([Laws.decode_value_spec(c1), Laws.decode_value_spec(c2), Laws.decode_value_spec(c3), Laws.decode_value_spec(c4), Laws.decode_value_spec(c5), Laws.decode_value_spec(c6), Laws.decode_value_spec(c7), Laws.decode_value_spec(c8)]) : U32}:
+  match proofs:
+    case (p1, p2, p3, p4, p5, p6, p7, p8):
+      %decode_value_agrees(c1, p1) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([_, Laws.decode_value_spec(c2), Laws.decode_value_spec(c3), Laws.decode_value_spec(c4), Laws.decode_value_spec(c5), Laws.decode_value_spec(c6), Laws.decode_value_spec(c7), Laws.decode_value_spec(c8)]) : U32}
+      %decode_value_agrees(c2, p2) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), _, Laws.decode_value_spec(c3), Laws.decode_value_spec(c4), Laws.decode_value_spec(c5), Laws.decode_value_spec(c6), Laws.decode_value_spec(c7), Laws.decode_value_spec(c8)]) : U32}
+      %decode_value_agrees(c3, p3) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), _, Laws.decode_value_spec(c4), Laws.decode_value_spec(c5), Laws.decode_value_spec(c6), Laws.decode_value_spec(c7), Laws.decode_value_spec(c8)]) : U32}
+      %decode_value_agrees(c4, p4) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), _, Laws.decode_value_spec(c5), Laws.decode_value_spec(c6), Laws.decode_value_spec(c7), Laws.decode_value_spec(c8)]) : U32}
+      %decode_value_agrees(c5, p5) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), _, Laws.decode_value_spec(c6), Laws.decode_value_spec(c7), Laws.decode_value_spec(c8)]) : U32}
+      %decode_value_agrees(c6, p6) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), H.decode(H.HexDigitChar{c5, p5}), _, Laws.decode_value_spec(c7), Laws.decode_value_spec(c8)]) : U32}
+      %decode_value_agrees(c7, p7) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), H.decode(H.HexDigitChar{c5, p5}), H.decode(H.HexDigitChar{c6, p6}), _, Laws.decode_value_spec(c8)]) : U32}
+      %decode_value_agrees(c8, p8) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == Laws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), H.decode(H.HexDigitChar{c5, p5}), H.decode(H.HexDigitChar{c6, p6}), H.decode(H.HexDigitChar{c7, p7}), _]) : U32}
+      {==}
+
 def hex_u32_complete(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
+  +valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
   proofs: {H.is_hex_digit(c1) == True{} : Bool} & {H.is_hex_digit(c2) == True{} : Bool} & {H.is_hex_digit(c3) == True{} : Bool} & {H.is_hex_digit(c4) == True{} : Bool} & {H.is_hex_digit(c5) == True{} : Bool} & {H.is_hex_digit(c6) == True{} : Bool} & {H.is_hex_digit(c7) == True{} : Bool} & {H.is_hex_digit(c8) == True{} : Bool}
 ) -> HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
   match proofs:
     case (p1, p2, p3, p4, p5, p6, p7, p8):
       ([H.HexDigitChar{c1, p1}, H.HexDigitChar{c2, p2}, H.HexDigitChar{c3, p3}, H.HexDigitChar{c4, p4}, H.HexDigitChar{c5, p5}, H.HexDigitChar{c6, p6}, H.HexDigitChar{c7, p7}, H.HexDigitChar{c8, p8}],
-       ({==}, {==}, {==}))
+       ({==}, {==}, hex_u32.reference_values(c1, c2, c3, c4, c5, c6, c7, c8, valid, H.hex_u32.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, valid))))
 
 def Laws.hex_u32(s, valid):
   match s:
