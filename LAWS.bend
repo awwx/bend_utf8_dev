@@ -106,12 +106,17 @@ law is_valid_binary_byte_input:
   ) : Bool}
 
 # Bool represents a single binary digit: False is '0', True is '1'.
+def bit_to_char(bit: Bool) -> Char:
+  match bit:
+    case False{}: '0'
+    case True{}: '1'
+
 def bits_to_string(bits: +List<Bool>) -> String:
   match bits:
     case Nil{}:
       SNil{}
     case Con{bit, rest}:
-      SCon{B.bit_to_char(bit), bits_to_string(rest)}
+      SCon{bit_to_char(bit), bits_to_string(rest)}
 
 # Read the bits most significant first, as in "10000000" = 128.
 def bit_list_value(bits: +List<Bool>) -> U32:

@@ -477,7 +477,7 @@ def Laws.is_valid_binary_byte_input(s):
 
 # A valid binary character is recovered from its decoded bit.
 def BinaryCharSpec(+c: Char, valid: {B.is_binary_digit(c) == True{} : Bool}) -> Type:
-  {c == B.bit_to_char(B.char_to_bit(c)) : Char}
+  {c == Laws.bit_to_char(B.char_to_bit(c)) : Char}
 
 law binary_char_bits:
   for +b31: Bool
@@ -893,19 +893,19 @@ def binary_byte.spells(
   match proofs:
     case (p1, p2, p3, p4, p5, p6, p7, p8):
       e8 = binary_char_roundtrip(c8, p8)
-      %e8 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{B.bit_to_char(B.char_to_bit(c1)), SCon{B.bit_to_char(B.char_to_bit(c2)), SCon{B.bit_to_char(B.char_to_bit(c3)), SCon{B.bit_to_char(B.char_to_bit(c4)), SCon{B.bit_to_char(B.char_to_bit(c5)), SCon{B.bit_to_char(B.char_to_bit(c6)), SCon{B.bit_to_char(B.char_to_bit(c7)), SCon{_, SNil{}}}}}}}}} : String}
+      %e8 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{Laws.bit_to_char(B.char_to_bit(c5)), SCon{Laws.bit_to_char(B.char_to_bit(c6)), SCon{Laws.bit_to_char(B.char_to_bit(c7)), SCon{_, SNil{}}}}}}}}} : String}
       e7 = binary_char_roundtrip(c7, p7)
-      %e7 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{B.bit_to_char(B.char_to_bit(c1)), SCon{B.bit_to_char(B.char_to_bit(c2)), SCon{B.bit_to_char(B.char_to_bit(c3)), SCon{B.bit_to_char(B.char_to_bit(c4)), SCon{B.bit_to_char(B.char_to_bit(c5)), SCon{B.bit_to_char(B.char_to_bit(c6)), SCon{_, SCon{c8, SNil{}}}}}}}}} : String}
+      %e7 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{Laws.bit_to_char(B.char_to_bit(c5)), SCon{Laws.bit_to_char(B.char_to_bit(c6)), SCon{_, SCon{c8, SNil{}}}}}}}}} : String}
       e6 = binary_char_roundtrip(c6, p6)
-      %e6 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{B.bit_to_char(B.char_to_bit(c1)), SCon{B.bit_to_char(B.char_to_bit(c2)), SCon{B.bit_to_char(B.char_to_bit(c3)), SCon{B.bit_to_char(B.char_to_bit(c4)), SCon{B.bit_to_char(B.char_to_bit(c5)), SCon{_, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %e6 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{Laws.bit_to_char(B.char_to_bit(c5)), SCon{_, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       e5 = binary_char_roundtrip(c5, p5)
-      %e5 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{B.bit_to_char(B.char_to_bit(c1)), SCon{B.bit_to_char(B.char_to_bit(c2)), SCon{B.bit_to_char(B.char_to_bit(c3)), SCon{B.bit_to_char(B.char_to_bit(c4)), SCon{_, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %e5 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{_, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       e4 = binary_char_roundtrip(c4, p4)
-      %e4 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{B.bit_to_char(B.char_to_bit(c1)), SCon{B.bit_to_char(B.char_to_bit(c2)), SCon{B.bit_to_char(B.char_to_bit(c3)), SCon{_, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %e4 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{_, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       e3 = binary_char_roundtrip(c3, p3)
-      %e3 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{B.bit_to_char(B.char_to_bit(c1)), SCon{B.bit_to_char(B.char_to_bit(c2)), SCon{_, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %e3 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{_, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       e2 = binary_char_roundtrip(c2, p2)
-      %e2 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{B.bit_to_char(B.char_to_bit(c1)), SCon{_, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %e2 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{_, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       e1 = binary_char_roundtrip(c1, p1)
       %e1 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{_, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       {==}
