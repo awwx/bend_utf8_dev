@@ -2,6 +2,7 @@ import Base
 import ./LAWS.bend as Laws
 import ./hexdigits.bend as H
 import ./binary.bend as B
+import ./utf8.bend as UTF8
 
 # State the membership specification as a type for the bit-level lemma.
 def HexDigitSpec(+c: Char) -> Type:
@@ -1004,8 +1005,8 @@ def utf8_proof.mask_codepoint(+low: Word(6n), +high: Word(5n)) ->
     word_mask_fields(6n, low, 26n, word_join(5n, high, 21n, Word.zero(21n))))
 
 def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
-  valid: {B.utf8.can_encode_two(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
-  {B.utf8.first(B.utf8.encode_two(utf8_proof.codepoint(low, high), valid)) == utf8_proof.first_byte(high) : U32}:
+  valid: {UTF8.can_encode_two(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
+  {UTF8.first(UTF8.encode_two(utf8_proof.codepoint(low, high), valid)) == utf8_proof.first_byte(high) : U32}:
   match low high:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}:
       Equal.cong(Word(32n), U32, x => U32{x},
@@ -1014,8 +1015,8 @@ def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
         word_add_fields(5n, high, 27n, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}))
 
 def utf8_proof.encode_second(+low: Word(6n), +high: Word(5n),
-  valid: {B.utf8.can_encode_two(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
-  {B.utf8.second(B.utf8.encode_two(utf8_proof.codepoint(low, high), valid)) == utf8_proof.second_byte(low) : U32}:
+  valid: {UTF8.can_encode_two(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
+  {UTF8.second(UTF8.encode_two(utf8_proof.codepoint(low, high), valid)) == utf8_proof.second_byte(low) : U32}:
   Equal.trans(U32,
     (128 + U32.and(utf8_proof.codepoint(low, high), 63) : U32),
     (128 + U32{word_join(6n, low, 26n, Word.zero(26n))} : U32), utf8_proof.second_byte(low),
@@ -1038,7 +1039,7 @@ def utf8_proof.mask_second(+low: Word(6n)) ->
     word_join(6n, low, 26n, Word.zero(26n)), word_mask_fields(6n, low, 26n, WCon{False{}, WCon{True{}, Word.zero(24n)}}))
 
 def utf8_proof.decode_fields(+low: Word(6n), +high: Word(5n)) ->
-  {B.utf8.decode_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)) == utf8_proof.codepoint(low, high) : U32}:
+  {UTF8.decode_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)) == utf8_proof.codepoint(low, high) : U32}:
   match low high:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}:
       %Equal.sym(U32, U32.and(utf8_proof.first_byte(high), 31), U32{word_join(5n, high, 27n, Word.zero(27n))}, utf8_proof.mask_first(high)) : {(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(_)))))) + U32.and(utf8_proof.second_byte(low), 63) : U32) == utf8_proof.codepoint(low, high) : U32}
@@ -1158,8 +1159,8 @@ def utf8_proof.second_byte_facts(+low: Word(6n)) ->
 
 # Compare high bits first; inspect the low bits only at the 127/128 boundary.
 def utf8_proof.threshold_bits(+b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) ->
-  {B.utf8.can_encode_one(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}})) == utf8_proof.fits_one_byte(WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}) : Bool} &
-  {Bool.not(B.utf8.can_encode_one(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}))) == U32.is_ge(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}), 128) : Bool}:
+  {UTF8.can_encode_one(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}})) == utf8_proof.fits_one_byte(WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}) : Bool} &
+  {Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}))) == U32.is_ge(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}), 128) : Bool}:
   match b10 b9 b8 b7 b6 b5 b4 b3 b2 b1 b0:
     case True{} _ _ _ _ _ _ _ _ _ _: ({==}, {==})
     case False{} True{} _ _ _ _ _ _ _ _ _: ({==}, {==})
@@ -1195,37 +1196,37 @@ def bool_and_equal(+a: Bool, +b: Bool, +x: Bool, +y: Bool,
 def utf8_proof.shape_from_masks(+b1: U32, +b2: U32,
   first: {B.byte_mask("110xxxxx", b1, {==}) == True{} : Bool},
   second: {B.byte_mask("10xxxxxx", b2, {==}) == True{} : Bool}) ->
-  {B.utf8.two_byte_shape(b1, b2) == True{} : Bool}:
+  {UTF8.two_byte_shape(b1, b2) == True{} : Bool}:
   bool_and_equal(B.byte_mask("110xxxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), True{}, True{}, first, second)
 
 def utf8_proof.overlong_from_facts(+cp: U32, +b1: U32, +b2: U32,
-  shape: {B.utf8.two_byte_shape(b1, b2) == True{} : Bool},
-  decoded: {B.utf8.decode_two(b1, b2) == cp : U32}) ->
-  {B.utf8.overlong_two(b1, b2) == B.utf8.can_encode_one(cp) : Bool}:
-  %decoded : {B.utf8.overlong_two(b1, b2) == B.utf8.can_encode_one(_) : Bool}
-  %shape : {B.utf8.overlong_two(b1, b2) == (_ && B.utf8.can_encode_one(B.utf8.decode_two(b1, b2))) : Bool}
+  shape: {UTF8.two_byte_shape(b1, b2) == True{} : Bool},
+  decoded: {UTF8.decode_two(b1, b2) == cp : U32}) ->
+  {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool}:
+  %decoded : {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(_) : Bool}
+  %shape : {UTF8.overlong_two(b1, b2) == (_ && UTF8.can_encode_one(UTF8.decode_two(b1, b2))) : Bool}
   {==}
 
 def utf8_proof.valid_from_facts(+cp: U32, +b1: U32, +b2: U32,
-  shape: {B.utf8.two_byte_shape(b1, b2) == True{} : Bool},
-  overlong: {B.utf8.overlong_two(b1, b2) == B.utf8.can_encode_one(cp) : Bool}) ->
-  {B.utf8.valid_two(b1, b2) == Bool.not(B.utf8.can_encode_one(cp)) : Bool}:
-  %overlong : {B.utf8.valid_two(b1, b2) == Bool.not(_) : Bool}
-  %shape : {B.utf8.valid_two(b1, b2) == (_ && Bool.not(B.utf8.overlong_two(b1, b2))) : Bool}
+  shape: {UTF8.two_byte_shape(b1, b2) == True{} : Bool},
+  overlong: {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool}) ->
+  {UTF8.valid_two(b1, b2) == Bool.not(UTF8.can_encode_one(cp)) : Bool}:
+  %overlong : {UTF8.valid_two(b1, b2) == Bool.not(_) : Bool}
+  %shape : {UTF8.valid_two(b1, b2) == (_ && Bool.not(UTF8.overlong_two(b1, b2))) : Bool}
   {==}
 
 def utf8_proof.range_from_facts(+low: Word(6n), +high: Word(5n),
   first: {(U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) == Bool.not(utf8_proof.fits_one_byte(high)) : Bool},
   second: {(U32.is_ge(utf8_proof.second_byte(low), 128) && U32.is_le(utf8_proof.second_byte(low), 191)) == True{} : Bool},
-  small: {B.utf8.can_encode_one(utf8_proof.codepoint(low, high)) == utf8_proof.fits_one_byte(high) : Bool}) ->
-  {Bool.not(B.utf8.can_encode_one(utf8_proof.codepoint(low, high))) ==
+  small: {UTF8.can_encode_one(utf8_proof.codepoint(low, high)) == utf8_proof.fits_one_byte(high) : Bool}) ->
+  {Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(low, high))) ==
     ((U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) &&
      (U32.is_ge(utf8_proof.second_byte(low), 128) && U32.is_le(utf8_proof.second_byte(low), 191))) : Bool}:
   Equal.trans(Bool,
-    Bool.not(B.utf8.can_encode_one(utf8_proof.codepoint(low, high))), Bool.not(utf8_proof.fits_one_byte(high)),
+    Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(low, high))), Bool.not(utf8_proof.fits_one_byte(high)),
     ((U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) &&
      (U32.is_ge(utf8_proof.second_byte(low), 128) && U32.is_le(utf8_proof.second_byte(low), 191))),
-    Equal.cong(Bool, Bool, Bool.not, B.utf8.can_encode_one(utf8_proof.codepoint(low, high)), utf8_proof.fits_one_byte(high), small),
+    Equal.cong(Bool, Bool, Bool.not, UTF8.can_encode_one(utf8_proof.codepoint(low, high)), utf8_proof.fits_one_byte(high), small),
     Equal.sym(Bool,
       ((U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) &&
        (U32.is_ge(utf8_proof.second_byte(low), 128) && U32.is_le(utf8_proof.second_byte(low), 191))), Bool.not(utf8_proof.fits_one_byte(high)),
@@ -1239,11 +1240,11 @@ def utf8_proof.range_from_facts(+low: Word(6n), +high: Word(5n),
           Bool.not(utf8_proof.fits_one_byte(high)), True{}, first, second), bool_and_true(Bool.not(utf8_proof.fits_one_byte(high))))))
 
 def Utf8RoundtripSpec(+cp: U32, +b1: U32, +b2: U32) -> Type:
-  {B.utf8.decode_two(b1, b2) == cp : U32} &
-  {B.utf8.two_byte_shape(b1, b2) == True{} : Bool} &
-  {B.utf8.overlong_two(b1, b2) == B.utf8.can_encode_one(cp) : Bool} &
-  {B.utf8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
-  {B.utf8.valid_two(b1, b2) ==
+  {UTF8.decode_two(b1, b2) == cp : U32} &
+  {UTF8.two_byte_shape(b1, b2) == True{} : Bool} &
+  {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
+  {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
+  {UTF8.valid_two(b1, b2) ==
     ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&
      (U32.is_ge(b2, 128) && U32.is_le(b2, 191))) : Bool}
 
@@ -1252,8 +1253,8 @@ def utf8_proof.fields_from_facts(+low: Word(6n), +high: Word(5n),
     {(U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) == Bool.not(utf8_proof.fits_one_byte(high)) : Bool},
   second: {B.byte_mask("10xxxxxx", utf8_proof.second_byte(low), {==}) == True{} : Bool} &
     {(U32.is_ge(utf8_proof.second_byte(low), 128) && U32.is_le(utf8_proof.second_byte(low), 191)) == True{} : Bool},
-  threshold: {B.utf8.can_encode_one(utf8_proof.codepoint(low, high)) == utf8_proof.fits_one_byte(high) : Bool} &
-    {Bool.not(B.utf8.can_encode_one(utf8_proof.codepoint(low, high))) == U32.is_ge(utf8_proof.codepoint(low, high), 128) : Bool}) ->
+  threshold: {UTF8.can_encode_one(utf8_proof.codepoint(low, high)) == utf8_proof.fits_one_byte(high) : Bool} &
+    {Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(low, high))) == U32.is_ge(utf8_proof.codepoint(low, high), 128) : Bool}) ->
   Utf8RoundtripSpec(utf8_proof.codepoint(low, high), utf8_proof.first_byte(high), utf8_proof.second_byte(low)):
   (shape1, range1) = first
   (shape2, range2) = second
@@ -1264,8 +1265,8 @@ def utf8_proof.fields_from_facts(+low: Word(6n), +high: Word(5n),
   +valid = utf8_proof.valid_from_facts(utf8_proof.codepoint(low, high), utf8_proof.first_byte(high), utf8_proof.second_byte(low), shape, overlong)
   range = utf8_proof.range_from_facts(low, high, range1, range2, small)
   (decoded, shape, overlong,
-   Equal.trans(Bool, B.utf8.valid_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)), Bool.not(B.utf8.can_encode_one(utf8_proof.codepoint(low, high))), U32.is_ge(utf8_proof.codepoint(low, high), 128), valid, large),
-   Equal.trans(Bool, B.utf8.valid_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)), Bool.not(B.utf8.can_encode_one(utf8_proof.codepoint(low, high))),
+   Equal.trans(Bool, UTF8.valid_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)), Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(low, high))), U32.is_ge(utf8_proof.codepoint(low, high), 128), valid, large),
+   Equal.trans(Bool, UTF8.valid_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)), Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(low, high))),
      ((U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) &&
       (U32.is_ge(utf8_proof.second_byte(low), 128) && U32.is_le(utf8_proof.second_byte(low), 191))), valid, range))
 
@@ -1277,7 +1278,7 @@ def utf8_proof.fields_roundtrip(+low: Word(6n), +high: Word(5n)) ->
 
 # The first zero below the all-ones maximum determines the comparison.
 # This needs twelve cases, regardless of the remaining lower bits.
-def utf8_proof.capacity_bits(+b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) -> {B.utf8.can_encode_two(B.utf8.codepoint11(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}})) == True{} : Bool}:
+def utf8_proof.capacity_bits(+b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) -> {UTF8.can_encode_two(UTF8.codepoint11(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}})) == True{} : Bool}:
   match b10 b9 b8 b7 b6 b5 b4 b3 b2 b1 b0:
     case False{} _ _ _ _ _ _ _ _ _ _: {==}
     case True{} False{} _ _ _ _ _ _ _ _ _: {==}
@@ -1303,11 +1304,11 @@ def Laws.utf8_two_roundtrip(bits):
       +low = {WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} : Word(6n)}
       +high = {WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}} : Word(5n)}
       %Equal.sym(U32,
-        B.utf8.first(B.utf8.encode_two(utf8_proof.codepoint(low, high), Laws.utf8_two_capacity(bits))), utf8_proof.first_byte(high),
+        UTF8.first(UTF8.encode_two(utf8_proof.codepoint(low, high), Laws.utf8_two_capacity(bits))), utf8_proof.first_byte(high),
         utf8_proof.encode_first(low, high, Laws.utf8_two_capacity(bits))) :
-        Utf8RoundtripSpec(utf8_proof.codepoint(low, high), _, B.utf8.second(B.utf8.encode_two(utf8_proof.codepoint(low, high), Laws.utf8_two_capacity(bits))))
+        Utf8RoundtripSpec(utf8_proof.codepoint(low, high), _, UTF8.second(UTF8.encode_two(utf8_proof.codepoint(low, high), Laws.utf8_two_capacity(bits))))
       %Equal.sym(U32,
-        B.utf8.second(B.utf8.encode_two(utf8_proof.codepoint(low, high), Laws.utf8_two_capacity(bits))), utf8_proof.second_byte(low),
+        UTF8.second(UTF8.encode_two(utf8_proof.codepoint(low, high), Laws.utf8_two_capacity(bits))), utf8_proof.second_byte(low),
         utf8_proof.encode_second(low, high, Laws.utf8_two_capacity(bits))) :
         Utf8RoundtripSpec(utf8_proof.codepoint(low, high), utf8_proof.first_byte(high), _)
       utf8_proof.fields_roundtrip(low, high)
