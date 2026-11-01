@@ -189,12 +189,29 @@ law utf8_encode_one:
   for valid: {UTF8.can_encode_one(cp) == True{} : Bool}
   {UTF8.encode_one(cp, valid) == cp : U32}
 
+# The table writes the code point as 00000xxx yyyyzzzz, then distributes
+# those eleven payload bits into the output bytes 110xxxyy 10yyzzzz.
+# https://en.wikipedia.org/wiki/UTF-8#Description
 law utf8_encode_two:
   for +cp: U32
   for valid: {UTF8.can_encode_two(cp) == True{} : Bool}
+  exs x1: Bool
+  exs x2: Bool
+  exs x3: Bool
+  exs y1: Bool
+  exs y2: Bool
+  exs y3: Bool
+  exs y4: Bool
+  exs z1: Bool
+  exs z2: Bool
+  exs z3: Bool
+  exs z4: Bool
+  {cp == B.byte2_u32(
+    B.byte8((False{}, False{}, False{}, False{}, False{}, x1, x2, x3)),
+    B.byte8((y1, y2, y3, y4, z1, z2, z3, z4))) : U32} &
   {UTF8.encode_two(cp, valid) ==
-    ((192 + U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(cp)))))) : U32),
-     (128 + U32.and(cp, 63) : U32)) : U32 & U32}
+    (B.byte8((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
+     B.byte8((True{}, False{}, y3, y4, z1, z2, z3, z4))) : U32 & U32}
 
 # Overlong means that the same decoded code point fits in one byte.
 law utf8_overlong_two:
@@ -274,3 +291,16 @@ law byte8_bit8_roundtrip:
   for +byte: U32
   for valid: {U32.is_le(byte, 255) == True{} : Bool}
   {B.byte8(B.bit8(byte, valid)) == byte : U32}
+
+# Two-byte values are split and packed in big-endian order.
+law u32_byte2_roundtrip:
+  for +value: U32
+  for valid: {U32.is_le(value, 65535) == True{} : Bool}
+  {B.byte2_u32(UTF8.first(B.u32_byte2(value, valid)),
+               UTF8.second(B.u32_byte2(value, valid))) == value : U32}
+
+law byte2_examples:
+  {B.u32_byte2(0, {==}) == (0, 0) : U32 & U32} &
+  {B.u32_byte2(4660, {==}) == (18, 52) : U32 & U32} &
+  {B.u32_byte2(65535, {==}) == (255, 255) : U32 & U32} &
+  {B.byte2_u32(18, 52) == 4660 : U32}
