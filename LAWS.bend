@@ -176,6 +176,20 @@ law byte_mask_examples:
   {B.byte_mask("10000001", 129, {==}) == True{} : Bool} &
   {B.byte_mask("10000001", 128, {==}) == False{} : Bool}
 
+# Canonical decomposition: four bytes, most significant byte and bit first.
+# Read the U32 representation directly, independently of B.bit32.
+def bit32_spec(value: U32) -> B.Bits32():
+  match value:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      ((b31, b30, b29, b28, b27, b26, b25, b24),
+       (b23, b22, b21, b20, b19, b18, b17, b16),
+       (b15, b14, b13, b12, b11, b10, b9, b8),
+       (b7, b6, b5, b4, b3, b2, b1, b0))
+
+law bit32:
+  for +value: U32
+  {B.bit32(value) == bit32_spec(value) : B.Bits32()}
+
 # Reference model: 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz.
 # The leading zeros enforce the input shape; any other shape returns None.
 # Capacity includes overlong encodings of 0..127; shortest-form validity is separate.
@@ -192,7 +206,7 @@ def maybe_encode_two.bits(bits: B.Bits32()) -> Maybe<&1, U32 & U32>:
       None{}
 
 def maybe_encode_two(cp: U32) -> Maybe<&1, U32 & U32>:
-  maybe_encode_two.bits(B.bit32(cp))
+  maybe_encode_two.bits(bit32_spec(cp))
 
 # Operations under specification. PROOF.bend binds them to the implementation.
 law utf8.can_encode_one:
