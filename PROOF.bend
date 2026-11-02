@@ -403,15 +403,21 @@ def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) 
     result => Maybe.default(&2, Laws.Nibble(), result, Word.zero(4n)),
     Some{H.decode(H.HexDigitChar{c, valid})}, Laws.decode_spec(c), decode_agrees(c, valid))
 
+def hex_all_agree(+chars: +List<Char>) ->
+  {List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), chars) == List.all(~&2, ~Char, ~(c => Laws.is_hex_digit_spec(c)), chars) : Bool}:
+  match chars:
+    case Nil{}: {==}
+    case Con{+c, +rest}:
+      %Laws.is_hex_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), rest), H.is_hex_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => Laws.is_hex_digit_spec(c)), rest), _) : Bool}
+      %hex_all_agree(rest) : {List.all.if(u => List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), rest), H.is_hex_digit(c)) == List.all.if(u => _, H.is_hex_digit(c)) : Bool}
+      {==}
+
 def Laws.is_valid_hex_u32_input(s):
-  {==}
+  Equal.cong(Bool, Bool, all => (Nat.is_eq(String.length(s), 8n) && all),
+    List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => Laws.is_hex_digit_spec(c)), String.to_list(s)), hex_all_agree(String.to_list(s)))
 
 def HexU32Spec(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
-  &digits: +List<H.HexDigitChar> ->
-  {List.length(&2, H.HexDigitChar, digits) == 8n : Nat} &
-  {s == Laws.digits_to_string(digits) : String} &
-  {H.hex_u32(s, valid) == Laws.nibble_list_value(Laws.digits_to_nibbles(digits)) : U32}
-
+  {H.hex_u32(s, valid) == Laws.hex_u32_spec(s) : U32}
 
 def hex_u32.reference_values(+c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
   valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
@@ -434,12 +440,9 @@ def hex_u32_complete(
   +valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
   proofs: {H.is_hex_digit(c1) == True{} : Bool} & {H.is_hex_digit(c2) == True{} : Bool} & {H.is_hex_digit(c3) == True{} : Bool} & {H.is_hex_digit(c4) == True{} : Bool} & {H.is_hex_digit(c5) == True{} : Bool} & {H.is_hex_digit(c6) == True{} : Bool} & {H.is_hex_digit(c7) == True{} : Bool} & {H.is_hex_digit(c8) == True{} : Bool}
 ) -> HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
-  match proofs:
-    case (p1, p2, p3, p4, p5, p6, p7, p8):
-      ([H.HexDigitChar{c1, p1}, H.HexDigitChar{c2, p2}, H.HexDigitChar{c3, p3}, H.HexDigitChar{c4, p4}, H.HexDigitChar{c5, p5}, H.HexDigitChar{c6, p6}, H.HexDigitChar{c7, p7}, H.HexDigitChar{c8, p8}],
-       ({==}, {==}, hex_u32.reference_values(c1, c2, c3, c4, c5, c6, c7, c8, valid, H.hex_u32.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, valid))))
+  hex_u32.reference_values(c1, c2, c3, c4, c5, c6, c7, c8, valid, proofs)
 
-def Laws.hex_u32(s, valid):
+def hex_u32_agrees(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> HexU32Spec(s, valid):
   match s:
     case SNil{}:
       Empty.absurd(HexU32Spec(SNil{}, valid), H.hex_u32.false_true(valid))
@@ -478,122 +481,18 @@ def binary_membership(+a: Bool, +b: Bool) ->
 def Laws.is_binary_digit(c):
   binary_membership(Char.is_eq('0', c), Char.is_eq('1', c))
 
+def binary_all_agree(+chars: +List<Char>) ->
+  {List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), chars) == List.all(~&2, ~Char, ~(c => Laws.is_binary_digit_spec(c)), chars) : Bool}:
+  match chars:
+    case Nil{}: {==}
+    case Con{+c, +rest}:
+      %Laws.is_binary_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => Laws.is_binary_digit_spec(c)), rest), _) : Bool}
+      %binary_all_agree(rest) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => _, B.is_binary_digit(c)) : Bool}
+      {==}
+
 def Laws.is_valid_binary_byte_input(s):
-  {==}
-
-# A valid binary character is recovered from its decoded bit.
-def BinaryCharSpec(+c: Char, valid: {B.is_binary_digit(c) == True{} : Bool}) -> Type:
-  {c == Laws.bit_to_char(B.char_to_bit(c)) : Char}
-
-law binary_char_bits:
-  for +b31: Bool
-  for +b30: Bool
-  for +b29: Bool
-  for +b28: Bool
-  for +b27: Bool
-  for +b26: Bool
-  for +b25: Bool
-  for +b24: Bool
-  for +b23: Bool
-  for +b22: Bool
-  for +b21: Bool
-  for +b20: Bool
-  for +b19: Bool
-  for +b18: Bool
-  for +b17: Bool
-  for +b16: Bool
-  for +b15: Bool
-  for +b14: Bool
-  for +b13: Bool
-  for +b12: Bool
-  for +b11: Bool
-  for +b10: Bool
-  for +b9: Bool
-  for +b8: Bool
-  for +b7: Bool
-  for +b6: Bool
-  for +b5: Bool
-  for +b4: Bool
-  for +b3: Bool
-  for +b2: Bool
-  for +b1: Bool
-  for +b0: Bool
-  for valid: {B.is_binary_digit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)) == True{} : Bool}
-  BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid)
-
-def binary_char_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid):
-  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8 b7 b6 b5 b4 b3 b2 b1:
-    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} _ _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} False{} _ _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} True{} _ _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} True{} _:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} True{}:
-      Empty.absurd(BinaryCharSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} False{}:
-      match b0:
-        case False{}: {==}
-        case True{}: {==}
-
-def binary_char_roundtrip(+c: Char, valid: {B.is_binary_digit(c) == True{} : Bool}) -> BinaryCharSpec(c, valid):
-  match c:
-    case Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
-      binary_char_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
+  Equal.cong(Bool, Bool, all => (Nat.is_eq(String.length(s), 8n) && all),
+    List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => Laws.is_binary_digit_spec(c)), String.to_list(s)), binary_all_agree(String.to_list(s)))
 
 def eight_bits_bound(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) -> {U32.is_le(Laws.bit_list_value([b1, b2, b3, b4, b5, b6, b7, b8]), 255) == True{} : Bool}:
   match b1 b2 b3 b4 b5 b6 b7 b8:
@@ -885,47 +784,18 @@ def binary_byte.digit_proofs(
   p8 = H.hex_u32.head_true(B.is_binary_digit(c8), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), []), e7)
   (p1, p2, p3, p4, p5, p6, p7, p8)
 
-def BinaryByteSpec(+s: String, valid: {B.is_valid_binary_byte(s) == True{} : Bool}) -> Type:
-  &bits: +List<Bool> ->
-  {List.length(&2, Bool, bits) == 8n : Nat} &
-  {s == Laws.bits_to_string(bits) : String} &
-  {B.binary_byte(s, valid) == Laws.bit_list_value(bits) : U32} &
+def BinaryByteSpec(+s: String, +valid: {B.is_valid_binary_byte(s) == True{} : Bool}) -> Type:
+  {B.binary_byte(s, valid) == Laws.binary_byte_spec(s) : U32} &
   {U32.is_le(B.binary_byte(s, valid), 255) == True{} : Bool}
-
-def binary_byte.spells(
-  +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  proofs: {B.is_binary_digit(c1) == True{} : Bool} & {B.is_binary_digit(c2) == True{} : Bool} & {B.is_binary_digit(c3) == True{} : Bool} & {B.is_binary_digit(c4) == True{} : Bool} & {B.is_binary_digit(c5) == True{} : Bool} & {B.is_binary_digit(c6) == True{} : Bool} & {B.is_binary_digit(c7) == True{} : Bool} & {B.is_binary_digit(c8) == True{} : Bool}
-) -> {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == Laws.bits_to_string([B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)]) : String}:
-  match proofs:
-    case (p1, p2, p3, p4, p5, p6, p7, p8):
-      e8 = binary_char_roundtrip(c8, p8)
-      %e8 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{Laws.bit_to_char(B.char_to_bit(c5)), SCon{Laws.bit_to_char(B.char_to_bit(c6)), SCon{Laws.bit_to_char(B.char_to_bit(c7)), SCon{_, SNil{}}}}}}}}} : String}
-      e7 = binary_char_roundtrip(c7, p7)
-      %e7 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{Laws.bit_to_char(B.char_to_bit(c5)), SCon{Laws.bit_to_char(B.char_to_bit(c6)), SCon{_, SCon{c8, SNil{}}}}}}}}} : String}
-      e6 = binary_char_roundtrip(c6, p6)
-      %e6 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{Laws.bit_to_char(B.char_to_bit(c5)), SCon{_, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
-      e5 = binary_char_roundtrip(c5, p5)
-      %e5 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{Laws.bit_to_char(B.char_to_bit(c4)), SCon{_, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
-      e4 = binary_char_roundtrip(c4, p4)
-      %e4 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{Laws.bit_to_char(B.char_to_bit(c3)), SCon{_, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
-      e3 = binary_char_roundtrip(c3, p3)
-      %e3 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{Laws.bit_to_char(B.char_to_bit(c2)), SCon{_, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
-      e2 = binary_char_roundtrip(c2, p2)
-      %e2 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{Laws.bit_to_char(B.char_to_bit(c1)), SCon{_, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
-      e1 = binary_char_roundtrip(c1, p1)
-      %e1 : {SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} == SCon{_, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
-      {==}
 
 def binary_byte_complete(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
   valid: {B.is_valid_binary_byte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
   proofs: {B.is_binary_digit(c1) == True{} : Bool} & {B.is_binary_digit(c2) == True{} : Bool} & {B.is_binary_digit(c3) == True{} : Bool} & {B.is_binary_digit(c4) == True{} : Bool} & {B.is_binary_digit(c5) == True{} : Bool} & {B.is_binary_digit(c6) == True{} : Bool} & {B.is_binary_digit(c7) == True{} : Bool} & {B.is_binary_digit(c8) == True{} : Bool}
 ) -> BinaryByteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
-  ([B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)],
-    ({==}, binary_byte.spells(c1, c2, c3, c4, c5, c6, c7, c8, proofs), {==},
-     eight_bits_bound(B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8))))
+  ({==}, eight_bits_bound(B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)))
 
-def Laws.binary_byte(s, valid):
+def binary_byte_agrees(+s: String, valid: {B.is_valid_binary_byte(s) == True{} : Bool}) -> BinaryByteSpec(s, valid):
   match s:
     case SNil{}:
       Empty.absurd(BinaryByteSpec(SNil{}, valid), H.hex_u32.false_true(valid))
@@ -955,11 +825,9 @@ def Laws.is_valid_byte_mask(mask):
 
 def ByteMaskSpec(+mask: String, +byte: U32,
   valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> Type:
-  {B.byte_mask(mask, byte, valid) ==
-    (U32.is_le(byte, 255) &&
-     Laws.mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
+  {B.byte_mask(mask, byte, valid) == Laws.byte_mask_spec(mask, byte) : Bool}
 
-def Laws.byte_mask(mask, byte, valid):
+def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> ByteMaskSpec(mask, byte, valid):
   match mask:
     case SNil{}:
       Empty.absurd(ByteMaskSpec(SNil{}, byte, valid), H.hex_u32.false_true(valid))
@@ -1746,8 +1614,8 @@ def Laws.byte8_bit8_roundtrip(byte, valid):
 
 def Byte2RoundtripSpec(+value: U32,
   +valid: {U32.is_le(value, 65535) == True{} : Bool}) -> Type:
-  {B.byte2_u32(UTF8.first(B.u32_byte2(value, valid)),
-               UTF8.second(B.u32_byte2(value, valid))) == value : U32}
+  {B.byte2_u32(B.first(B.u32_byte2(value, valid)),
+               B.second(B.u32_byte2(value, valid))) == value : U32}
 
 def byte2_roundtrip_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
   valid: {U32.is_le(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), 65535) == True{} : Bool}) -> Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid):
@@ -1880,3 +1748,33 @@ def Laws.bit32(value):
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       {==}
+
+def Laws.hex_u32(s, valid):
+  +accepted = Equal.trans(Bool, H.is_valid_hex_u32(s), Laws.is_valid_hex_u32_spec(s), True{}, Laws.is_valid_hex_u32_input(s), valid)
+  (accepted, hex_u32_agrees(s, accepted))
+
+def Laws.binary_byte(s, valid):
+  +accepted = Equal.trans(Bool, B.is_valid_binary_byte(s), Laws.is_valid_binary_byte_spec(s), True{}, Laws.is_valid_binary_byte_input(s), valid)
+  (accepted, binary_byte_agrees(s, accepted))
+
+def Laws.byte_mask(mask, byte, valid):
+  +accepted = Equal.trans(Bool, B.is_valid_byte_mask(mask), Laws.is_valid_byte_mask_spec(mask), True{}, Laws.is_valid_byte_mask(mask), valid)
+  (accepted, byte_mask_agrees(mask, byte, accepted))
+
+def Laws.byte8(bits):
+  match bits:
+    case (b7, b6, b5, b4, b3, b2, b1, b0): {==}
+
+def Laws.u32_byte2(value, valid):
+  match value:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}: {==}
+
+def Laws.byte2_u32(high, low):
+  match high low:
+    case U32{WCon{h0, WCon{h1, WCon{h2, WCon{h3, WCon{h4, WCon{h5, WCon{h6, WCon{h7, WCon{h8, WCon{h9, WCon{h10, WCon{h11, WCon{h12, WCon{h13, WCon{h14, WCon{h15, WCon{h16, WCon{h17, WCon{h18, WCon{h19, WCon{h20, WCon{h21, WCon{h22, WCon{h23, WCon{h24, WCon{h25, WCon{h26, WCon{h27, WCon{h28, WCon{h29, WCon{h30, WCon{h31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}} U32{WCon{l0, WCon{l1, WCon{l2, WCon{l3, WCon{l4, WCon{l5, WCon{l6, WCon{l7, WCon{l8, WCon{l9, WCon{l10, WCon{l11, WCon{l12, WCon{l13, WCon{l14, WCon{l15, WCon{l16, WCon{l17, WCon{l18, WCon{l19, WCon{l20, WCon{l21, WCon{l22, WCon{l23, WCon{l24, WCon{l25, WCon{l26, WCon{l27, WCon{l28, WCon{l29, WCon{l30, WCon{l31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}: {==}
+
+def Laws.first(high, low):
+  {==}
+
+def Laws.second(high, low):
+  {==}
