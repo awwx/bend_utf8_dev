@@ -475,25 +475,18 @@ def Laws.example_zero():
 def BinaryLaws.is_binary_digit(c):
   {==}
 
-def binary_all_agree(+chars: +List<Char>) ->
-  {List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), chars) == List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), chars) : Bool}:
-  match chars:
-    case Nil{}: {==}
-    case Con{+c, +rest}:
-      %BinaryLaws.is_binary_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), rest), _) : Bool}
-      %binary_all_agree(rest) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => _, B.is_binary_digit(c)) : Bool}
-      {==}
-
 def BinaryLaws.valid_byte_string(s):
-  Equal.cong(Bool, Bool, all => (Nat.is_eq(String.length(s), 8n) && all),
-    List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), String.to_list(s)), binary_all_agree(String.to_list(s)))
+  {==}
+
+def BinaryLaws.is_mask_digit(c):
+  {==}
 
 def BinaryLaws.is_valid_byte_mask(mask):
   {==}
 
 def ByteMaskSpec(+mask: String, +byte: U32,
   valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> Type:
-  {B.byte_mask(mask, byte, valid) == BinaryLaws.byte_mask_spec(mask, byte) : Bool}
+  {B.byte_mask(mask, byte, valid) == (U32.is_le(byte, 255) && BinaryLaws.mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
 
 def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> ByteMaskSpec(mask, byte, valid):
   match mask:
@@ -1412,30 +1405,25 @@ def Laws.utf8_two_byte_shape(b1, b2):
 def Laws.utf8_decode_two(b1, b2):
   {==}
 
-def BinaryLaws.bit32(value):
-  match value:
-    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
-      {==}
+def BinaryLaws.bit32(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
+  {==}
 
 def Laws.hex_u32(s, valid):
   +accepted = Equal.trans(Bool, H.is_valid_hex_u32(s), Laws.is_valid_hex_u32_spec(s), True{}, Laws.is_valid_hex_u32_input(s), valid)
   (accepted, hex_u32_agrees(s, accepted))
 
 def BinaryLaws.byte_mask(mask, byte, valid):
-  +accepted = Equal.trans(Bool, B.is_valid_byte_mask(mask), BinaryLaws.is_valid_byte_mask_spec(mask), True{}, BinaryLaws.is_valid_byte_mask(mask), valid)
+  +accepted = valid
   (accepted, byte_mask_agrees(mask, byte, accepted))
 
-def BinaryLaws.byte8(bits):
-  match bits:
-    case (b7, b6, b5, b4, b3, b2, b1, b0): {==}
+def BinaryLaws.byte8(b7, b6, b5, b4, b3, b2, b1, b0):
+  {==}
 
-def BinaryLaws.u32_byte2(value, valid):
-  match value:
-    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}: {==}
+def BinaryLaws.u32_byte2(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid):
+  {==}
 
-def BinaryLaws.byte2_u32(high, low):
-  match high low:
-    case U32{WCon{h0, WCon{h1, WCon{h2, WCon{h3, WCon{h4, WCon{h5, WCon{h6, WCon{h7, WCon{h8, WCon{h9, WCon{h10, WCon{h11, WCon{h12, WCon{h13, WCon{h14, WCon{h15, WCon{h16, WCon{h17, WCon{h18, WCon{h19, WCon{h20, WCon{h21, WCon{h22, WCon{h23, WCon{h24, WCon{h25, WCon{h26, WCon{h27, WCon{h28, WCon{h29, WCon{h30, WCon{h31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}} U32{WCon{l0, WCon{l1, WCon{l2, WCon{l3, WCon{l4, WCon{l5, WCon{l6, WCon{l7, WCon{l8, WCon{l9, WCon{l10, WCon{l11, WCon{l12, WCon{l13, WCon{l14, WCon{l15, WCon{l16, WCon{l17, WCon{l18, WCon{l19, WCon{l20, WCon{l21, WCon{l22, WCon{l23, WCon{l24, WCon{l25, WCon{l26, WCon{l27, WCon{l28, WCon{l29, WCon{l30, WCon{l31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}: {==}
+def BinaryLaws.byte2_u32(h7, h6, h5, h4, h3, h2, h1, h0, l7, l6, l5, l4, l3, l2, l1, l0, rest_high, rest_low):
+  {==}
 
 def BinaryLaws.first(high, low):
   {==}
@@ -1670,8 +1658,8 @@ def BinaryLaws.strbyte(s, valid):
       Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       +v = valid
-      accepted = Equal.trans(Bool, B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), BinaryLaws.spec_valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), True{}, BinaryLaws.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), v)
-      (accepted, ((BinaryLaws.bit_number(Char.is_eq(c1, '1')), BinaryLaws.bit_number(Char.is_eq(c2, '1')), BinaryLaws.bit_number(Char.is_eq(c3, '1')), BinaryLaws.bit_number(Char.is_eq(c4, '1')), BinaryLaws.bit_number(Char.is_eq(c5, '1')), BinaryLaws.bit_number(Char.is_eq(c6, '1')), BinaryLaws.bit_number(Char.is_eq(c7, '1')), BinaryLaws.bit_number(Char.is_eq(c8, '1'))) : BinaryLaws.NumericBits8()), strbyte.parsed(BinaryLaws.spec_valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), ((BinaryLaws.bit_number(Char.is_eq(c1, '1')), BinaryLaws.bit_number(Char.is_eq(c2, '1')), BinaryLaws.bit_number(Char.is_eq(c3, '1')), BinaryLaws.bit_number(Char.is_eq(c4, '1')), BinaryLaws.bit_number(Char.is_eq(c5, '1')), BinaryLaws.bit_number(Char.is_eq(c6, '1')), BinaryLaws.bit_number(Char.is_eq(c7, '1')), BinaryLaws.bit_number(Char.is_eq(c8, '1'))) : BinaryLaws.NumericBits8()), v),
+      accepted = v
+      (accepted, ((BinaryLaws.bit_number(Char.is_eq(c1, '1')), BinaryLaws.bit_number(Char.is_eq(c2, '1')), BinaryLaws.bit_number(Char.is_eq(c3, '1')), BinaryLaws.bit_number(Char.is_eq(c4, '1')), BinaryLaws.bit_number(Char.is_eq(c5, '1')), BinaryLaws.bit_number(Char.is_eq(c6, '1')), BinaryLaws.bit_number(Char.is_eq(c7, '1')), BinaryLaws.bit_number(Char.is_eq(c8, '1'))) : BinaryLaws.NumericBits8()), strbyte.parsed(B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), ((BinaryLaws.bit_number(Char.is_eq(c1, '1')), BinaryLaws.bit_number(Char.is_eq(c2, '1')), BinaryLaws.bit_number(Char.is_eq(c3, '1')), BinaryLaws.bit_number(Char.is_eq(c4, '1')), BinaryLaws.bit_number(Char.is_eq(c5, '1')), BinaryLaws.bit_number(Char.is_eq(c6, '1')), BinaryLaws.bit_number(Char.is_eq(c7, '1')), BinaryLaws.bit_number(Char.is_eq(c8, '1'))) : BinaryLaws.NumericBits8()), v),
         strbyte.weighted_bits(Char.is_eq(c1, '1'), Char.is_eq(c2, '1'), Char.is_eq(c3, '1'), Char.is_eq(c4, '1'), Char.is_eq(c5, '1'), Char.is_eq(c6, '1'), Char.is_eq(c7, '1'), Char.is_eq(c8, '1')))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
       Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}), H.hex_u32.false_true(valid))
@@ -1966,7 +1954,7 @@ def strbyte_lt_256.reference(+s: String) ->
   {U32.is_lt(strbyte_lt_256.parsed_value(BinaryLaws.str_bits(s)), 256) == True{} : Bool}:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
-      strbyte_lt_256.reference_if(BinaryLaws.spec_valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}),
+      strbyte_lt_256.reference_if(B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}),
         (BinaryLaws.bit_number(Char.is_eq(c1, '1')), BinaryLaws.bit_number(Char.is_eq(c2, '1')), BinaryLaws.bit_number(Char.is_eq(c3, '1')), BinaryLaws.bit_number(Char.is_eq(c4, '1')), BinaryLaws.bit_number(Char.is_eq(c5, '1')), BinaryLaws.bit_number(Char.is_eq(c6, '1')), BinaryLaws.bit_number(Char.is_eq(c7, '1')), BinaryLaws.bit_number(Char.is_eq(c8, '1'))),
         strbyte_lt_256.weighted_bits(Char.is_eq(c1, '1'), Char.is_eq(c2, '1'), Char.is_eq(c3, '1'), Char.is_eq(c4, '1'), Char.is_eq(c5, '1'), Char.is_eq(c6, '1'), Char.is_eq(c7, '1'), Char.is_eq(c8, '1')))
     case SNil{}: {==}

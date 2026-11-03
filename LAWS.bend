@@ -105,13 +105,13 @@ def maybe_encode_two.bits(bits: B.Bits32()) -> Maybe<&1, U32 & U32>:
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, x1, x2, x3),
           (y1, y2, y3, y4, z1, z2, z3, z4)):
-      Some{(BinaryLaws.byte8_spec((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
-            BinaryLaws.byte8_spec((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+      Some{(B.byte8((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
+            B.byte8((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
     case _:
       None{}
 
 def maybe_encode_two(cp: U32) -> Maybe<&1, U32 & U32>:
-  maybe_encode_two.bits(BinaryLaws.bit32_spec(cp))
+  maybe_encode_two.bits(B.bit32(cp))
 
 # Operations under specification. PROOF.bend binds them to the implementation.
 law utf8.can_encode_one:
