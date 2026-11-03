@@ -30,12 +30,12 @@ law valid_byte_string:
 
 # Type alias for a tuple of eight bools.
 
-def Bool8() -> Type:
+def Bit8() -> Type:
   Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool
 
 # As of Bend 2.0.39 "if" statements are written this way.
 
-def str_bits.if(valid: Bool, bits: Bool8()) -> Maybe<&1, Bool8()>:
+def str_bits.if(valid: Bool, bits: Bit8()) -> Maybe<&1, Bit8()>:
   match valid:
     case False{}: None{}
     case True{}: Some{bits}
@@ -43,7 +43,7 @@ def str_bits.if(valid: Bool, bits: Bool8()) -> Maybe<&1, Bool8()>:
 # If `s` is a valid input, converts the string to a tuple of eight
 # bools, otherwise returns None.
 
-def str_bits(+s: String) -> Maybe<&1, Bool8()>:
+def str_bits(+s: String) -> Maybe<&1, Bit8()>:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       str_bits.if(B.valid_byte_string(s),
@@ -60,7 +60,7 @@ def str_bits(+s: String) -> Maybe<&1, Bool8()>:
 # Given a tuple of eight bools, return the U32 value of the binary
 # integer, most significant bit first.
 
-def bits_value(bits: Bool8()) -> U32:
+def bits_value(bits: Bit8()) -> U32:
   (b1, b2, b3, b4, b5, b6, b7, b8) = bits
   (Bool.to_u32(b1) * 128 +
    Bool.to_u32(b2) * 64 +
@@ -75,8 +75,8 @@ law strbyte:
   for +s: String
   for +valid: {B.valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  exs bits: Bool8()
-  {Some{bits} == str_bits(s) : Maybe<&1, Bool8()>} &
+  exs bits: Bit8()
+  {Some{bits} == str_bits(s) : Maybe<&1, Bit8()>} &
   {B.strbyte(s, accepted) == bits_value(bits) : U32}
 
 # A redundant check of our spec: a byte value is always < 256.
