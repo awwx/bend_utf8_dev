@@ -52,7 +52,7 @@ def byte_mask(+mask: String, +byte: U32,
 # Eight bits, most significant first. U32 is unsigned, so <=255 establishes
 # the full byte range 0..255. The final argument is a proof, not a runtime test.
 def bit8(+byte: U32,
-  valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool:
+  valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Defs.Bit8():
   (U32.is_ne(U32.and(byte, 128), 0),
    U32.is_ne(U32.and(byte, 64), 0),
    U32.is_ne(U32.and(byte, 32), 0),
