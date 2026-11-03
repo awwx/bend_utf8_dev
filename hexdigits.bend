@@ -8,11 +8,6 @@ def is_hex_digit(+c: Char) -> Bool:
 type HexDigitChar is Data:
   HexDigitChar{char: Char, valid: {is_hex_digit(char) == True{} : Bool}}
 
-def HexDigitChar.char(digit: HexDigitChar) -> Char:
-  match digit:
-    case HexDigitChar{c, valid}:
-      c
-
 # Four-bit words use least-significant-bit-first WCon fields.
 def word4_from_u32(n: U32) -> Word(4n):
   match n:

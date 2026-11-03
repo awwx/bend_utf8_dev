@@ -3,11 +3,6 @@ import Base
 def is_binary_digit(+c: Char) -> Bool:
   Char.is_eq('0', c) || Char.is_eq('1', c)
 
-def bit_to_char(bit: Bool) -> Char:
-  match bit:
-    case False{}: '0'
-    case True{}: '1'
-
 def char_to_bit(c: Char) -> Bool:
   Char.is_eq(c, '1')
 

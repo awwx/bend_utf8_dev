@@ -18,19 +18,6 @@ law valid_byte_string:
   for +s: String
   {B.valid_byte_string(s) == spec_valid_byte_string(s) : Bool}
 
-# Bool represents a single binary digit: False is '0', True is '1'.
-def bit_to_char(bit: Bool) -> Char:
-  match bit:
-    case False{}: '0'
-    case True{}: '1'
-
-def bits_to_string(bits: +List<Bool>) -> String:
-  match bits:
-    case Nil{}:
-      SNil{}
-    case Con{bit, rest}:
-      SCon{bit_to_char(bit), bits_to_string(rest)}
-
 # A numeric bit carries evidence that its U32 value is either zero or one.
 type BitValue is Data:
   BitValue{value: U32, bound: {U32.is_le(value, 1) == True{} : Bool}}
