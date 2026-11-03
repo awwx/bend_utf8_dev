@@ -22,6 +22,35 @@ law bit8_value:
      Bool.to_u32(b1) * 2 +
      Bool.to_u32(b0) * 1 : U32) : U32}
 
+# Decompose a byte value represented by a U32 < 256 into its eight
+# booleans, most significant first.
+
+law bit8:
+  for +byte: U32
+  for valid: {U32.is_le(byte, 255) == True{} : Bool}
+  {B.bit8(byte, valid) ==
+    (U32.is_ne(U32.and(byte, 128), 0),
+     U32.is_ne(U32.and(byte, 64), 0),
+     U32.is_ne(U32.and(byte, 32), 0),
+     U32.is_ne(U32.and(byte, 16), 0),
+     U32.is_ne(U32.and(byte, 8), 0),
+     U32.is_ne(U32.and(byte, 4), 0),
+     U32.is_ne(U32.and(byte, 2), 0),
+     U32.is_ne(U32.and(byte, 1), 0)) : Defs.Bit8()}
+
+law bit8_examples:
+  {B.bit8(0, {==}) == (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}) : Defs.Bit8()} &
+  {B.bit8(65, {==}) == (False{}, True{}, False{}, False{}, False{}, False{}, False{}, True{}) : Defs.Bit8()} &
+  {B.bit8(255, {==}) == (True{}, True{}, True{}, True{}, True{}, True{}, True{}, True{}) : Defs.Bit8()}
+
+# Every byte survives conversion to eight bits and back without loss.
+
+law bit8_value_bit8_roundtrip:
+  for +byte: U32
+  for valid: {U32.is_le(byte, 255) == True{} : Bool}
+  {B.bit8_value(B.bit8(byte, valid)) == byte : U32}
+
+
 # strbyte: binary byte literals
 #
 # strbyte("10000001", {==}) == 129
@@ -152,7 +181,8 @@ law byte_mask:
   {B.byte_mask(mask, byte, accepted) ==
     (U32.is_le(byte, 255) && mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
 
-# Canonical decomposition: most significant byte and bit first.
+# bit32
+
 law bit32:
   for +b31: Bool
   for +b30: Bool
@@ -191,30 +221,6 @@ law bit32:
      (b23, b22, b21, b20, b19, b18, b17, b16),
      (b15, b14, b13, b12, b11, b10, b9, b8),
      (b7, b6, b5, b4, b3, b2, b1, b0)) : Defs.Bit32()}
-
-law bit8:
-  for +byte: U32
-  for valid: {U32.is_le(byte, 255) == True{} : Bool}
-  {B.bit8(byte, valid) ==
-    (U32.is_ne(U32.and(byte, 128), 0),
-     U32.is_ne(U32.and(byte, 64), 0),
-     U32.is_ne(U32.and(byte, 32), 0),
-     U32.is_ne(U32.and(byte, 16), 0),
-     U32.is_ne(U32.and(byte, 8), 0),
-     U32.is_ne(U32.and(byte, 4), 0),
-     U32.is_ne(U32.and(byte, 2), 0),
-     U32.is_ne(U32.and(byte, 1), 0)) : Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool}
-
-law bit8_examples:
-  {B.bit8(0, {==}) == (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}) : Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool} &
-  {B.bit8(65, {==}) == (False{}, True{}, False{}, False{}, False{}, False{}, False{}, True{}) : Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool} &
-  {B.bit8(255, {==}) == (True{}, True{}, True{}, True{}, True{}, True{}, True{}, True{}) : Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool}
-
-# Every byte survives conversion to eight bits and back without loss.
-law bit8_value_bit8_roundtrip:
-  for +byte: U32
-  for valid: {U32.is_le(byte, 255) == True{} : Bool}
-  {B.bit8_value(B.bit8(byte, valid)) == byte : U32}
 
 # Reference byte order: the high byte occupies bits 15..8, the low byte 7..0.
 # Split bits 15..8 and 7..0 into high and low bytes.
