@@ -71,7 +71,7 @@ def str_bits(+s: String) -> Maybe<&1, NumericBits8()>:
          bit_number(Char.is_eq(c8, '1'))))
     case _: None{}
 
-def strbyte_value(bits: NumericBits8()) -> U32:
+def bits_value(bits: NumericBits8()) -> U32:
   (BitValue{b1, _},
    BitValue{b2, _},
    BitValue{b3, _},
@@ -95,7 +95,7 @@ law strbyte:
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
   exs bits: NumericBits8()
   {Some{bits} == str_bits(s) : Maybe<&1, NumericBits8()>} &
-  {B.strbyte(s, accepted) == strbyte_value(bits) : U32}
+  {B.strbyte(s, accepted) == bits_value(bits) : U32}
 
 law strbyte_lt_256:
   for +s: String
