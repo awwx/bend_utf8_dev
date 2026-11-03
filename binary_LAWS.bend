@@ -57,6 +57,37 @@ law strbyte:
   {B.strbyte(s, accepted) == binary_byte_spec(s) : U32} &
   {U32.is_le(B.strbyte(s, accepted), 255) == True{} : Bool}
 
+law strbyte2:
+  for +s: String
+  for valid: {spec_valid_byte_string(s) == True{} : Bool}
+  exs accepted: {B.valid_byte_string(s) == True{} : Bool}
+  exs c1: Char
+  exs c2: Char
+  exs c3: Char
+  exs c4: Char
+  exs c5: Char
+  exs c6: Char
+  exs c7: Char
+  exs c8: Char
+  exs p1: {spec_is_binary_digit(c1) == True{} : Bool}
+  exs p2: {spec_is_binary_digit(c2) == True{} : Bool}
+  exs p3: {spec_is_binary_digit(c3) == True{} : Bool}
+  exs p4: {spec_is_binary_digit(c4) == True{} : Bool}
+  exs p5: {spec_is_binary_digit(c5) == True{} : Bool}
+  exs p6: {spec_is_binary_digit(c6) == True{} : Bool}
+  exs p7: {spec_is_binary_digit(c7) == True{} : Bool}
+  exs p8: {spec_is_binary_digit(c8) == True{} : Bool}
+  {s == SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String} &
+  {B.strbyte(s, accepted) ==
+    (bit_value(c1, p1) * 128 +
+     bit_value(c2, p2) * 64 +
+     bit_value(c3, p3) * 32 +
+     bit_value(c4, p4) * 16 +
+     bit_value(c5, p5) * 8 +
+     bit_value(c6, p6) * 4 +
+     bit_value(c7, p7) * 2 +
+     bit_value(c8, p8) * 1 : U32) : U32}
+
 # A well-formed mask has eight symbols, each from the fixed mask alphabet.
 def is_mask_digit_spec(+c: Char) -> Bool:
   Char.is_eq(c, '0') || Char.is_eq(c, '1') || Char.is_eq(c, 'x')
