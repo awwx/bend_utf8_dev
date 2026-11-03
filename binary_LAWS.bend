@@ -28,7 +28,7 @@ law valid_byte_string:
 def Bool8() -> Type:
   Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool
 
-# As of  Bend 2.0.39 "if" statements are written this way.
+# As of Bend 2.0.39 "if" statements are written this way.
 
 def str_bits.if(valid: Bool, bits: Bool8()) -> Maybe<&1, Bool8()>:
   match valid:
