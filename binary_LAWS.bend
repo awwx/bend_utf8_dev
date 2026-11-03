@@ -6,6 +6,11 @@ import ./binary.bend as B
 def spec_is_binary_digit(+c: Char) -> Bool:
   Char.is_eq('0', c) || Char.is_eq('1', c)
 
+# The proof restricts the character to '0' or '1', with numeric values 0 and 1.
+def bit_value(+c: Char,
+  valid: {spec_is_binary_digit(c) == True{} : Bool}) -> U32:
+  Bool.to_u32(Char.is_eq(c, '1'))
+
 law is_binary_digit:
   for +c: Char
   {B.is_binary_digit(c) == spec_is_binary_digit(c) : Bool}
@@ -45,12 +50,12 @@ def binary_bits_spec(s: String) -> +List<Bool>:
 def binary_byte_spec(s: String) -> U32:
   bit_list_value(binary_bits_spec(s))
 
-law binary_byte:
+law strbyte:
   for +s: String
   for valid: {spec_valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  {B.binary_byte(s, accepted) == binary_byte_spec(s) : U32} &
-  {U32.is_le(B.binary_byte(s, accepted), 255) == True{} : Bool}
+  {B.strbyte(s, accepted) == binary_byte_spec(s) : U32} &
+  {U32.is_le(B.strbyte(s, accepted), 255) == True{} : Bool}
 
 # A well-formed mask has eight symbols, each from the fixed mask alphabet.
 def is_mask_digit_spec(+c: Char) -> Bool:

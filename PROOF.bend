@@ -747,7 +747,7 @@ def eight_bits_bound(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6:
     case True{} True{} True{} True{} True{} True{} True{} False{}: {==}
     case True{} True{} True{} True{} True{} True{} True{} True{}: {==}
 
-def binary_byte.digit_proofs(
+def strbyte.digit_proofs(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char,
   +c5: Char, +c6: Char, +c7: Char, +c8: Char,
   +valid: {B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool}
@@ -779,8 +779,8 @@ def binary_byte.digit_proofs(
   (p1, p2, p3, p4, p5, p6, p7, p8)
 
 def BinaryByteSpec(+s: String, +valid: {B.valid_byte_string(s) == True{} : Bool}) -> Type:
-  {B.binary_byte(s, valid) == BinaryLaws.binary_byte_spec(s) : U32} &
-  {U32.is_le(B.binary_byte(s, valid), 255) == True{} : Bool}
+  {B.strbyte(s, valid) == BinaryLaws.binary_byte_spec(s) : U32} &
+  {U32.is_le(B.strbyte(s, valid), 255) == True{} : Bool}
 
 def binary_byte_complete(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
@@ -810,7 +810,7 @@ def binary_byte_agrees(+s: String, valid: {B.valid_byte_string(s) == True{} : Bo
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       +v = valid
       binary_byte_complete(c1, c2, c3, c4, c5, c6, c7, c8, v,
-        binary_byte.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, v))
+        strbyte.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, v))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
       Empty.absurd(BinaryByteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), H.hex_u32.false_true(valid))
 
@@ -1747,7 +1747,7 @@ def Laws.hex_u32(s, valid):
   +accepted = Equal.trans(Bool, H.is_valid_hex_u32(s), Laws.is_valid_hex_u32_spec(s), True{}, Laws.is_valid_hex_u32_input(s), valid)
   (accepted, hex_u32_agrees(s, accepted))
 
-def BinaryLaws.binary_byte(s, valid):
+def BinaryLaws.strbyte(s, valid):
   +accepted = Equal.trans(Bool, B.valid_byte_string(s), BinaryLaws.spec_valid_byte_string(s), True{}, BinaryLaws.valid_byte_string(s), valid)
   (accepted, binary_byte_agrees(s, accepted))
 
