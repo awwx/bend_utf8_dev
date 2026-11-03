@@ -247,7 +247,7 @@ def Laws.is_hex_digit(c):
 
 # Compare every implemented digit conversion with the independent table.
 def DecodeSpec(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) -> Type:
-  {Some{H.decode(H.HexDigitChar{c, valid})} == Laws.decode_spec(c) : Maybe<&2, Laws.Nibble()>}
+  {Some{H.decode(H.HexDigitChar{c, valid})} == Laws.decode_spec(c) : Maybe<&2, Defs.Nibble()>}
 
 law decode_bits:
   for +b31: Bool
@@ -400,9 +400,9 @@ def Laws.decode(c, valid):
   (accepted, decode_agrees(c, accepted))
 
 def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) ->
-  {H.decode(H.HexDigitChar{c, valid}) == Laws.decode_value_spec(c) : Laws.Nibble()}:
-  Equal.cong(Maybe<&2, Laws.Nibble()>, Laws.Nibble(),
-    result => Maybe.default(&2, Laws.Nibble(), result, Word.zero(4n)),
+  {H.decode(H.HexDigitChar{c, valid}) == Laws.decode_value_spec(c) : Defs.Nibble()}:
+  Equal.cong(Maybe<&2, Defs.Nibble()>, Defs.Nibble(),
+    result => Maybe.default(&2, Defs.Nibble(), result, Word.zero(4n)),
     Some{H.decode(H.HexDigitChar{c, valid})}, Laws.decode_spec(c), decode_agrees(c, valid))
 
 def hex_all_agree(+chars: +List<Char>) ->

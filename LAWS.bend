@@ -4,12 +4,6 @@ import ./hexdigits.bend as H
 import ./binary.bend as B
 import ./binary_LAWS.bend as BinaryLaws
 
-# A "nibble" is half of a byte, a four-bit numeral, which can be
-# represented by a single hexadecimal digit.
-
-def Nibble() -> Data:
-  Word(4n)
-
 # The complete set of accepted hexadecimal characters.
 def hex_digits() -> +List<Char>:
   ['0', '1', '2', '3', '4', '5', '6', '7',
@@ -24,12 +18,12 @@ law is_hex_digit:
   {H.is_hex_digit(c) == is_hex_digit_spec(c) : Bool}
 
 # The low four bits represent a nibble, least significant bit first.
-def nibble_spec(value: U32) -> Nibble():
+def nibble_spec(value: U32) -> Defs.Nibble():
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, rest}}}}}:
       WCon{b0, WCon{b1, WCon{b2, WCon{b3, WNil{}}}}}
 
-def decode_spec(c: Char) -> Maybe<&2, Nibble()>:
+def decode_spec(c: Char) -> Maybe<&2, Defs.Nibble()>:
   match c:
     case '0': Some{nibble_spec(0)}
     case '1': Some{nibble_spec(1)}
@@ -50,8 +44,8 @@ def decode_spec(c: Char) -> Maybe<&2, Nibble()>:
     case _: None{}
 
 # Used only for valid digits in the multi-digit reference calculation.
-def decode_value_spec(c: Char) -> Nibble():
-  Maybe.default(&2, Nibble(), decode_spec(c), Word.zero(4n))
+def decode_value_spec(c: Char) -> Defs.Nibble():
+  Maybe.default(&2, Defs.Nibble(), decode_spec(c), Word.zero(4n))
 
 # Every character accepted by the specification must be accepted and decoded
 # correctly by the implementation, regardless of its packaged input type.
@@ -59,7 +53,7 @@ law decode:
   for +c: Char
   for valid: {is_hex_digit_spec(c) == True{} : Bool}
   exs accepted: {H.is_hex_digit(c) == True{} : Bool}
-  {Some{H.decode(H.HexDigitChar{c, accepted})} == decode_spec(c) : Maybe<&2, Nibble()>}
+  {Some{H.decode(H.HexDigitChar{c, accepted})} == decode_spec(c) : Maybe<&2, Defs.Nibble()>}
 
 # A valid input to hex_u32 is a string of exactly eight characters,
 # each of which is a valid hexadecimal digit.
@@ -73,13 +67,13 @@ law is_valid_hex_u32_input:
   {H.is_valid_hex_u32(s) == is_valid_hex_u32_spec(s) : Bool}
 
 # Decode the characters using the reference table, in textual order.
-def hex_nibbles_spec(s: String) -> +List<Nibble>:
+def hex_nibbles_spec(s: String) -> +List<Defs.Nibble>:
   match s:
     case SNil{}: Nil{}
     case SCon{c, rest}: decode_value_spec(c) <> hex_nibbles_spec(rest)
 
-def nibble_list_value(nibbles: +List<Nibble>) -> U32:
-  List.foldl(~&2, ~Nibble, ~U32,
+def nibble_list_value(nibbles: +List<Defs.Nibble>) -> U32:
+  List.foldl(~&2, ~Defs.Nibble, ~U32,
     ~(acc => n => (acc * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)),
     nibbles, 0)
 
