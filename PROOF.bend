@@ -1443,56 +1443,56 @@ def BinaryLaws.first(high, low):
 def BinaryLaws.second(high, low):
   {==}
 
-def strbyte2.weight128(+bit: Bool) ->
+def strbyte.weight128(+bit: Bool) ->
   {(Bool.to_u32(bit) * 128 : U32) == Bool.pick(U32, bit, 128, 0) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
-def strbyte2.weight64(+bit: Bool) ->
+def strbyte.weight64(+bit: Bool) ->
   {(Bool.to_u32(bit) * 64 : U32) == Bool.pick(U32, bit, 64, 0) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
-def strbyte2.weight32(+bit: Bool) ->
+def strbyte.weight32(+bit: Bool) ->
   {(Bool.to_u32(bit) * 32 : U32) == Bool.pick(U32, bit, 32, 0) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
-def strbyte2.weight16(+bit: Bool) ->
+def strbyte.weight16(+bit: Bool) ->
   {(Bool.to_u32(bit) * 16 : U32) == Bool.pick(U32, bit, 16, 0) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
-def strbyte2.weight8(+bit: Bool) ->
+def strbyte.weight8(+bit: Bool) ->
   {(Bool.to_u32(bit) * 8 : U32) == Bool.pick(U32, bit, 8, 0) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
-def strbyte2.weight4(+bit: Bool) ->
+def strbyte.weight4(+bit: Bool) ->
   {(Bool.to_u32(bit) * 4 : U32) == Bool.pick(U32, bit, 4, 0) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
-def strbyte2.weight2(+bit: Bool) ->
+def strbyte.weight2(+bit: Bool) ->
   {(Bool.to_u32(bit) * 2 : U32) == Bool.pick(U32, bit, 2, 0) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
-def strbyte2.weight1(+bit: Bool) ->
+def strbyte.weight1(+bit: Bool) ->
   {(Bool.to_u32(bit) * 1 : U32) == Bool.to_u32(bit) : U32}:
   match bit:
     case False{}: {==}
     case True{}: {==}
 
 # Expand the binary fold into its positional weights.
-def strbyte2.weighted_choices(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
+def strbyte.weighted_choices(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
   {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) ==
     (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + Bool.pick(U32, b7, 2, 0) + Bool.to_u32(b8) : U32) : U32}:
   match b1 b2 b3 b4 b5 b6 b7:
@@ -1625,21 +1625,21 @@ def strbyte2.weighted_choices(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: B
     case True{} True{} True{} True{} True{} True{} False{}: {==}
     case True{} True{} True{} True{} True{} True{} True{}: {==}
 
-def strbyte2.weighted_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
+def strbyte.weighted_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
   {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) ==
     (Bool.to_u32(b1) * 128 + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}:
-  %Equal.sym(U32, (Bool.to_u32(b1) * 128 : U32), Bool.pick(U32, b1, 128, 0), strbyte2.weight128(b1)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (_ + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
-  %Equal.sym(U32, (Bool.to_u32(b2) * 64 : U32), Bool.pick(U32, b2, 64, 0), strbyte2.weight64(b2)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + _ + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
-  %Equal.sym(U32, (Bool.to_u32(b3) * 32 : U32), Bool.pick(U32, b3, 32, 0), strbyte2.weight32(b3)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + _ + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
-  %Equal.sym(U32, (Bool.to_u32(b4) * 16 : U32), Bool.pick(U32, b4, 16, 0), strbyte2.weight16(b4)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + _ + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
-  %Equal.sym(U32, (Bool.to_u32(b5) * 8 : U32), Bool.pick(U32, b5, 8, 0), strbyte2.weight8(b5)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + _ + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
-  %Equal.sym(U32, (Bool.to_u32(b6) * 4 : U32), Bool.pick(U32, b6, 4, 0), strbyte2.weight4(b6)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + _ + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
-  %Equal.sym(U32, (Bool.to_u32(b7) * 2 : U32), Bool.pick(U32, b7, 2, 0), strbyte2.weight2(b7)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + _ + Bool.to_u32(b8) * 1 : U32) : U32}
-  %Equal.sym(U32, (Bool.to_u32(b8) * 1 : U32), Bool.to_u32(b8), strbyte2.weight1(b8)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + Bool.pick(U32, b7, 2, 0) + _ : U32) : U32}
-  strbyte2.weighted_choices(b1, b2, b3, b4, b5, b6, b7, b8)
+  %Equal.sym(U32, (Bool.to_u32(b1) * 128 : U32), Bool.pick(U32, b1, 128, 0), strbyte.weight128(b1)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (_ + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b2) * 64 : U32), Bool.pick(U32, b2, 64, 0), strbyte.weight64(b2)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + _ + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b3) * 32 : U32), Bool.pick(U32, b3, 32, 0), strbyte.weight32(b3)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + _ + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b4) * 16 : U32), Bool.pick(U32, b4, 16, 0), strbyte.weight16(b4)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + _ + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b5) * 8 : U32), Bool.pick(U32, b5, 8, 0), strbyte.weight8(b5)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + _ + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b6) * 4 : U32), Bool.pick(U32, b6, 4, 0), strbyte.weight4(b6)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + _ + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b7) * 2 : U32), Bool.pick(U32, b7, 2, 0), strbyte.weight2(b7)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + _ + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b8) * 1 : U32), Bool.to_u32(b8), strbyte.weight1(b8)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + Bool.pick(U32, b7, 2, 0) + _ : U32) : U32}
+  strbyte.weighted_choices(b1, b2, b3, b4, b5, b6, b7, b8)
 
 # Result type of the existential law, for eliminating impossible input lengths.
-def Strbyte2Spec(+s: String) -> Type:
+def StrbyteSpec(+s: String) -> Type:
   Exists({B.valid_byte_string(s) == True{} : Bool}, accepted =>
   Exists(Char, c1 =>
   Exists(Char, c2 =>
@@ -1661,24 +1661,24 @@ def Strbyte2Spec(+s: String) -> Type:
     {B.strbyte(s, accepted) ==
       (BinaryLaws.bit_value(c1, p1) * 128 + BinaryLaws.bit_value(c2, p2) * 64 + BinaryLaws.bit_value(c3, p3) * 32 + BinaryLaws.bit_value(c4, p4) * 16 + BinaryLaws.bit_value(c5, p5) * 8 + BinaryLaws.bit_value(c6, p6) * 4 + BinaryLaws.bit_value(c7, p7) * 2 + BinaryLaws.bit_value(c8, p8) * 1 : U32) : U32})))))))))))))))))
 
-def BinaryLaws.strbyte2(s, valid):
+def BinaryLaws.strbyte(s, valid):
   match s:
     case SNil{}:
-      Empty.absurd(Strbyte2Spec(SNil{}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SNil{}), H.hex_u32.false_true(valid))
     case SCon{c1, SNil{}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SNil{}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SNil{}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SNil{}}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SCon{c2, SNil{}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SNil{}}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SNil{}}}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}), H.hex_u32.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       +accepted = Equal.trans(Bool, B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), BinaryLaws.spec_valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), True{}, BinaryLaws.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), valid)
       p1 = H.hex_u32.head_true(BinaryLaws.spec_is_binary_digit(c1), List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), accepted)
@@ -1697,9 +1697,9 @@ def BinaryLaws.strbyte2(s, valid):
       +e7 = H.hex_u32.tail_true(BinaryLaws.spec_is_binary_digit(c7), List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), [c8]), e6)
       p8 = H.hex_u32.head_true(BinaryLaws.spec_is_binary_digit(c8), List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), []), e7)
       (accepted, c1, c2, c3, c4, c5, c6, c7, c8, p1, p2, p3, p4, p5, p6, p7, p8, {==},
-        strbyte2.weighted_bits(B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)))
+        strbyte.weighted_bits(B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
-      Empty.absurd(Strbyte2Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}), H.hex_u32.false_true(valid))
 
 
 # The reference weighted sum fits in a byte for every assignment of bits.
@@ -1965,17 +1965,17 @@ def strbyte_lt_256.choices(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool
 
 def strbyte_lt_256.weighted_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
   {U32.is_lt((Bool.to_u32(b1) * 128 + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}:
-  %Equal.sym(U32, (Bool.to_u32(b1) * 128 : U32), Bool.pick(U32, b1, 128, 0), strbyte2.weight128(b1)) : {U32.is_lt((_ + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
-  %Equal.sym(U32, (Bool.to_u32(b2) * 64 : U32), Bool.pick(U32, b2, 64, 0), strbyte2.weight64(b2)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + _ + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
-  %Equal.sym(U32, (Bool.to_u32(b3) * 32 : U32), Bool.pick(U32, b3, 32, 0), strbyte2.weight32(b3)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + _ + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
-  %Equal.sym(U32, (Bool.to_u32(b4) * 16 : U32), Bool.pick(U32, b4, 16, 0), strbyte2.weight16(b4)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + _ + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
-  %Equal.sym(U32, (Bool.to_u32(b5) * 8 : U32), Bool.pick(U32, b5, 8, 0), strbyte2.weight8(b5)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + _ + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
-  %Equal.sym(U32, (Bool.to_u32(b6) * 4 : U32), Bool.pick(U32, b6, 4, 0), strbyte2.weight4(b6)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + _ + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
-  %Equal.sym(U32, (Bool.to_u32(b7) * 2 : U32), Bool.pick(U32, b7, 2, 0), strbyte2.weight2(b7)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + _ + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
-  %Equal.sym(U32, (Bool.to_u32(b8) * 1 : U32), Bool.to_u32(b8), strbyte2.weight1(b8)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + Bool.pick(U32, b7, 2, 0) + _ : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b1) * 128 : U32), Bool.pick(U32, b1, 128, 0), strbyte.weight128(b1)) : {U32.is_lt((_ + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b2) * 64 : U32), Bool.pick(U32, b2, 64, 0), strbyte.weight64(b2)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + _ + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b3) * 32 : U32), Bool.pick(U32, b3, 32, 0), strbyte.weight32(b3)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + _ + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b4) * 16 : U32), Bool.pick(U32, b4, 16, 0), strbyte.weight16(b4)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + _ + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b5) * 8 : U32), Bool.pick(U32, b5, 8, 0), strbyte.weight8(b5)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + _ + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b6) * 4 : U32), Bool.pick(U32, b6, 4, 0), strbyte.weight4(b6)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + _ + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b7) * 2 : U32), Bool.pick(U32, b7, 2, 0), strbyte.weight2(b7)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + _ + Bool.to_u32(b8) * 1 : U32), 256) == True{} : Bool}
+  %Equal.sym(U32, (Bool.to_u32(b8) * 1 : U32), Bool.to_u32(b8), strbyte.weight1(b8)) : {U32.is_lt((Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + Bool.pick(U32, b7, 2, 0) + _ : U32), 256) == True{} : Bool}
   strbyte_lt_256.choices(b1, b2, b3, b4, b5, b6, b7, b8)
 
-def strbyte_lt_256.finish(+s: String, evidence: Strbyte2Spec(s)) ->
+def strbyte_lt_256.finish(+s: String, evidence: StrbyteSpec(s)) ->
   Exists({B.valid_byte_string(s) == True{} : Bool}, accepted =>
     {U32.is_lt(B.strbyte(s, accepted), 256) == True{} : Bool}):
   (accepted, c1, c2, c3, c4, c5, c6, c7, c8, p1, p2, p3, p4, p5, p6, p7, p8, shape, value) = evidence
@@ -1988,4 +1988,4 @@ def strbyte_lt_256.finish(+s: String, evidence: Strbyte2Spec(s)) ->
       strbyte_lt_256.weighted_bits(Char.is_eq(c1, '1'), Char.is_eq(c2, '1'), Char.is_eq(c3, '1'), Char.is_eq(c4, '1'), Char.is_eq(c5, '1'), Char.is_eq(c6, '1'), Char.is_eq(c7, '1'), Char.is_eq(c8, '1'))))
 
 def BinaryLaws.strbyte_lt_256(s, valid):
-  strbyte_lt_256.finish(s, BinaryLaws.strbyte2(s, valid))
+  strbyte_lt_256.finish(s, BinaryLaws.strbyte(s, valid))

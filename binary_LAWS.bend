@@ -36,7 +36,7 @@ def bits_to_string(bits: +List<Bool>) -> String:
     case Con{bit, rest}:
       SCon{bit_to_char(bit), bits_to_string(rest)}
 
-law strbyte2:
+law strbyte:
   for +s: String
   for valid: {spec_valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
