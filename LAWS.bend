@@ -1,4 +1,5 @@
 import Base
+import ./defs.bend as Defs
 import ./hexdigits.bend as H
 import ./binary.bend as B
 import ./binary_LAWS.bend as BinaryLaws
@@ -99,7 +100,7 @@ law example_zero:
 # The leading zeros enforce the input shape; any other shape returns None.
 # Capacity includes overlong encodings of 0..127; shortest-form validity is separate.
 # https://en.wikipedia.org/wiki/UTF-8#Description
-def maybe_encode_two.bits(bits: B.Bits32()) -> Maybe<&1, U32 & U32>:
+def maybe_encode_two.bits(bits: Defs.Bit32()) -> Maybe<&1, U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),

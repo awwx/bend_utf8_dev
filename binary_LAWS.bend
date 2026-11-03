@@ -1,4 +1,5 @@
 import Base
+import ./defs.bend as Defs
 import ./binary.bend as B
 
 # strbyte: binary byte literals
@@ -30,7 +31,7 @@ law valid_byte_string:
 
 # As of Bend 2.0.39 "if" statements are written this way.
 
-def str_bit8.if(valid: Bool, bit8: B.Bit8()) -> Maybe<&1, B.Bit8()>:
+def str_bit8.if(valid: Bool, bit8: Defs.Bit8()) -> Maybe<&1, Defs.Bit8()>:
   match valid:
     case False{}: None{}
     case True{}: Some{bit8}
@@ -38,7 +39,7 @@ def str_bit8.if(valid: Bool, bit8: B.Bit8()) -> Maybe<&1, B.Bit8()>:
 # If `s` is a valid input, converts the string to a tuple of eight
 # bools, otherwise returns None.
 
-def str_bit8(+s: String) -> Maybe<&1, B.Bit8()>:
+def str_bit8(+s: String) -> Maybe<&1, Defs.Bit8()>:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       str_bit8.if(B.valid_byte_string(s),
@@ -56,8 +57,8 @@ law strbyte:
   for +s: String
   for +valid: {B.valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  exs bits: B.Bit8()
-  {Some{bits} == str_bit8(s) : Maybe<&1, B.Bit8()>} &
+  exs bits: Defs.Bit8()
+  {Some{bits} == str_bit8(s) : Maybe<&1, Defs.Bit8()>} &
   {B.strbyte(s, accepted) == B.bit8_value(bits) : U32}
 
 # A redundant check of our spec: a byte value is always < 256.
@@ -189,7 +190,7 @@ law bit32:
     ((b31, b30, b29, b28, b27, b26, b25, b24),
      (b23, b22, b21, b20, b19, b18, b17, b16),
      (b15, b14, b13, b12, b11, b10, b9, b8),
-     (b7, b6, b5, b4, b3, b2, b1, b0)) : B.Bits32()}
+     (b7, b6, b5, b4, b3, b2, b1, b0)) : Defs.Bit32()}
 
 law bit8:
   for +byte: U32
