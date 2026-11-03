@@ -60,8 +60,8 @@ def str_bit8(+s: String) -> Maybe<&1, Bit8()>:
 # Given a tuple of eight bools, return the U32 value of the binary
 # integer, most significant bit first.
 
-def bits_value(bits: Bit8()) -> U32:
-  (b1, b2, b3, b4, b5, b6, b7, b8) = bits
+def bit8_value(bit8: Bit8()) -> U32:
+  (b1, b2, b3, b4, b5, b6, b7, b8) = bit8
   (Bool.to_u32(b1) * 128 +
    Bool.to_u32(b2) * 64 +
    Bool.to_u32(b3) * 32 +
@@ -77,7 +77,7 @@ law strbyte:
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
   exs bits: Bit8()
   {Some{bits} == str_bit8(s) : Maybe<&1, Bit8()>} &
-  {B.strbyte(s, accepted) == bits_value(bits) : U32}
+  {B.strbyte(s, accepted) == bit8_value(bits) : U32}
 
 # A redundant check of our spec: a byte value is always < 256.
 

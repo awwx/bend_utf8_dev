@@ -1630,7 +1630,7 @@ def StrbyteSpec(+s: String) -> Type:
   Exists({B.valid_byte_string(s) == True{} : Bool}, accepted =>
   Exists(BinaryLaws.Bit8(), bits =>
     {Some{bits} == BinaryLaws.str_bit8(s) : Maybe<&1, BinaryLaws.Bit8()>} &
-    {B.strbyte(s, accepted) == BinaryLaws.bits_value(bits) : U32}))
+    {B.strbyte(s, accepted) == BinaryLaws.bit8_value(bits) : U32}))
 
 def strbyte.parsed(+valid: Bool, bits: BinaryLaws.Bit8(),
   evidence: {valid == True{} : Bool}) ->
@@ -1941,10 +1941,10 @@ def strbyte_lt_256.weighted_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5
 def strbyte_lt_256.parsed_value(m: Maybe<&1, BinaryLaws.Bit8()>) -> U32:
   match m:
     case None{}: 0
-    case Some{bits}: BinaryLaws.bits_value(bits)
+    case Some{bits}: BinaryLaws.bit8_value(bits)
 
 def strbyte_lt_256.reference_if(+valid: Bool, bits: BinaryLaws.Bit8(),
-  bound: {U32.is_lt(BinaryLaws.bits_value(bits), 256) == True{} : Bool}) ->
+  bound: {U32.is_lt(BinaryLaws.bit8_value(bits), 256) == True{} : Bool}) ->
   {U32.is_lt(strbyte_lt_256.parsed_value(BinaryLaws.str_bit8.if(valid, bits)), 256) == True{} : Bool}:
   match valid:
     case False{}: {==}
@@ -1969,7 +1969,7 @@ def strbyte_lt_256.reference(+s: String) ->
 
 def strbyte_lt_256.bits(+s: String, bits: BinaryLaws.Bit8(),
   parsed: {Some{bits} == BinaryLaws.str_bit8(s) : Maybe<&1, BinaryLaws.Bit8()>}) ->
-  {U32.is_lt(BinaryLaws.bits_value(bits), 256) == True{} : Bool}:
+  {U32.is_lt(BinaryLaws.bit8_value(bits), 256) == True{} : Bool}:
   %Equal.sym(Maybe<&1, BinaryLaws.Bit8()>, Some{bits}, BinaryLaws.str_bit8(s), parsed) :
     {U32.is_lt(strbyte_lt_256.parsed_value(_), 256) == True{} : Bool}
   strbyte_lt_256.reference(s)
@@ -1981,9 +1981,9 @@ def strbyte_lt_256.finish(+s: String, evidence: StrbyteSpec(s)) ->
   +a = accepted
   bs = bits
   (a, Equal.trans(Bool, U32.is_lt(B.strbyte(s, a), 256),
-    U32.is_lt(BinaryLaws.bits_value(bs), 256), True{},
+    U32.is_lt(BinaryLaws.bit8_value(bs), 256), True{},
     Equal.cong(U32, Bool, n => U32.is_lt(n, 256), B.strbyte(s, a),
-      BinaryLaws.bits_value(bs), value),
+      BinaryLaws.bit8_value(bs), value),
     strbyte_lt_256.bits(s, bs, parsed)))
 
 def BinaryLaws.strbyte_examples():
