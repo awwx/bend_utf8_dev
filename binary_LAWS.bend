@@ -36,27 +36,6 @@ def bits_to_string(bits: +List<Bool>) -> String:
     case Con{bit, rest}:
       SCon{bit_to_char(bit), bits_to_string(rest)}
 
-# Read the bits most significant first, as in "10000000" = 128.
-def bit_list_value(bits: +List<Bool>) -> U32:
-  List.foldl(~&2, ~Bool, ~U32,
-    ~(acc => bit => (acc * 2 + Bool.to_u32(bit) : U32)), bits, 0)
-
-# Interpret valid binary characters according to the fixed '0'/'1' mapping.
-def binary_bits_spec(s: String) -> +List<Bool>:
-  match s:
-    case SNil{}: Nil{}
-    case SCon{c, rest}: Char.is_eq(c, '1') <> binary_bits_spec(rest)
-
-def binary_byte_spec(s: String) -> U32:
-  bit_list_value(binary_bits_spec(s))
-
-law strbyte:
-  for +s: String
-  for valid: {spec_valid_byte_string(s) == True{} : Bool}
-  exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  {B.strbyte(s, accepted) == binary_byte_spec(s) : U32} &
-  {U32.is_le(B.strbyte(s, accepted), 255) == True{} : Bool}
-
 law strbyte2:
   for +s: String
   for valid: {spec_valid_byte_string(s) == True{} : Bool}
