@@ -10,13 +10,13 @@ law is_binary_digit:
   for +c: Char
   {B.is_binary_digit(c) == spec_is_binary_digit(c) : Bool}
 
-def is_valid_binary_byte_spec(+s: String) -> Bool:
+def spec_valid_byte_string(+s: String) -> Bool:
   Nat.is_eq(String.length(s), 8n) &&
   List.all(~&2, ~Char, ~(c => spec_is_binary_digit(c)), String.to_list(s))
 
 law is_valid_binary_byte_input:
   for +s: String
-  {B.is_valid_binary_byte(s) == is_valid_binary_byte_spec(s) : Bool}
+  {B.valid_byte_string(s) == spec_valid_byte_string(s) : Bool}
 
 # Bool represents a single binary digit: False is '0', True is '1'.
 def bit_to_char(bit: Bool) -> Char:
@@ -47,8 +47,8 @@ def binary_byte_spec(s: String) -> U32:
 
 law binary_byte:
   for +s: String
-  for valid: {is_valid_binary_byte_spec(s) == True{} : Bool}
-  exs accepted: {B.is_valid_binary_byte(s) == True{} : Bool}
+  for valid: {spec_valid_byte_string(s) == True{} : Bool}
+  exs accepted: {B.valid_byte_string(s) == True{} : Bool}
   {B.binary_byte(s, accepted) == binary_byte_spec(s) : U32} &
   {U32.is_le(B.binary_byte(s, accepted), 255) == True{} : Bool}
 

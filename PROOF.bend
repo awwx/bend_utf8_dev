@@ -750,7 +750,7 @@ def eight_bits_bound(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6:
 def binary_byte.digit_proofs(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char,
   +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  +valid: {B.is_valid_binary_byte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool}
+  +valid: {B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool}
 ) -> (
   {B.is_binary_digit(c1) == True{} : Bool} &
   {B.is_binary_digit(c2) == True{} : Bool} &
@@ -778,18 +778,18 @@ def binary_byte.digit_proofs(
   p8 = H.hex_u32.head_true(B.is_binary_digit(c8), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), []), e7)
   (p1, p2, p3, p4, p5, p6, p7, p8)
 
-def BinaryByteSpec(+s: String, +valid: {B.is_valid_binary_byte(s) == True{} : Bool}) -> Type:
+def BinaryByteSpec(+s: String, +valid: {B.valid_byte_string(s) == True{} : Bool}) -> Type:
   {B.binary_byte(s, valid) == BinaryLaws.binary_byte_spec(s) : U32} &
   {U32.is_le(B.binary_byte(s, valid), 255) == True{} : Bool}
 
 def binary_byte_complete(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  valid: {B.is_valid_binary_byte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
+  valid: {B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
   proofs: {B.is_binary_digit(c1) == True{} : Bool} & {B.is_binary_digit(c2) == True{} : Bool} & {B.is_binary_digit(c3) == True{} : Bool} & {B.is_binary_digit(c4) == True{} : Bool} & {B.is_binary_digit(c5) == True{} : Bool} & {B.is_binary_digit(c6) == True{} : Bool} & {B.is_binary_digit(c7) == True{} : Bool} & {B.is_binary_digit(c8) == True{} : Bool}
 ) -> BinaryByteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
   ({==}, eight_bits_bound(B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)))
 
-def binary_byte_agrees(+s: String, valid: {B.is_valid_binary_byte(s) == True{} : Bool}) -> BinaryByteSpec(s, valid):
+def binary_byte_agrees(+s: String, valid: {B.valid_byte_string(s) == True{} : Bool}) -> BinaryByteSpec(s, valid):
   match s:
     case SNil{}:
       Empty.absurd(BinaryByteSpec(SNil{}, valid), H.hex_u32.false_true(valid))
@@ -1748,7 +1748,7 @@ def Laws.hex_u32(s, valid):
   (accepted, hex_u32_agrees(s, accepted))
 
 def BinaryLaws.binary_byte(s, valid):
-  +accepted = Equal.trans(Bool, B.is_valid_binary_byte(s), BinaryLaws.is_valid_binary_byte_spec(s), True{}, BinaryLaws.is_valid_binary_byte_input(s), valid)
+  +accepted = Equal.trans(Bool, B.valid_byte_string(s), BinaryLaws.spec_valid_byte_string(s), True{}, BinaryLaws.is_valid_binary_byte_input(s), valid)
   (accepted, binary_byte_agrees(s, accepted))
 
 def BinaryLaws.byte_mask(mask, byte, valid):
