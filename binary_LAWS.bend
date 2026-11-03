@@ -72,7 +72,7 @@ def str_bits(+s: String) -> Maybe<&1, NumericBits8()>:
     case _: None{}
 
 def strbyte_value(bits: NumericBits8()) -> U32:
-  (BitValue{b1, p1}, BitValue{b2, p2}, BitValue{b3, p3}, BitValue{b4, p4}, BitValue{b5, p5}, BitValue{b6, p6}, BitValue{b7, p7}, BitValue{b8, p8}) = bits
+  (BitValue{b1, _}, BitValue{b2, _}, BitValue{b3, _}, BitValue{b4, _}, BitValue{b5, _}, BitValue{b6, _}, BitValue{b7, _}, BitValue{b8, _}) = bits
   (b1 * 128 +
    b2 * 64 +
    b3 * 32 +
