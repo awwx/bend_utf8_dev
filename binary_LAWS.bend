@@ -6,11 +6,6 @@ import ./binary.bend as B
 def spec_is_binary_digit(+c: Char) -> Bool:
   Char.is_eq('0', c) || Char.is_eq('1', c)
 
-# The proof restricts the character to '0' or '1', with numeric values 0 and 1.
-def bit_value(+c: Char,
-  valid: {spec_is_binary_digit(c) == True{} : Bool}) -> U32:
-  Bool.to_u32(Char.is_eq(c, '1'))
-
 law is_binary_digit:
   for +c: Char
   {B.is_binary_digit(c) == spec_is_binary_digit(c) : Bool}
