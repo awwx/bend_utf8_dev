@@ -1773,268 +1773,200 @@ def BinaryLaws.first(high, low):
 def BinaryLaws.second(high, low):
   {==}
 
+def strbyte2.weight128(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 128 : U32) == Bool.pick(U32, bit, 128, 0) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
+def strbyte2.weight64(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 64 : U32) == Bool.pick(U32, bit, 64, 0) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
+def strbyte2.weight32(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 32 : U32) == Bool.pick(U32, bit, 32, 0) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
+def strbyte2.weight16(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 16 : U32) == Bool.pick(U32, bit, 16, 0) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
+def strbyte2.weight8(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 8 : U32) == Bool.pick(U32, bit, 8, 0) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
+def strbyte2.weight4(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 4 : U32) == Bool.pick(U32, bit, 4, 0) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
+def strbyte2.weight2(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 2 : U32) == Bool.pick(U32, bit, 2, 0) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
+def strbyte2.weight1(+bit: Bool) ->
+  {(Bool.to_u32(bit) * 1 : U32) == Bool.to_u32(bit) : U32}:
+  match bit:
+    case False{}: {==}
+    case True{}: {==}
+
 # Expand the binary fold into its positional weights.
+def strbyte2.weighted_choices(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
+  {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) ==
+    (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + Bool.pick(U32, b7, 2, 0) + Bool.to_u32(b8) : U32) : U32}:
+  match b1 b2 b3 b4 b5 b6 b7:
+    case False{} False{} False{} False{} False{} False{} False{}: {==}
+    case False{} False{} False{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} False{} False{} True{} False{}: {==}
+    case False{} False{} False{} False{} False{} True{} True{}: {==}
+    case False{} False{} False{} False{} True{} False{} False{}: {==}
+    case False{} False{} False{} False{} True{} False{} True{}: {==}
+    case False{} False{} False{} False{} True{} True{} False{}: {==}
+    case False{} False{} False{} False{} True{} True{} True{}: {==}
+    case False{} False{} False{} True{} False{} False{} False{}: {==}
+    case False{} False{} False{} True{} False{} False{} True{}: {==}
+    case False{} False{} False{} True{} False{} True{} False{}: {==}
+    case False{} False{} False{} True{} False{} True{} True{}: {==}
+    case False{} False{} False{} True{} True{} False{} False{}: {==}
+    case False{} False{} False{} True{} True{} False{} True{}: {==}
+    case False{} False{} False{} True{} True{} True{} False{}: {==}
+    case False{} False{} False{} True{} True{} True{} True{}: {==}
+    case False{} False{} True{} False{} False{} False{} False{}: {==}
+    case False{} False{} True{} False{} False{} False{} True{}: {==}
+    case False{} False{} True{} False{} False{} True{} False{}: {==}
+    case False{} False{} True{} False{} False{} True{} True{}: {==}
+    case False{} False{} True{} False{} True{} False{} False{}: {==}
+    case False{} False{} True{} False{} True{} False{} True{}: {==}
+    case False{} False{} True{} False{} True{} True{} False{}: {==}
+    case False{} False{} True{} False{} True{} True{} True{}: {==}
+    case False{} False{} True{} True{} False{} False{} False{}: {==}
+    case False{} False{} True{} True{} False{} False{} True{}: {==}
+    case False{} False{} True{} True{} False{} True{} False{}: {==}
+    case False{} False{} True{} True{} False{} True{} True{}: {==}
+    case False{} False{} True{} True{} True{} False{} False{}: {==}
+    case False{} False{} True{} True{} True{} False{} True{}: {==}
+    case False{} False{} True{} True{} True{} True{} False{}: {==}
+    case False{} False{} True{} True{} True{} True{} True{}: {==}
+    case False{} True{} False{} False{} False{} False{} False{}: {==}
+    case False{} True{} False{} False{} False{} False{} True{}: {==}
+    case False{} True{} False{} False{} False{} True{} False{}: {==}
+    case False{} True{} False{} False{} False{} True{} True{}: {==}
+    case False{} True{} False{} False{} True{} False{} False{}: {==}
+    case False{} True{} False{} False{} True{} False{} True{}: {==}
+    case False{} True{} False{} False{} True{} True{} False{}: {==}
+    case False{} True{} False{} False{} True{} True{} True{}: {==}
+    case False{} True{} False{} True{} False{} False{} False{}: {==}
+    case False{} True{} False{} True{} False{} False{} True{}: {==}
+    case False{} True{} False{} True{} False{} True{} False{}: {==}
+    case False{} True{} False{} True{} False{} True{} True{}: {==}
+    case False{} True{} False{} True{} True{} False{} False{}: {==}
+    case False{} True{} False{} True{} True{} False{} True{}: {==}
+    case False{} True{} False{} True{} True{} True{} False{}: {==}
+    case False{} True{} False{} True{} True{} True{} True{}: {==}
+    case False{} True{} True{} False{} False{} False{} False{}: {==}
+    case False{} True{} True{} False{} False{} False{} True{}: {==}
+    case False{} True{} True{} False{} False{} True{} False{}: {==}
+    case False{} True{} True{} False{} False{} True{} True{}: {==}
+    case False{} True{} True{} False{} True{} False{} False{}: {==}
+    case False{} True{} True{} False{} True{} False{} True{}: {==}
+    case False{} True{} True{} False{} True{} True{} False{}: {==}
+    case False{} True{} True{} False{} True{} True{} True{}: {==}
+    case False{} True{} True{} True{} False{} False{} False{}: {==}
+    case False{} True{} True{} True{} False{} False{} True{}: {==}
+    case False{} True{} True{} True{} False{} True{} False{}: {==}
+    case False{} True{} True{} True{} False{} True{} True{}: {==}
+    case False{} True{} True{} True{} True{} False{} False{}: {==}
+    case False{} True{} True{} True{} True{} False{} True{}: {==}
+    case False{} True{} True{} True{} True{} True{} False{}: {==}
+    case False{} True{} True{} True{} True{} True{} True{}: {==}
+    case True{} False{} False{} False{} False{} False{} False{}: {==}
+    case True{} False{} False{} False{} False{} False{} True{}: {==}
+    case True{} False{} False{} False{} False{} True{} False{}: {==}
+    case True{} False{} False{} False{} False{} True{} True{}: {==}
+    case True{} False{} False{} False{} True{} False{} False{}: {==}
+    case True{} False{} False{} False{} True{} False{} True{}: {==}
+    case True{} False{} False{} False{} True{} True{} False{}: {==}
+    case True{} False{} False{} False{} True{} True{} True{}: {==}
+    case True{} False{} False{} True{} False{} False{} False{}: {==}
+    case True{} False{} False{} True{} False{} False{} True{}: {==}
+    case True{} False{} False{} True{} False{} True{} False{}: {==}
+    case True{} False{} False{} True{} False{} True{} True{}: {==}
+    case True{} False{} False{} True{} True{} False{} False{}: {==}
+    case True{} False{} False{} True{} True{} False{} True{}: {==}
+    case True{} False{} False{} True{} True{} True{} False{}: {==}
+    case True{} False{} False{} True{} True{} True{} True{}: {==}
+    case True{} False{} True{} False{} False{} False{} False{}: {==}
+    case True{} False{} True{} False{} False{} False{} True{}: {==}
+    case True{} False{} True{} False{} False{} True{} False{}: {==}
+    case True{} False{} True{} False{} False{} True{} True{}: {==}
+    case True{} False{} True{} False{} True{} False{} False{}: {==}
+    case True{} False{} True{} False{} True{} False{} True{}: {==}
+    case True{} False{} True{} False{} True{} True{} False{}: {==}
+    case True{} False{} True{} False{} True{} True{} True{}: {==}
+    case True{} False{} True{} True{} False{} False{} False{}: {==}
+    case True{} False{} True{} True{} False{} False{} True{}: {==}
+    case True{} False{} True{} True{} False{} True{} False{}: {==}
+    case True{} False{} True{} True{} False{} True{} True{}: {==}
+    case True{} False{} True{} True{} True{} False{} False{}: {==}
+    case True{} False{} True{} True{} True{} False{} True{}: {==}
+    case True{} False{} True{} True{} True{} True{} False{}: {==}
+    case True{} False{} True{} True{} True{} True{} True{}: {==}
+    case True{} True{} False{} False{} False{} False{} False{}: {==}
+    case True{} True{} False{} False{} False{} False{} True{}: {==}
+    case True{} True{} False{} False{} False{} True{} False{}: {==}
+    case True{} True{} False{} False{} False{} True{} True{}: {==}
+    case True{} True{} False{} False{} True{} False{} False{}: {==}
+    case True{} True{} False{} False{} True{} False{} True{}: {==}
+    case True{} True{} False{} False{} True{} True{} False{}: {==}
+    case True{} True{} False{} False{} True{} True{} True{}: {==}
+    case True{} True{} False{} True{} False{} False{} False{}: {==}
+    case True{} True{} False{} True{} False{} False{} True{}: {==}
+    case True{} True{} False{} True{} False{} True{} False{}: {==}
+    case True{} True{} False{} True{} False{} True{} True{}: {==}
+    case True{} True{} False{} True{} True{} False{} False{}: {==}
+    case True{} True{} False{} True{} True{} False{} True{}: {==}
+    case True{} True{} False{} True{} True{} True{} False{}: {==}
+    case True{} True{} False{} True{} True{} True{} True{}: {==}
+    case True{} True{} True{} False{} False{} False{} False{}: {==}
+    case True{} True{} True{} False{} False{} False{} True{}: {==}
+    case True{} True{} True{} False{} False{} True{} False{}: {==}
+    case True{} True{} True{} False{} False{} True{} True{}: {==}
+    case True{} True{} True{} False{} True{} False{} False{}: {==}
+    case True{} True{} True{} False{} True{} False{} True{}: {==}
+    case True{} True{} True{} False{} True{} True{} False{}: {==}
+    case True{} True{} True{} False{} True{} True{} True{}: {==}
+    case True{} True{} True{} True{} False{} False{} False{}: {==}
+    case True{} True{} True{} True{} False{} False{} True{}: {==}
+    case True{} True{} True{} True{} False{} True{} False{}: {==}
+    case True{} True{} True{} True{} False{} True{} True{}: {==}
+    case True{} True{} True{} True{} True{} False{} False{}: {==}
+    case True{} True{} True{} True{} True{} False{} True{}: {==}
+    case True{} True{} True{} True{} True{} True{} False{}: {==}
+    case True{} True{} True{} True{} True{} True{} True{}: {==}
+
 def strbyte2.weighted_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
   {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) ==
     (Bool.to_u32(b1) * 128 + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}:
-  match b1 b2 b3 b4 b5 b6 b7 b8:
-    case False{} False{} False{} False{} False{} False{} False{} False{}: {==}
-    case False{} False{} False{} False{} False{} False{} False{} True{}: {==}
-    case False{} False{} False{} False{} False{} False{} True{} False{}: {==}
-    case False{} False{} False{} False{} False{} False{} True{} True{}: {==}
-    case False{} False{} False{} False{} False{} True{} False{} False{}: {==}
-    case False{} False{} False{} False{} False{} True{} False{} True{}: {==}
-    case False{} False{} False{} False{} False{} True{} True{} False{}: {==}
-    case False{} False{} False{} False{} False{} True{} True{} True{}: {==}
-    case False{} False{} False{} False{} True{} False{} False{} False{}: {==}
-    case False{} False{} False{} False{} True{} False{} False{} True{}: {==}
-    case False{} False{} False{} False{} True{} False{} True{} False{}: {==}
-    case False{} False{} False{} False{} True{} False{} True{} True{}: {==}
-    case False{} False{} False{} False{} True{} True{} False{} False{}: {==}
-    case False{} False{} False{} False{} True{} True{} False{} True{}: {==}
-    case False{} False{} False{} False{} True{} True{} True{} False{}: {==}
-    case False{} False{} False{} False{} True{} True{} True{} True{}: {==}
-    case False{} False{} False{} True{} False{} False{} False{} False{}: {==}
-    case False{} False{} False{} True{} False{} False{} False{} True{}: {==}
-    case False{} False{} False{} True{} False{} False{} True{} False{}: {==}
-    case False{} False{} False{} True{} False{} False{} True{} True{}: {==}
-    case False{} False{} False{} True{} False{} True{} False{} False{}: {==}
-    case False{} False{} False{} True{} False{} True{} False{} True{}: {==}
-    case False{} False{} False{} True{} False{} True{} True{} False{}: {==}
-    case False{} False{} False{} True{} False{} True{} True{} True{}: {==}
-    case False{} False{} False{} True{} True{} False{} False{} False{}: {==}
-    case False{} False{} False{} True{} True{} False{} False{} True{}: {==}
-    case False{} False{} False{} True{} True{} False{} True{} False{}: {==}
-    case False{} False{} False{} True{} True{} False{} True{} True{}: {==}
-    case False{} False{} False{} True{} True{} True{} False{} False{}: {==}
-    case False{} False{} False{} True{} True{} True{} False{} True{}: {==}
-    case False{} False{} False{} True{} True{} True{} True{} False{}: {==}
-    case False{} False{} False{} True{} True{} True{} True{} True{}: {==}
-    case False{} False{} True{} False{} False{} False{} False{} False{}: {==}
-    case False{} False{} True{} False{} False{} False{} False{} True{}: {==}
-    case False{} False{} True{} False{} False{} False{} True{} False{}: {==}
-    case False{} False{} True{} False{} False{} False{} True{} True{}: {==}
-    case False{} False{} True{} False{} False{} True{} False{} False{}: {==}
-    case False{} False{} True{} False{} False{} True{} False{} True{}: {==}
-    case False{} False{} True{} False{} False{} True{} True{} False{}: {==}
-    case False{} False{} True{} False{} False{} True{} True{} True{}: {==}
-    case False{} False{} True{} False{} True{} False{} False{} False{}: {==}
-    case False{} False{} True{} False{} True{} False{} False{} True{}: {==}
-    case False{} False{} True{} False{} True{} False{} True{} False{}: {==}
-    case False{} False{} True{} False{} True{} False{} True{} True{}: {==}
-    case False{} False{} True{} False{} True{} True{} False{} False{}: {==}
-    case False{} False{} True{} False{} True{} True{} False{} True{}: {==}
-    case False{} False{} True{} False{} True{} True{} True{} False{}: {==}
-    case False{} False{} True{} False{} True{} True{} True{} True{}: {==}
-    case False{} False{} True{} True{} False{} False{} False{} False{}: {==}
-    case False{} False{} True{} True{} False{} False{} False{} True{}: {==}
-    case False{} False{} True{} True{} False{} False{} True{} False{}: {==}
-    case False{} False{} True{} True{} False{} False{} True{} True{}: {==}
-    case False{} False{} True{} True{} False{} True{} False{} False{}: {==}
-    case False{} False{} True{} True{} False{} True{} False{} True{}: {==}
-    case False{} False{} True{} True{} False{} True{} True{} False{}: {==}
-    case False{} False{} True{} True{} False{} True{} True{} True{}: {==}
-    case False{} False{} True{} True{} True{} False{} False{} False{}: {==}
-    case False{} False{} True{} True{} True{} False{} False{} True{}: {==}
-    case False{} False{} True{} True{} True{} False{} True{} False{}: {==}
-    case False{} False{} True{} True{} True{} False{} True{} True{}: {==}
-    case False{} False{} True{} True{} True{} True{} False{} False{}: {==}
-    case False{} False{} True{} True{} True{} True{} False{} True{}: {==}
-    case False{} False{} True{} True{} True{} True{} True{} False{}: {==}
-    case False{} False{} True{} True{} True{} True{} True{} True{}: {==}
-    case False{} True{} False{} False{} False{} False{} False{} False{}: {==}
-    case False{} True{} False{} False{} False{} False{} False{} True{}: {==}
-    case False{} True{} False{} False{} False{} False{} True{} False{}: {==}
-    case False{} True{} False{} False{} False{} False{} True{} True{}: {==}
-    case False{} True{} False{} False{} False{} True{} False{} False{}: {==}
-    case False{} True{} False{} False{} False{} True{} False{} True{}: {==}
-    case False{} True{} False{} False{} False{} True{} True{} False{}: {==}
-    case False{} True{} False{} False{} False{} True{} True{} True{}: {==}
-    case False{} True{} False{} False{} True{} False{} False{} False{}: {==}
-    case False{} True{} False{} False{} True{} False{} False{} True{}: {==}
-    case False{} True{} False{} False{} True{} False{} True{} False{}: {==}
-    case False{} True{} False{} False{} True{} False{} True{} True{}: {==}
-    case False{} True{} False{} False{} True{} True{} False{} False{}: {==}
-    case False{} True{} False{} False{} True{} True{} False{} True{}: {==}
-    case False{} True{} False{} False{} True{} True{} True{} False{}: {==}
-    case False{} True{} False{} False{} True{} True{} True{} True{}: {==}
-    case False{} True{} False{} True{} False{} False{} False{} False{}: {==}
-    case False{} True{} False{} True{} False{} False{} False{} True{}: {==}
-    case False{} True{} False{} True{} False{} False{} True{} False{}: {==}
-    case False{} True{} False{} True{} False{} False{} True{} True{}: {==}
-    case False{} True{} False{} True{} False{} True{} False{} False{}: {==}
-    case False{} True{} False{} True{} False{} True{} False{} True{}: {==}
-    case False{} True{} False{} True{} False{} True{} True{} False{}: {==}
-    case False{} True{} False{} True{} False{} True{} True{} True{}: {==}
-    case False{} True{} False{} True{} True{} False{} False{} False{}: {==}
-    case False{} True{} False{} True{} True{} False{} False{} True{}: {==}
-    case False{} True{} False{} True{} True{} False{} True{} False{}: {==}
-    case False{} True{} False{} True{} True{} False{} True{} True{}: {==}
-    case False{} True{} False{} True{} True{} True{} False{} False{}: {==}
-    case False{} True{} False{} True{} True{} True{} False{} True{}: {==}
-    case False{} True{} False{} True{} True{} True{} True{} False{}: {==}
-    case False{} True{} False{} True{} True{} True{} True{} True{}: {==}
-    case False{} True{} True{} False{} False{} False{} False{} False{}: {==}
-    case False{} True{} True{} False{} False{} False{} False{} True{}: {==}
-    case False{} True{} True{} False{} False{} False{} True{} False{}: {==}
-    case False{} True{} True{} False{} False{} False{} True{} True{}: {==}
-    case False{} True{} True{} False{} False{} True{} False{} False{}: {==}
-    case False{} True{} True{} False{} False{} True{} False{} True{}: {==}
-    case False{} True{} True{} False{} False{} True{} True{} False{}: {==}
-    case False{} True{} True{} False{} False{} True{} True{} True{}: {==}
-    case False{} True{} True{} False{} True{} False{} False{} False{}: {==}
-    case False{} True{} True{} False{} True{} False{} False{} True{}: {==}
-    case False{} True{} True{} False{} True{} False{} True{} False{}: {==}
-    case False{} True{} True{} False{} True{} False{} True{} True{}: {==}
-    case False{} True{} True{} False{} True{} True{} False{} False{}: {==}
-    case False{} True{} True{} False{} True{} True{} False{} True{}: {==}
-    case False{} True{} True{} False{} True{} True{} True{} False{}: {==}
-    case False{} True{} True{} False{} True{} True{} True{} True{}: {==}
-    case False{} True{} True{} True{} False{} False{} False{} False{}: {==}
-    case False{} True{} True{} True{} False{} False{} False{} True{}: {==}
-    case False{} True{} True{} True{} False{} False{} True{} False{}: {==}
-    case False{} True{} True{} True{} False{} False{} True{} True{}: {==}
-    case False{} True{} True{} True{} False{} True{} False{} False{}: {==}
-    case False{} True{} True{} True{} False{} True{} False{} True{}: {==}
-    case False{} True{} True{} True{} False{} True{} True{} False{}: {==}
-    case False{} True{} True{} True{} False{} True{} True{} True{}: {==}
-    case False{} True{} True{} True{} True{} False{} False{} False{}: {==}
-    case False{} True{} True{} True{} True{} False{} False{} True{}: {==}
-    case False{} True{} True{} True{} True{} False{} True{} False{}: {==}
-    case False{} True{} True{} True{} True{} False{} True{} True{}: {==}
-    case False{} True{} True{} True{} True{} True{} False{} False{}: {==}
-    case False{} True{} True{} True{} True{} True{} False{} True{}: {==}
-    case False{} True{} True{} True{} True{} True{} True{} False{}: {==}
-    case False{} True{} True{} True{} True{} True{} True{} True{}: {==}
-    case True{} False{} False{} False{} False{} False{} False{} False{}: {==}
-    case True{} False{} False{} False{} False{} False{} False{} True{}: {==}
-    case True{} False{} False{} False{} False{} False{} True{} False{}: {==}
-    case True{} False{} False{} False{} False{} False{} True{} True{}: {==}
-    case True{} False{} False{} False{} False{} True{} False{} False{}: {==}
-    case True{} False{} False{} False{} False{} True{} False{} True{}: {==}
-    case True{} False{} False{} False{} False{} True{} True{} False{}: {==}
-    case True{} False{} False{} False{} False{} True{} True{} True{}: {==}
-    case True{} False{} False{} False{} True{} False{} False{} False{}: {==}
-    case True{} False{} False{} False{} True{} False{} False{} True{}: {==}
-    case True{} False{} False{} False{} True{} False{} True{} False{}: {==}
-    case True{} False{} False{} False{} True{} False{} True{} True{}: {==}
-    case True{} False{} False{} False{} True{} True{} False{} False{}: {==}
-    case True{} False{} False{} False{} True{} True{} False{} True{}: {==}
-    case True{} False{} False{} False{} True{} True{} True{} False{}: {==}
-    case True{} False{} False{} False{} True{} True{} True{} True{}: {==}
-    case True{} False{} False{} True{} False{} False{} False{} False{}: {==}
-    case True{} False{} False{} True{} False{} False{} False{} True{}: {==}
-    case True{} False{} False{} True{} False{} False{} True{} False{}: {==}
-    case True{} False{} False{} True{} False{} False{} True{} True{}: {==}
-    case True{} False{} False{} True{} False{} True{} False{} False{}: {==}
-    case True{} False{} False{} True{} False{} True{} False{} True{}: {==}
-    case True{} False{} False{} True{} False{} True{} True{} False{}: {==}
-    case True{} False{} False{} True{} False{} True{} True{} True{}: {==}
-    case True{} False{} False{} True{} True{} False{} False{} False{}: {==}
-    case True{} False{} False{} True{} True{} False{} False{} True{}: {==}
-    case True{} False{} False{} True{} True{} False{} True{} False{}: {==}
-    case True{} False{} False{} True{} True{} False{} True{} True{}: {==}
-    case True{} False{} False{} True{} True{} True{} False{} False{}: {==}
-    case True{} False{} False{} True{} True{} True{} False{} True{}: {==}
-    case True{} False{} False{} True{} True{} True{} True{} False{}: {==}
-    case True{} False{} False{} True{} True{} True{} True{} True{}: {==}
-    case True{} False{} True{} False{} False{} False{} False{} False{}: {==}
-    case True{} False{} True{} False{} False{} False{} False{} True{}: {==}
-    case True{} False{} True{} False{} False{} False{} True{} False{}: {==}
-    case True{} False{} True{} False{} False{} False{} True{} True{}: {==}
-    case True{} False{} True{} False{} False{} True{} False{} False{}: {==}
-    case True{} False{} True{} False{} False{} True{} False{} True{}: {==}
-    case True{} False{} True{} False{} False{} True{} True{} False{}: {==}
-    case True{} False{} True{} False{} False{} True{} True{} True{}: {==}
-    case True{} False{} True{} False{} True{} False{} False{} False{}: {==}
-    case True{} False{} True{} False{} True{} False{} False{} True{}: {==}
-    case True{} False{} True{} False{} True{} False{} True{} False{}: {==}
-    case True{} False{} True{} False{} True{} False{} True{} True{}: {==}
-    case True{} False{} True{} False{} True{} True{} False{} False{}: {==}
-    case True{} False{} True{} False{} True{} True{} False{} True{}: {==}
-    case True{} False{} True{} False{} True{} True{} True{} False{}: {==}
-    case True{} False{} True{} False{} True{} True{} True{} True{}: {==}
-    case True{} False{} True{} True{} False{} False{} False{} False{}: {==}
-    case True{} False{} True{} True{} False{} False{} False{} True{}: {==}
-    case True{} False{} True{} True{} False{} False{} True{} False{}: {==}
-    case True{} False{} True{} True{} False{} False{} True{} True{}: {==}
-    case True{} False{} True{} True{} False{} True{} False{} False{}: {==}
-    case True{} False{} True{} True{} False{} True{} False{} True{}: {==}
-    case True{} False{} True{} True{} False{} True{} True{} False{}: {==}
-    case True{} False{} True{} True{} False{} True{} True{} True{}: {==}
-    case True{} False{} True{} True{} True{} False{} False{} False{}: {==}
-    case True{} False{} True{} True{} True{} False{} False{} True{}: {==}
-    case True{} False{} True{} True{} True{} False{} True{} False{}: {==}
-    case True{} False{} True{} True{} True{} False{} True{} True{}: {==}
-    case True{} False{} True{} True{} True{} True{} False{} False{}: {==}
-    case True{} False{} True{} True{} True{} True{} False{} True{}: {==}
-    case True{} False{} True{} True{} True{} True{} True{} False{}: {==}
-    case True{} False{} True{} True{} True{} True{} True{} True{}: {==}
-    case True{} True{} False{} False{} False{} False{} False{} False{}: {==}
-    case True{} True{} False{} False{} False{} False{} False{} True{}: {==}
-    case True{} True{} False{} False{} False{} False{} True{} False{}: {==}
-    case True{} True{} False{} False{} False{} False{} True{} True{}: {==}
-    case True{} True{} False{} False{} False{} True{} False{} False{}: {==}
-    case True{} True{} False{} False{} False{} True{} False{} True{}: {==}
-    case True{} True{} False{} False{} False{} True{} True{} False{}: {==}
-    case True{} True{} False{} False{} False{} True{} True{} True{}: {==}
-    case True{} True{} False{} False{} True{} False{} False{} False{}: {==}
-    case True{} True{} False{} False{} True{} False{} False{} True{}: {==}
-    case True{} True{} False{} False{} True{} False{} True{} False{}: {==}
-    case True{} True{} False{} False{} True{} False{} True{} True{}: {==}
-    case True{} True{} False{} False{} True{} True{} False{} False{}: {==}
-    case True{} True{} False{} False{} True{} True{} False{} True{}: {==}
-    case True{} True{} False{} False{} True{} True{} True{} False{}: {==}
-    case True{} True{} False{} False{} True{} True{} True{} True{}: {==}
-    case True{} True{} False{} True{} False{} False{} False{} False{}: {==}
-    case True{} True{} False{} True{} False{} False{} False{} True{}: {==}
-    case True{} True{} False{} True{} False{} False{} True{} False{}: {==}
-    case True{} True{} False{} True{} False{} False{} True{} True{}: {==}
-    case True{} True{} False{} True{} False{} True{} False{} False{}: {==}
-    case True{} True{} False{} True{} False{} True{} False{} True{}: {==}
-    case True{} True{} False{} True{} False{} True{} True{} False{}: {==}
-    case True{} True{} False{} True{} False{} True{} True{} True{}: {==}
-    case True{} True{} False{} True{} True{} False{} False{} False{}: {==}
-    case True{} True{} False{} True{} True{} False{} False{} True{}: {==}
-    case True{} True{} False{} True{} True{} False{} True{} False{}: {==}
-    case True{} True{} False{} True{} True{} False{} True{} True{}: {==}
-    case True{} True{} False{} True{} True{} True{} False{} False{}: {==}
-    case True{} True{} False{} True{} True{} True{} False{} True{}: {==}
-    case True{} True{} False{} True{} True{} True{} True{} False{}: {==}
-    case True{} True{} False{} True{} True{} True{} True{} True{}: {==}
-    case True{} True{} True{} False{} False{} False{} False{} False{}: {==}
-    case True{} True{} True{} False{} False{} False{} False{} True{}: {==}
-    case True{} True{} True{} False{} False{} False{} True{} False{}: {==}
-    case True{} True{} True{} False{} False{} False{} True{} True{}: {==}
-    case True{} True{} True{} False{} False{} True{} False{} False{}: {==}
-    case True{} True{} True{} False{} False{} True{} False{} True{}: {==}
-    case True{} True{} True{} False{} False{} True{} True{} False{}: {==}
-    case True{} True{} True{} False{} False{} True{} True{} True{}: {==}
-    case True{} True{} True{} False{} True{} False{} False{} False{}: {==}
-    case True{} True{} True{} False{} True{} False{} False{} True{}: {==}
-    case True{} True{} True{} False{} True{} False{} True{} False{}: {==}
-    case True{} True{} True{} False{} True{} False{} True{} True{}: {==}
-    case True{} True{} True{} False{} True{} True{} False{} False{}: {==}
-    case True{} True{} True{} False{} True{} True{} False{} True{}: {==}
-    case True{} True{} True{} False{} True{} True{} True{} False{}: {==}
-    case True{} True{} True{} False{} True{} True{} True{} True{}: {==}
-    case True{} True{} True{} True{} False{} False{} False{} False{}: {==}
-    case True{} True{} True{} True{} False{} False{} False{} True{}: {==}
-    case True{} True{} True{} True{} False{} False{} True{} False{}: {==}
-    case True{} True{} True{} True{} False{} False{} True{} True{}: {==}
-    case True{} True{} True{} True{} False{} True{} False{} False{}: {==}
-    case True{} True{} True{} True{} False{} True{} False{} True{}: {==}
-    case True{} True{} True{} True{} False{} True{} True{} False{}: {==}
-    case True{} True{} True{} True{} False{} True{} True{} True{}: {==}
-    case True{} True{} True{} True{} True{} False{} False{} False{}: {==}
-    case True{} True{} True{} True{} True{} False{} False{} True{}: {==}
-    case True{} True{} True{} True{} True{} False{} True{} False{}: {==}
-    case True{} True{} True{} True{} True{} False{} True{} True{}: {==}
-    case True{} True{} True{} True{} True{} True{} False{} False{}: {==}
-    case True{} True{} True{} True{} True{} True{} False{} True{}: {==}
-    case True{} True{} True{} True{} True{} True{} True{} False{}: {==}
-    case True{} True{} True{} True{} True{} True{} True{} True{}: {==}
-
+  %Equal.sym(U32, (Bool.to_u32(b1) * 128 : U32), Bool.pick(U32, b1, 128, 0), strbyte2.weight128(b1)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (_ + Bool.to_u32(b2) * 64 + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b2) * 64 : U32), Bool.pick(U32, b2, 64, 0), strbyte2.weight64(b2)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + _ + Bool.to_u32(b3) * 32 + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b3) * 32 : U32), Bool.pick(U32, b3, 32, 0), strbyte2.weight32(b3)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + _ + Bool.to_u32(b4) * 16 + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b4) * 16 : U32), Bool.pick(U32, b4, 16, 0), strbyte2.weight16(b4)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + _ + Bool.to_u32(b5) * 8 + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b5) * 8 : U32), Bool.pick(U32, b5, 8, 0), strbyte2.weight8(b5)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + _ + Bool.to_u32(b6) * 4 + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b6) * 4 : U32), Bool.pick(U32, b6, 4, 0), strbyte2.weight4(b6)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + _ + Bool.to_u32(b7) * 2 + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b7) * 2 : U32), Bool.pick(U32, b7, 2, 0), strbyte2.weight2(b7)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + _ + Bool.to_u32(b8) * 1 : U32) : U32}
+  %Equal.sym(U32, (Bool.to_u32(b8) * 1 : U32), Bool.to_u32(b8), strbyte2.weight1(b8)) : {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == (Bool.pick(U32, b1, 128, 0) + Bool.pick(U32, b2, 64, 0) + Bool.pick(U32, b3, 32, 0) + Bool.pick(U32, b4, 16, 0) + Bool.pick(U32, b5, 8, 0) + Bool.pick(U32, b6, 4, 0) + Bool.pick(U32, b7, 2, 0) + _ : U32) : U32}
+  strbyte2.weighted_choices(b1, b2, b3, b4, b5, b6, b7, b8)
 
 # Result type of the existential law, for eliminating impossible input lengths.
 def Strbyte2Spec(+s: String) -> Type:
