@@ -1,5 +1,6 @@
 import Base
 import ./LAWS.bend as Laws
+import ./binary_LAWS.bend as BinaryLaws
 import ./hexdigits.bend as H
 import ./binary.bend as B
 import ./utf8.bend as UTF8
@@ -478,23 +479,23 @@ def binary_membership(+a: Bool, +b: Bool) ->
     case False{} True{}: {==}
     case True{} _: {==}
 
-def Laws.is_binary_digit(c):
+def BinaryLaws.is_binary_digit(c):
   binary_membership(Char.is_eq('0', c), Char.is_eq('1', c))
 
 def binary_all_agree(+chars: +List<Char>) ->
-  {List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), chars) == List.all(~&2, ~Char, ~(c => Laws.is_binary_digit_spec(c)), chars) : Bool}:
+  {List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), chars) == List.all(~&2, ~Char, ~(c => BinaryLaws.is_binary_digit_spec(c)), chars) : Bool}:
   match chars:
     case Nil{}: {==}
     case Con{+c, +rest}:
-      %Laws.is_binary_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => Laws.is_binary_digit_spec(c)), rest), _) : Bool}
+      %BinaryLaws.is_binary_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => BinaryLaws.is_binary_digit_spec(c)), rest), _) : Bool}
       %binary_all_agree(rest) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => _, B.is_binary_digit(c)) : Bool}
       {==}
 
-def Laws.is_valid_binary_byte_input(s):
+def BinaryLaws.is_valid_binary_byte_input(s):
   Equal.cong(Bool, Bool, all => (Nat.is_eq(String.length(s), 8n) && all),
-    List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => Laws.is_binary_digit_spec(c)), String.to_list(s)), binary_all_agree(String.to_list(s)))
+    List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => BinaryLaws.is_binary_digit_spec(c)), String.to_list(s)), binary_all_agree(String.to_list(s)))
 
-def eight_bits_bound(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) -> {U32.is_le(Laws.bit_list_value([b1, b2, b3, b4, b5, b6, b7, b8]), 255) == True{} : Bool}:
+def eight_bits_bound(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) -> {U32.is_le(BinaryLaws.bit_list_value([b1, b2, b3, b4, b5, b6, b7, b8]), 255) == True{} : Bool}:
   match b1 b2 b3 b4 b5 b6 b7 b8:
     case False{} False{} False{} False{} False{} False{} False{} False{}: {==}
     case False{} False{} False{} False{} False{} False{} False{} True{}: {==}
@@ -785,7 +786,7 @@ def binary_byte.digit_proofs(
   (p1, p2, p3, p4, p5, p6, p7, p8)
 
 def BinaryByteSpec(+s: String, +valid: {B.is_valid_binary_byte(s) == True{} : Bool}) -> Type:
-  {B.binary_byte(s, valid) == Laws.binary_byte_spec(s) : U32} &
+  {B.binary_byte(s, valid) == BinaryLaws.binary_byte_spec(s) : U32} &
   {U32.is_le(B.binary_byte(s, valid), 255) == True{} : Bool}
 
 def binary_byte_complete(
@@ -820,12 +821,12 @@ def binary_byte_agrees(+s: String, valid: {B.is_valid_binary_byte(s) == True{} :
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
       Empty.absurd(BinaryByteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), H.hex_u32.false_true(valid))
 
-def Laws.is_valid_byte_mask(mask):
+def BinaryLaws.is_valid_byte_mask(mask):
   {==}
 
 def ByteMaskSpec(+mask: String, +byte: U32,
   valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> Type:
-  {B.byte_mask(mask, byte, valid) == Laws.byte_mask_spec(mask, byte) : Bool}
+  {B.byte_mask(mask, byte, valid) == BinaryLaws.byte_mask_spec(mask, byte) : Bool}
 
 def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> ByteMaskSpec(mask, byte, valid):
   match mask:
@@ -850,7 +851,7 @@ def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mas
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
       Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, byte, valid), H.hex_u32.false_true(valid))
 
-def Laws.byte_mask_examples():
+def BinaryLaws.byte_mask_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==})
 
 def Laws.valid_utf8_one_byte_examples():
@@ -1252,10 +1253,10 @@ def Laws.utf8_two_roundtrip(bits):
 def Laws.utf8_encoding_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==})
 
-def Laws.bit8(byte, valid):
+def BinaryLaws.bit8(byte, valid):
   {==}
 
-def Laws.bit8_examples():
+def BinaryLaws.bit8_examples():
   ({==}, {==}, {==})
 
 def Byte8RoundtripSpec(+byte: U32,
@@ -1607,7 +1608,7 @@ def byte8_roundtrip_bits(
         case True{} True{} True{} True{} True{} True{} True{} False{}: {==}
         case True{} True{} True{} True{} True{} True{} True{} True{}: {==}
 
-def Laws.byte8_bit8_roundtrip(byte, valid):
+def BinaryLaws.byte8_bit8_roundtrip(byte, valid):
   match byte:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       byte8_roundtrip_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
@@ -1654,12 +1655,12 @@ def byte2_roundtrip_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: B
       Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}: {==}
 
-def Laws.u32_byte2_roundtrip(value, valid):
+def BinaryLaws.u32_byte2_roundtrip(value, valid):
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       byte2_roundtrip_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
 
-def Laws.byte2_examples():
+def BinaryLaws.byte2_examples():
   ({==}, {==}, {==}, {==})
 
 
@@ -1744,7 +1745,7 @@ def Laws.utf8_two_byte_shape(b1, b2):
 def Laws.utf8_decode_two(b1, b2):
   {==}
 
-def Laws.bit32(value):
+def BinaryLaws.bit32(value):
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       {==}
@@ -1753,28 +1754,28 @@ def Laws.hex_u32(s, valid):
   +accepted = Equal.trans(Bool, H.is_valid_hex_u32(s), Laws.is_valid_hex_u32_spec(s), True{}, Laws.is_valid_hex_u32_input(s), valid)
   (accepted, hex_u32_agrees(s, accepted))
 
-def Laws.binary_byte(s, valid):
-  +accepted = Equal.trans(Bool, B.is_valid_binary_byte(s), Laws.is_valid_binary_byte_spec(s), True{}, Laws.is_valid_binary_byte_input(s), valid)
+def BinaryLaws.binary_byte(s, valid):
+  +accepted = Equal.trans(Bool, B.is_valid_binary_byte(s), BinaryLaws.is_valid_binary_byte_spec(s), True{}, BinaryLaws.is_valid_binary_byte_input(s), valid)
   (accepted, binary_byte_agrees(s, accepted))
 
-def Laws.byte_mask(mask, byte, valid):
-  +accepted = Equal.trans(Bool, B.is_valid_byte_mask(mask), Laws.is_valid_byte_mask_spec(mask), True{}, Laws.is_valid_byte_mask(mask), valid)
+def BinaryLaws.byte_mask(mask, byte, valid):
+  +accepted = Equal.trans(Bool, B.is_valid_byte_mask(mask), BinaryLaws.is_valid_byte_mask_spec(mask), True{}, BinaryLaws.is_valid_byte_mask(mask), valid)
   (accepted, byte_mask_agrees(mask, byte, accepted))
 
-def Laws.byte8(bits):
+def BinaryLaws.byte8(bits):
   match bits:
     case (b7, b6, b5, b4, b3, b2, b1, b0): {==}
 
-def Laws.u32_byte2(value, valid):
+def BinaryLaws.u32_byte2(value, valid):
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}: {==}
 
-def Laws.byte2_u32(high, low):
+def BinaryLaws.byte2_u32(high, low):
   match high low:
     case U32{WCon{h0, WCon{h1, WCon{h2, WCon{h3, WCon{h4, WCon{h5, WCon{h6, WCon{h7, WCon{h8, WCon{h9, WCon{h10, WCon{h11, WCon{h12, WCon{h13, WCon{h14, WCon{h15, WCon{h16, WCon{h17, WCon{h18, WCon{h19, WCon{h20, WCon{h21, WCon{h22, WCon{h23, WCon{h24, WCon{h25, WCon{h26, WCon{h27, WCon{h28, WCon{h29, WCon{h30, WCon{h31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}} U32{WCon{l0, WCon{l1, WCon{l2, WCon{l3, WCon{l4, WCon{l5, WCon{l6, WCon{l7, WCon{l8, WCon{l9, WCon{l10, WCon{l11, WCon{l12, WCon{l13, WCon{l14, WCon{l15, WCon{l16, WCon{l17, WCon{l18, WCon{l19, WCon{l20, WCon{l21, WCon{l22, WCon{l23, WCon{l24, WCon{l25, WCon{l26, WCon{l27, WCon{l28, WCon{l29, WCon{l30, WCon{l31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}: {==}
 
-def Laws.first(high, low):
+def BinaryLaws.first(high, low):
   {==}
 
-def Laws.second(high, low):
+def BinaryLaws.second(high, low):
   {==}
