@@ -1,12 +1,10 @@
 import Base
 import ./binary.bend as B
 
-# The complete set of accepted binary characters.
-def binary_digits() -> +List<Char>:
-  ['0', '1']
+# A binary digit is '0' or '1'.
 
-def spec_is_binary_digit(c: Char) -> Bool:
-  List.contains(~Char, ~Char.is_eq, binary_digits(), c)
+def spec_is_binary_digit(+c: Char) -> Bool:
+  Char.is_eq('0', c) || Char.is_eq('1', c)
 
 law is_binary_digit:
   for +c: Char

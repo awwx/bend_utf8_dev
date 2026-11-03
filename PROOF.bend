@@ -472,15 +472,8 @@ def Laws.example_zero():
   {==}
 
 # Binary input validation and byte conversion.
-def binary_membership(+a: Bool, +b: Bool) ->
-  {Bool.or(a, b) == List.any.if(u => List.any.if(u => False{}, b), a) : Bool}:
-  match a b:
-    case False{} False{}: {==}
-    case False{} True{}: {==}
-    case True{} _: {==}
-
 def BinaryLaws.is_binary_digit(c):
-  binary_membership(Char.is_eq('0', c), Char.is_eq('1', c))
+  {==}
 
 def binary_all_agree(+chars: +List<Char>) ->
   {List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), chars) == List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), chars) : Bool}:
