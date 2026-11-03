@@ -88,6 +88,12 @@ law strbyte2:
      bit_value(c7, p7) * 2 +
      bit_value(c8, p8) * 1 : U32) : U32}
 
+law strbyte_lt_256:
+  for +s: String
+  for valid: {spec_valid_byte_string(s) == True{} : Bool}
+  exs accepted: {B.valid_byte_string(s) == True{} : Bool}
+  {U32.is_lt(B.strbyte(s, accepted), 256) == True{} : Bool}
+
 # A well-formed mask has eight symbols, each from the fixed mask alphabet.
 def is_mask_digit_spec(+c: Char) -> Bool:
   Char.is_eq(c, '0') || Char.is_eq(c, '1') || Char.is_eq(c, 'x')
