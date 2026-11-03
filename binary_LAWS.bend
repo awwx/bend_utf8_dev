@@ -13,65 +13,46 @@ law valid_byte_string:
     (Nat.is_eq(String.length(s), 8n) &&
      List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s))) : Bool}
 
-# A numeric bit carries evidence that its U32 value is either zero or one.
-type BitValue is Data:
-  BitValue{value: U32, bound: {U32.is_le(value, 1) == True{} : Bool}}
-
-def bit_number.bound(+bit: Bool) -> {U32.is_le(Bool.to_u32(bit), 1) == True{} : Bool}:
-  match bit:
-    case False{}: {==}
-    case True{}: {==}
-
-def bit_number(+bit: Bool) -> BitValue:
-  BitValue{Bool.to_u32(bit), bit_number.bound(bit)}
-
-def NumericBits8() -> Type:
-  BitValue & BitValue & BitValue & BitValue & BitValue & BitValue & BitValue & BitValue
+def Bool8() -> Type:
+  Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool
 
 # Independent reference parser: only eight binary characters are accepted.
-def str_bits.if(valid: Bool, bits: NumericBits8()) -> Maybe<&1, NumericBits8()>:
+def str_bits.if(valid: Bool, bits: Bool8()) -> Maybe<&1, Bool8()>:
   match valid:
     case False{}: None{}
     case True{}: Some{bits}
 
-def str_bits(+s: String) -> Maybe<&1, NumericBits8()>:
+def str_bits(+s: String) -> Maybe<&1, Bool8()>:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       str_bits.if(B.valid_byte_string(s),
-        (bit_number(Char.is_eq(c1, '1')),
-         bit_number(Char.is_eq(c2, '1')),
-         bit_number(Char.is_eq(c3, '1')),
-         bit_number(Char.is_eq(c4, '1')),
-         bit_number(Char.is_eq(c5, '1')),
-         bit_number(Char.is_eq(c6, '1')),
-         bit_number(Char.is_eq(c7, '1')),
-         bit_number(Char.is_eq(c8, '1'))))
+        (Char.is_eq(c1, '1'),
+         Char.is_eq(c2, '1'),
+         Char.is_eq(c3, '1'),
+         Char.is_eq(c4, '1'),
+         Char.is_eq(c5, '1'),
+         Char.is_eq(c6, '1'),
+         Char.is_eq(c7, '1'),
+         Char.is_eq(c8, '1')))
     case _: None{}
 
-def bits_value(bits: NumericBits8()) -> U32:
-  (BitValue{b1, _},
-   BitValue{b2, _},
-   BitValue{b3, _},
-   BitValue{b4, _},
-   BitValue{b5, _},
-   BitValue{b6, _},
-   BitValue{b7, _},
-   BitValue{b8, _}) = bits
-  (b1 * 128 +
-   b2 * 64 +
-   b3 * 32 +
-   b4 * 16 +
-   b5 * 8 +
-   b6 * 4 +
-   b7 * 2 +
-   b8 * 1 : U32)
+def bits_value(bits: Bool8()) -> U32:
+  (b1, b2, b3, b4, b5, b6, b7, b8) = bits
+  (Bool.to_u32(b1) * 128 +
+   Bool.to_u32(b2) * 64 +
+   Bool.to_u32(b3) * 32 +
+   Bool.to_u32(b4) * 16 +
+   Bool.to_u32(b5) * 8 +
+   Bool.to_u32(b6) * 4 +
+   Bool.to_u32(b7) * 2 +
+   Bool.to_u32(b8) * 1 : U32)
 
 law strbyte:
   for +s: String
   for +valid: {B.valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  exs bits: NumericBits8()
-  {Some{bits} == str_bits(s) : Maybe<&1, NumericBits8()>} &
+  exs bits: Bool8()
+  {Some{bits} == str_bits(s) : Maybe<&1, Bool8()>} &
   {B.strbyte(s, accepted) == bits_value(bits) : U32}
 
 law strbyte_lt_256:
