@@ -483,17 +483,17 @@ def BinaryLaws.is_binary_digit(c):
   binary_membership(Char.is_eq('0', c), Char.is_eq('1', c))
 
 def binary_all_agree(+chars: +List<Char>) ->
-  {List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), chars) == List.all(~&2, ~Char, ~(c => BinaryLaws.is_binary_digit_spec(c)), chars) : Bool}:
+  {List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), chars) == List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), chars) : Bool}:
   match chars:
     case Nil{}: {==}
     case Con{+c, +rest}:
-      %BinaryLaws.is_binary_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => BinaryLaws.is_binary_digit_spec(c)), rest), _) : Bool}
+      %BinaryLaws.is_binary_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), rest), _) : Bool}
       %binary_all_agree(rest) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => _, B.is_binary_digit(c)) : Bool}
       {==}
 
 def BinaryLaws.is_valid_binary_byte_input(s):
   Equal.cong(Bool, Bool, all => (Nat.is_eq(String.length(s), 8n) && all),
-    List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => BinaryLaws.is_binary_digit_spec(c)), String.to_list(s)), binary_all_agree(String.to_list(s)))
+    List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), String.to_list(s)), binary_all_agree(String.to_list(s)))
 
 def eight_bits_bound(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) -> {U32.is_le(BinaryLaws.bit_list_value([b1, b2, b3, b4, b5, b6, b7, b8]), 255) == True{} : Bool}:
   match b1 b2 b3 b4 b5 b6 b7 b8:

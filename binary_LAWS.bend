@@ -5,16 +5,16 @@ import ./binary.bend as B
 def binary_digits() -> +List<Char>:
   ['0', '1']
 
-def is_binary_digit_spec(c: Char) -> Bool:
+def spec_is_binary_digit(c: Char) -> Bool:
   List.contains(~Char, ~Char.is_eq, binary_digits(), c)
 
 law is_binary_digit:
   for +c: Char
-  {B.is_binary_digit(c) == is_binary_digit_spec(c) : Bool}
+  {B.is_binary_digit(c) == spec_is_binary_digit(c) : Bool}
 
 def is_valid_binary_byte_spec(+s: String) -> Bool:
   Nat.is_eq(String.length(s), 8n) &&
-  List.all(~&2, ~Char, ~(c => is_binary_digit_spec(c)), String.to_list(s))
+  List.all(~&2, ~Char, ~(c => spec_is_binary_digit(c)), String.to_list(s))
 
 law is_valid_binary_byte_input:
   for +s: String
