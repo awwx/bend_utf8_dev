@@ -51,27 +51,25 @@ def bit_number(+bit: Bool) -> BitValue:
 def NumericBits8() -> Type:
   BitValue & BitValue & BitValue & BitValue & BitValue & BitValue & BitValue & BitValue
 
-# Independent reference conversion, in textual order.
-def str_bits(s: String, valid: {spec_valid_byte_string(s) == True{} : Bool}) -> NumericBits8():
+# Independent reference parser: only eight binary characters are accepted.
+def str_bits.if(valid: Bool, bits: NumericBits8()) -> Maybe<&1, NumericBits8()>:
+  match valid:
+    case False{}: None{}
+    case True{}: Some{bits}
+
+def str_bits(+s: String) -> Maybe<&1, NumericBits8()>:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
-      (bit_number(Char.is_eq(c1, '1')),
-       bit_number(Char.is_eq(c2, '1')),
-       bit_number(Char.is_eq(c3, '1')),
-       bit_number(Char.is_eq(c4, '1')),
-       bit_number(Char.is_eq(c5, '1')),
-       bit_number(Char.is_eq(c6, '1')),
-       bit_number(Char.is_eq(c7, '1')),
-       bit_number(Char.is_eq(c8, '1')))
-    case _:
-      (bit_number(False{}),
-       bit_number(False{}),
-       bit_number(False{}),
-       bit_number(False{}),
-       bit_number(False{}),
-       bit_number(False{}),
-       bit_number(False{}),
-       bit_number(False{}))
+      str_bits.if(spec_valid_byte_string(s),
+        (bit_number(Char.is_eq(c1, '1')),
+         bit_number(Char.is_eq(c2, '1')),
+         bit_number(Char.is_eq(c3, '1')),
+         bit_number(Char.is_eq(c4, '1')),
+         bit_number(Char.is_eq(c5, '1')),
+         bit_number(Char.is_eq(c6, '1')),
+         bit_number(Char.is_eq(c7, '1')),
+         bit_number(Char.is_eq(c8, '1'))))
+    case _: None{}
 
 def strbyte_value(bits: NumericBits8()) -> U32:
   (BitValue{b1, p1}, BitValue{b2, p2}, BitValue{b3, p3}, BitValue{b4, p4}, BitValue{b5, p5}, BitValue{b6, p6}, BitValue{b7, p7}, BitValue{b8, p8}) = bits
@@ -88,7 +86,9 @@ law strbyte:
   for +s: String
   for +valid: {spec_valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  {B.strbyte(s, accepted) == strbyte_value(str_bits(s, valid)) : U32}
+  exs bits: NumericBits8()
+  {Some{bits} == str_bits(s) : Maybe<&1, NumericBits8()>} &
+  {B.strbyte(s, accepted) == strbyte_value(bits) : U32}
 
 law strbyte_lt_256:
   for +s: String
