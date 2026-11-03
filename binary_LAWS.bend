@@ -35,18 +35,18 @@ def Bit8() -> Type:
 
 # As of Bend 2.0.39 "if" statements are written this way.
 
-def str_bits.if(valid: Bool, bits: Bit8()) -> Maybe<&1, Bit8()>:
+def str_bit8.if(valid: Bool, bit8: Bit8()) -> Maybe<&1, Bit8()>:
   match valid:
     case False{}: None{}
-    case True{}: Some{bits}
+    case True{}: Some{bit8}
 
 # If `s` is a valid input, converts the string to a tuple of eight
 # bools, otherwise returns None.
 
-def str_bits(+s: String) -> Maybe<&1, Bit8()>:
+def str_bit8(+s: String) -> Maybe<&1, Bit8()>:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
-      str_bits.if(B.valid_byte_string(s),
+      str_bit8.if(B.valid_byte_string(s),
         (Char.is_eq(c1, '1'),
          Char.is_eq(c2, '1'),
          Char.is_eq(c3, '1'),
@@ -76,7 +76,7 @@ law strbyte:
   for +valid: {B.valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
   exs bits: Bit8()
-  {Some{bits} == str_bits(s) : Maybe<&1, Bit8()>} &
+  {Some{bits} == str_bit8(s) : Maybe<&1, Bit8()>} &
   {B.strbyte(s, accepted) == bits_value(bits) : U32}
 
 # A redundant check of our spec: a byte value is always < 256.

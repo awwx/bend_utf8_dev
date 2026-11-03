@@ -1629,13 +1629,13 @@ def strbyte.weighted_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool,
 def StrbyteSpec(+s: String) -> Type:
   Exists({B.valid_byte_string(s) == True{} : Bool}, accepted =>
   Exists(BinaryLaws.Bit8(), bits =>
-    {Some{bits} == BinaryLaws.str_bits(s) : Maybe<&1, BinaryLaws.Bit8()>} &
+    {Some{bits} == BinaryLaws.str_bit8(s) : Maybe<&1, BinaryLaws.Bit8()>} &
     {B.strbyte(s, accepted) == BinaryLaws.bits_value(bits) : U32}))
 
 def strbyte.parsed(+valid: Bool, bits: BinaryLaws.Bit8(),
   evidence: {valid == True{} : Bool}) ->
-  {Some{bits} == BinaryLaws.str_bits.if(valid, bits) : Maybe<&1, BinaryLaws.Bit8()>}:
-  Equal.cong(Bool, Maybe<&1, BinaryLaws.Bit8()>, hit => BinaryLaws.str_bits.if(hit, bits),
+  {Some{bits} == BinaryLaws.str_bit8.if(valid, bits) : Maybe<&1, BinaryLaws.Bit8()>}:
+  Equal.cong(Bool, Maybe<&1, BinaryLaws.Bit8()>, hit => BinaryLaws.str_bit8.if(hit, bits),
     True{}, valid, Equal.sym(Bool, valid, True{}, evidence))
 
 def BinaryLaws.strbyte(s, valid):
@@ -1945,13 +1945,13 @@ def strbyte_lt_256.parsed_value(m: Maybe<&1, BinaryLaws.Bit8()>) -> U32:
 
 def strbyte_lt_256.reference_if(+valid: Bool, bits: BinaryLaws.Bit8(),
   bound: {U32.is_lt(BinaryLaws.bits_value(bits), 256) == True{} : Bool}) ->
-  {U32.is_lt(strbyte_lt_256.parsed_value(BinaryLaws.str_bits.if(valid, bits)), 256) == True{} : Bool}:
+  {U32.is_lt(strbyte_lt_256.parsed_value(BinaryLaws.str_bit8.if(valid, bits)), 256) == True{} : Bool}:
   match valid:
     case False{}: {==}
     case True{}: bound
 
 def strbyte_lt_256.reference(+s: String) ->
-  {U32.is_lt(strbyte_lt_256.parsed_value(BinaryLaws.str_bits(s)), 256) == True{} : Bool}:
+  {U32.is_lt(strbyte_lt_256.parsed_value(BinaryLaws.str_bit8(s)), 256) == True{} : Bool}:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       strbyte_lt_256.reference_if(B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}),
@@ -1968,9 +1968,9 @@ def strbyte_lt_256.reference(+s: String) ->
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}: {==}
 
 def strbyte_lt_256.bits(+s: String, bits: BinaryLaws.Bit8(),
-  parsed: {Some{bits} == BinaryLaws.str_bits(s) : Maybe<&1, BinaryLaws.Bit8()>}) ->
+  parsed: {Some{bits} == BinaryLaws.str_bit8(s) : Maybe<&1, BinaryLaws.Bit8()>}) ->
   {U32.is_lt(BinaryLaws.bits_value(bits), 256) == True{} : Bool}:
-  %Equal.sym(Maybe<&1, BinaryLaws.Bit8()>, Some{bits}, BinaryLaws.str_bits(s), parsed) :
+  %Equal.sym(Maybe<&1, BinaryLaws.Bit8()>, Some{bits}, BinaryLaws.str_bit8(s), parsed) :
     {U32.is_lt(strbyte_lt_256.parsed_value(_), 256) == True{} : Bool}
   strbyte_lt_256.reference(s)
 
