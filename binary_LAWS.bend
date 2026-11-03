@@ -28,14 +28,9 @@ law valid_byte_string:
     (Nat.is_eq(String.length(s), 8n) &&
      List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s))) : Bool}
 
-# Type alias for a tuple of eight bools.
-
-def Bit8() -> Type:
-  Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool
-
 # As of Bend 2.0.39 "if" statements are written this way.
 
-def str_bit8.if(valid: Bool, bit8: Bit8()) -> Maybe<&1, Bit8()>:
+def str_bit8.if(valid: Bool, bit8: B.Bit8()) -> Maybe<&1, B.Bit8()>:
   match valid:
     case False{}: None{}
     case True{}: Some{bit8}
@@ -43,7 +38,7 @@ def str_bit8.if(valid: Bool, bit8: Bit8()) -> Maybe<&1, Bit8()>:
 # If `s` is a valid input, converts the string to a tuple of eight
 # bools, otherwise returns None.
 
-def str_bit8(+s: String) -> Maybe<&1, Bit8()>:
+def str_bit8(+s: String) -> Maybe<&1, B.Bit8()>:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       str_bit8.if(B.valid_byte_string(s),
@@ -57,27 +52,13 @@ def str_bit8(+s: String) -> Maybe<&1, Bit8()>:
          Char.is_eq(c8, '1')))
     case _: None{}
 
-# Given a tuple of eight bools, return the U32 value of the binary
-# integer, most significant bit first.
-
-def bit8_value(bit8: Bit8()) -> U32:
-  (b1, b2, b3, b4, b5, b6, b7, b8) = bit8
-  (Bool.to_u32(b1) * 128 +
-   Bool.to_u32(b2) * 64 +
-   Bool.to_u32(b3) * 32 +
-   Bool.to_u32(b4) * 16 +
-   Bool.to_u32(b5) * 8 +
-   Bool.to_u32(b6) * 4 +
-   Bool.to_u32(b7) * 2 +
-   Bool.to_u32(b8) * 1 : U32)
-
 law strbyte:
   for +s: String
   for +valid: {B.valid_byte_string(s) == True{} : Bool}
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  exs bits: Bit8()
-  {Some{bits} == str_bit8(s) : Maybe<&1, Bit8()>} &
-  {B.strbyte(s, accepted) == bit8_value(bits) : U32}
+  exs bits: B.Bit8()
+  {Some{bits} == str_bit8(s) : Maybe<&1, B.Bit8()>} &
+  {B.strbyte(s, accepted) == B.bit8_value(bits) : U32}
 
 # A redundant check of our spec: a byte value is always < 256.
 
@@ -151,7 +132,7 @@ law byte_mask:
     (U32.is_le(byte, 255) && mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
 
 # A byte's tuple is most significant bit first; all higher U32 bits are zero.
-law byte8:
+law bit8_value:
   for +b7: Bool
   for +b6: Bool
   for +b5: Bool
@@ -160,7 +141,15 @@ law byte8:
   for +b2: Bool
   for +b1: Bool
   for +b0: Bool
-  {B.byte8((b7, b6, b5, b4, b3, b2, b1, b0)) == U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, Word.zero(24n)}}}}}}}}} : U32}
+  {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    (Bool.to_u32(b7) * 128 +
+     Bool.to_u32(b6) * 64 +
+     Bool.to_u32(b5) * 32 +
+     Bool.to_u32(b4) * 16 +
+     Bool.to_u32(b3) * 8 +
+     Bool.to_u32(b2) * 4 +
+     Bool.to_u32(b1) * 2 +
+     Bool.to_u32(b0) * 1 : U32) : U32}
 
 # Canonical decomposition: most significant byte and bit first.
 law bit32:
@@ -221,10 +210,10 @@ law bit8_examples:
   {B.bit8(255, {==}) == (True{}, True{}, True{}, True{}, True{}, True{}, True{}, True{}) : Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool}
 
 # Every byte survives conversion to eight bits and back without loss.
-law byte8_bit8_roundtrip:
+law bit8_value_bit8_roundtrip:
   for +byte: U32
   for valid: {U32.is_le(byte, 255) == True{} : Bool}
-  {B.byte8(B.bit8(byte, valid)) == byte : U32}
+  {B.bit8_value(B.bit8(byte, valid)) == byte : U32}
 
 # Reference byte order: the high byte occupies bits 15..8, the low byte 7..0.
 # Split bits 15..8 and 7..0 into high and low bytes.
@@ -263,7 +252,7 @@ law u32_byte2:
   for +b0: Bool
   for valid: {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}
   {B.u32_byte2(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, valid) ==
-    (B.byte8((b15, b14, b13, b12, b11, b10, b9, b8)), B.byte8((b7, b6, b5, b4, b3, b2, b1, b0))) : U32 & U32}
+    (B.bit8_value((b15, b14, b13, b12, b11, b10, b9, b8)), B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0))) : U32 & U32}
 
 # Pack the low eight bits of each argument; discard the remaining bits.
 law byte2_u32:
