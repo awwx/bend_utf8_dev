@@ -8,6 +8,11 @@ import ./binary.bend as B
 # The first argument is a string.  The second argument provides a
 # proof that the string is exactly eight characters, each '0' or '1'.
 
+law strbyte_examples:
+  {B.strbyte("00000000", {==}) ==   0 : U32} &
+  {B.strbyte("10000000", {==}) == 128 : U32} &
+  {B.strbyte("10000001", {==}) == 129 : U32} &
+  {B.strbyte("11111111", {==}) == 255 : U32}
 
 # A binary digit in the string is '0' or '1'.
 
@@ -74,12 +79,6 @@ law strbyte:
   {Some{bits} == str_bits(s) : Maybe<&1, Bool8()>} &
   {B.strbyte(s, accepted) == bits_value(bits) : U32}
 
-law strbyte_examples:
-  {B.strbyte("00000000", {==}) ==   0 : U32} &
-  {B.strbyte("10000000", {==}) == 128 : U32} &
-  {B.strbyte("10000001", {==}) == 129 : U32} &
-  {B.strbyte("11111111", {==}) == 255 : U32}
-
 # A redundant check of our spec: a byte value is always < 256.
 
 law strbyte_lt_256:
@@ -100,7 +99,25 @@ law strbyte_injective:
   for equal: {B.strbyte(s1, valid1) == B.strbyte(s2, valid2) : U32}
   {s1 == s2 : String}
 
-# A well-formed mask has eight symbols, each from the fixed mask alphabet.
+
+# Byte masks
+#
+#
+# A byte mask is a string of exactly eight characters, each '0', '1',
+# or 'x'.
+#
+# A byte matches a mask if for each '0' and '1' in the mask, the byte
+# has a matching 0 or 1 at that position.
+
+law byte_mask_examples:
+  {B.byte_mask("01xxxxxx",  64, {==}) == True{}  : Bool} &
+  {B.byte_mask("01xxxxxx", 127, {==}) == True{}  : Bool} &
+  {B.byte_mask("01xxxxxx", 128, {==}) == False{} : Bool} &
+  {B.byte_mask("xxxxxxxx", 255, {==}) == True{}  : Bool} &
+  {B.byte_mask("xxxxxxxx", 256, {==}) == False{} : Bool} &
+  {B.byte_mask("10000001", 129, {==}) == True{}  : Bool} &
+  {B.byte_mask("10000001", 128, {==}) == False{} : Bool}
+
 law is_mask_digit:
   for +c: Char
   {B.is_mask_digit(c) ==
@@ -132,15 +149,6 @@ law byte_mask:
   exs accepted: {B.is_valid_byte_mask(mask) == True{} : Bool}
   {B.byte_mask(mask, byte, accepted) ==
     (U32.is_le(byte, 255) && mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
-
-law byte_mask_examples:
-  {B.byte_mask("01xxxxxx", 64, {==}) == True{} : Bool} &
-  {B.byte_mask("01xxxxxx", 127, {==}) == True{} : Bool} &
-  {B.byte_mask("01xxxxxx", 128, {==}) == False{} : Bool} &
-  {B.byte_mask("xxxxxxxx", 255, {==}) == True{} : Bool} &
-  {B.byte_mask("xxxxxxxx", 256, {==}) == False{} : Bool} &
-  {B.byte_mask("10000001", 129, {==}) == True{} : Bool} &
-  {B.byte_mask("10000001", 128, {==}) == False{} : Bool}
 
 # A byte's tuple is most significant bit first; all higher U32 bits are zero.
 law byte8:
