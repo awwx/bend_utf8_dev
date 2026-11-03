@@ -14,7 +14,7 @@ def spec_valid_byte_string(+s: String) -> Bool:
   Nat.is_eq(String.length(s), 8n) &&
   List.all(~&2, ~Char, ~(c => spec_is_binary_digit(c)), String.to_list(s))
 
-law is_valid_binary_byte_input:
+law valid_byte_string:
   for +s: String
   {B.valid_byte_string(s) == spec_valid_byte_string(s) : Bool}
 

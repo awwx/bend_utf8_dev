@@ -484,7 +484,7 @@ def binary_all_agree(+chars: +List<Char>) ->
       %binary_all_agree(rest) : {List.all.if(u => List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), rest), B.is_binary_digit(c)) == List.all.if(u => _, B.is_binary_digit(c)) : Bool}
       {==}
 
-def BinaryLaws.is_valid_binary_byte_input(s):
+def BinaryLaws.valid_byte_string(s):
   Equal.cong(Bool, Bool, all => (Nat.is_eq(String.length(s), 8n) && all),
     List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => BinaryLaws.spec_is_binary_digit(c)), String.to_list(s)), binary_all_agree(String.to_list(s)))
 
@@ -1748,7 +1748,7 @@ def Laws.hex_u32(s, valid):
   (accepted, hex_u32_agrees(s, accepted))
 
 def BinaryLaws.binary_byte(s, valid):
-  +accepted = Equal.trans(Bool, B.valid_byte_string(s), BinaryLaws.spec_valid_byte_string(s), True{}, BinaryLaws.is_valid_binary_byte_input(s), valid)
+  +accepted = Equal.trans(Bool, B.valid_byte_string(s), BinaryLaws.spec_valid_byte_string(s), True{}, BinaryLaws.valid_byte_string(s), valid)
   (accepted, binary_byte_agrees(s, accepted))
 
 def BinaryLaws.byte_mask(mask, byte, valid):
