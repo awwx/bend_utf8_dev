@@ -1986,8 +1986,8 @@ def strbyte_lt_256.finish(+s: String, evidence: StrbyteSpec(s)) ->
       BinaryLaws.bits_value(bs), value),
     strbyte_lt_256.bits(s, bs, parsed)))
 
-def BinaryLaws.strbyte_example():
-  {==}
+def BinaryLaws.strbyte_examples():
+  ({==}, {==}, {==}, {==})
 
 def BinaryLaws.strbyte_lt_256(s, valid):
   strbyte_lt_256.finish(s, BinaryLaws.strbyte(s, valid))

@@ -15,20 +15,28 @@ law is_binary_digit:
   for +c: Char
   {B.is_binary_digit(c) == (Char.is_eq('0', c) || Char.is_eq('1', c)) : Bool}
 
+# A valid input string is eight characters, each '0' or '1'.
+
 law valid_byte_string:
   for +s: String
   {B.valid_byte_string(s) ==
     (Nat.is_eq(String.length(s), 8n) &&
      List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s))) : Bool}
 
+# Type alias for a tuple of eight bools.
+
 def Bool8() -> Type:
   Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool
 
-# Independent reference parser: only eight binary characters are accepted.
+# As of  Bend 2.0.39 "if" statements are written this way.
+
 def str_bits.if(valid: Bool, bits: Bool8()) -> Maybe<&1, Bool8()>:
   match valid:
     case False{}: None{}
     case True{}: Some{bits}
+
+# If `s` is a valid input, converts the string to a tuple of eight
+# bools, otherwise returns None.
 
 def str_bits(+s: String) -> Maybe<&1, Bool8()>:
   match s:
@@ -43,6 +51,9 @@ def str_bits(+s: String) -> Maybe<&1, Bool8()>:
          Char.is_eq(c7, '1'),
          Char.is_eq(c8, '1')))
     case _: None{}
+
+# Given a tuple of eight bools, return the U32 value of the binary
+# integer, most significant bit first.
 
 def bits_value(bits: Bool8()) -> U32:
   (b1, b2, b3, b4, b5, b6, b7, b8) = bits
@@ -63,8 +74,13 @@ law strbyte:
   {Some{bits} == str_bits(s) : Maybe<&1, Bool8()>} &
   {B.strbyte(s, accepted) == bits_value(bits) : U32}
 
-law strbyte_example:
-  {B.strbyte("10000001", {==}) == 129 : U32}
+law strbyte_examples:
+  {B.strbyte("00000000", {==}) ==   0 : U32} &
+  {B.strbyte("10000000", {==}) == 128 : U32} &
+  {B.strbyte("10000001", {==}) == 129 : U32} &
+  {B.strbyte("11111111", {==}) == 255 : U32}
+
+# A redundant check of our spec: a byte value is always < 256.
 
 law strbyte_lt_256:
   for +s: String
@@ -72,9 +88,9 @@ law strbyte_lt_256:
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
   {U32.is_lt(B.strbyte(s, accepted), 256) == True{} : Bool}
 
-# `strbyte` is injective: each different input produces a different
-# output value.
-# If the output values are the same that implies the inputs were the same.
+# Another redundant check for our spec: `strbyte` is injective: each
+# different input produces a different output value.  If the output
+# values are the same that implies the inputs were the same.
 
 law strbyte_injective:
   for +s1: String
