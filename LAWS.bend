@@ -9,13 +9,9 @@ def hex_digits() -> +List<Char>:
   ['0', '1', '2', '3', '4', '5', '6', '7',
    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F']
 
-# Independent character domain and hexadecimal decoding table.
-def is_hex_digit_spec(c: Char) -> Bool:
-  List.contains(~Char, ~Char.is_eq, hex_digits(), c)
-
 law is_hex_digit:
   for +c: Char
-  {H.is_hex_digit(c) == is_hex_digit_spec(c) : Bool}
+  {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, hex_digits(), c) : Bool}
 
 # The low four bits represent a nibble, least significant bit first.
 def nibble_spec(value: U32) -> Defs.Nibble():
@@ -51,20 +47,18 @@ def decode_value_spec(c: Char) -> Defs.Nibble():
 # correctly by the implementation, regardless of its packaged input type.
 law decode:
   for +c: Char
-  for valid: {is_hex_digit_spec(c) == True{} : Bool}
+  for valid: {H.is_hex_digit(c) == True{} : Bool}
   exs accepted: {H.is_hex_digit(c) == True{} : Bool}
   {Some{H.decode(H.HexDigitChar{c, accepted})} == decode_spec(c) : Maybe<&2, Defs.Nibble()>}
 
 # A valid input to hex_u32 is a string of exactly eight characters,
 # each of which is a valid hexadecimal digit.
 
-def is_valid_hex_u32_spec(+s: String) -> Bool:
-  Nat.is_eq(String.length(s), 8n) &&
-  List.all(~&2, ~Char, ~(c => is_hex_digit_spec(c)), String.to_list(s))
-
 law is_valid_hex_u32_input:
   for +s: String
-  {H.is_valid_hex_u32(s) == is_valid_hex_u32_spec(s) : Bool}
+  {H.is_valid_hex_u32(s) ==
+    (Nat.is_eq(String.length(s), 8n) &&
+     List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s))) : Bool}
 
 # Decode the characters using the reference table, in textual order.
 def hex_nibbles_spec(s: String) -> +List<Defs.Nibble>:
@@ -83,7 +77,7 @@ def hex_u32_spec(s: String) -> U32:
 
 law hex_u32:
   for +s: String
-  for valid: {is_valid_hex_u32_spec(s) == True{} : Bool}
+  for valid: {H.is_valid_hex_u32(s) == True{} : Bool}
   exs accepted: {H.is_valid_hex_u32(s) == True{} : Bool}
   {H.hex_u32(s, accepted) == hex_u32_spec(s) : U32}
 

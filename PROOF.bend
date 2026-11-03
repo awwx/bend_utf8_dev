@@ -396,7 +396,7 @@ def decode_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) -> Dec
       decode_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
 
 def Laws.decode(c, valid):
-  +accepted = Equal.trans(Bool, H.is_hex_digit(c), Laws.is_hex_digit_spec(c), True{}, Laws.is_hex_digit(c), valid)
+  +accepted = valid
   (accepted, decode_agrees(c, accepted))
 
 def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) ->
@@ -405,18 +405,8 @@ def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) 
     result => Maybe.default(&2, Defs.Nibble(), result, Word.zero(4n)),
     Some{H.decode(H.HexDigitChar{c, valid})}, Laws.decode_spec(c), decode_agrees(c, valid))
 
-def hex_all_agree(+chars: +List<Char>) ->
-  {List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), chars) == List.all(~&2, ~Char, ~(c => Laws.is_hex_digit_spec(c)), chars) : Bool}:
-  match chars:
-    case Nil{}: {==}
-    case Con{+c, +rest}:
-      %Laws.is_hex_digit(c) : {List.all.if(u => List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), rest), H.is_hex_digit(c)) == List.all.if(u => List.all(~&2, ~Char, ~(c => Laws.is_hex_digit_spec(c)), rest), _) : Bool}
-      %hex_all_agree(rest) : {List.all.if(u => List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), rest), H.is_hex_digit(c)) == List.all.if(u => _, H.is_hex_digit(c)) : Bool}
-      {==}
-
 def Laws.is_valid_hex_u32_input(s):
-  Equal.cong(Bool, Bool, all => (Nat.is_eq(String.length(s), 8n) && all),
-    List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s)), List.all(~&2, ~Char, ~(c => Laws.is_hex_digit_spec(c)), String.to_list(s)), hex_all_agree(String.to_list(s)))
+  {==}
 
 def HexU32Spec(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
   {H.hex_u32(s, valid) == Laws.hex_u32_spec(s) : U32}
@@ -1410,7 +1400,7 @@ def BinaryLaws.bit32(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20,
   {==}
 
 def Laws.hex_u32(s, valid):
-  +accepted = Equal.trans(Bool, H.is_valid_hex_u32(s), Laws.is_valid_hex_u32_spec(s), True{}, Laws.is_valid_hex_u32_input(s), valid)
+  +accepted = valid
   (accepted, hex_u32_agrees(s, accepted))
 
 def BinaryLaws.byte_mask(mask, byte, valid):
