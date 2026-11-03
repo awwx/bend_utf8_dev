@@ -2,6 +2,26 @@ import Base
 import ./defs.bend as Defs
 import ./binary.bend as B
 
+# A byte's tuple is most significant bit first; all higher U32 bits are zero.
+law bit8_value:
+  for +b7: Bool
+  for +b6: Bool
+  for +b5: Bool
+  for +b4: Bool
+  for +b3: Bool
+  for +b2: Bool
+  for +b1: Bool
+  for +b0: Bool
+  {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    (Bool.to_u32(b7) * 128 +
+     Bool.to_u32(b6) * 64 +
+     Bool.to_u32(b5) * 32 +
+     Bool.to_u32(b4) * 16 +
+     Bool.to_u32(b3) * 8 +
+     Bool.to_u32(b2) * 4 +
+     Bool.to_u32(b1) * 2 +
+     Bool.to_u32(b0) * 1 : U32) : U32}
+
 # strbyte: binary byte literals
 #
 # strbyte("10000001", {==}) == 129
@@ -131,26 +151,6 @@ law byte_mask:
   exs accepted: {B.is_valid_byte_mask(mask) == True{} : Bool}
   {B.byte_mask(mask, byte, accepted) ==
     (U32.is_le(byte, 255) && mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
-
-# A byte's tuple is most significant bit first; all higher U32 bits are zero.
-law bit8_value:
-  for +b7: Bool
-  for +b6: Bool
-  for +b5: Bool
-  for +b4: Bool
-  for +b3: Bool
-  for +b2: Bool
-  for +b1: Bool
-  for +b0: Bool
-  {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
-    (Bool.to_u32(b7) * 128 +
-     Bool.to_u32(b6) * 64 +
-     Bool.to_u32(b5) * 32 +
-     Bool.to_u32(b4) * 16 +
-     Bool.to_u32(b3) * 8 +
-     Bool.to_u32(b2) * 4 +
-     Bool.to_u32(b1) * 2 +
-     Bool.to_u32(b0) * 1 : U32) : U32}
 
 # Canonical decomposition: most significant byte and bit first.
 law bit32:
