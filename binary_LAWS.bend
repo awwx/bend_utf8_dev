@@ -1,17 +1,15 @@
 import Base
 import ./binary.bend as B
 
-# strbyte
-
+# strbyte: binary byte literals
+#
 # strbyte("10000001", {==}) == 129
 #
-# Provides a literal binary number representation for a single byte.
-#
 # The first argument is a string.  The second argument provides a
-# proof that the string is eight characters, each '0' or '1'.
+# proof that the string is exactly eight characters, each '0' or '1'.
 
 
-# A binary digit is '0' or '1'.
+# A binary digit in the string is '0' or '1'.
 
 law is_binary_digit:
   for +c: Char
