@@ -74,6 +74,18 @@ law strbyte_lt_256:
   exs accepted: {B.valid_byte_string(s) == True{} : Bool}
   {U32.is_lt(B.strbyte(s, accepted), 256) == True{} : Bool}
 
+# `strbyte` is injective: each different input produces a different
+# output value.
+# If the output values are the same that implies the inputs were the same.
+
+law strbyte_injective:
+  for +s1: String
+  for +s2: String
+  for +valid1: {B.valid_byte_string(s1) == True{} : Bool}
+  for +valid2: {B.valid_byte_string(s2) == True{} : Bool}
+  for equal: {B.strbyte(s1, valid1) == B.strbyte(s2, valid2) : U32}
+  {s1 == s2 : String}
+
 # A well-formed mask has eight symbols, each from the fixed mask alphabet.
 law is_mask_digit:
   for +c: Char

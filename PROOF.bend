@@ -1991,3 +1991,416 @@ def BinaryLaws.strbyte_example():
 
 def BinaryLaws.strbyte_lt_256(s, valid):
   strbyte_lt_256.finish(s, BinaryLaws.strbyte(s, valid))
+
+# Render a single binary digit for the inverse used by injectivity.
+def strbyte_injective.bit_char(bit: Bool) -> Char:
+  match bit:
+    case False{}: '0'
+    case True{}: '1'
+
+def strbyte_injective.char_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
+  valid: {B.is_binary_digit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)) == True{} : Bool}) ->
+  {strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}:
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8 b7 b6 b5 b4 b3 b2 b1 b0:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} _ _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} False{} _ _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} True{} _ _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} True{} _ _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} True{} _:
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} False{} False{}: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} False{} True{}: {==}
+
+def strbyte_injective.char(+c: Char,
+  valid: {B.is_binary_digit(c) == True{} : Bool}) ->
+  {strbyte_injective.bit_char(B.char_to_bit(c)) == c : Char}:
+  match c:
+    case Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      strbyte_injective.char_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
+
+# A left inverse reads the eight low bits back in textual order.
+def strbyte_injective.render(value: U32) -> String:
+  match value:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      SCon{strbyte_injective.bit_char(b7), SCon{strbyte_injective.bit_char(b6), SCon{strbyte_injective.bit_char(b5), SCon{strbyte_injective.bit_char(b4), SCon{strbyte_injective.bit_char(b3), SCon{strbyte_injective.bit_char(b2), SCon{strbyte_injective.bit_char(b1), SCon{strbyte_injective.bit_char(b0), SNil{}}}}}}}}}
+
+def strbyte_injective.fold_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5: Bool, +b6: Bool, +b7: Bool, +b8: Bool) ->
+  {B.strbyte.fold_bits([b1, b2, b3, b4, b5, b6, b7, b8], 0) == B.byte8((b1, b2, b3, b4, b5, b6, b7, b8)) : U32}:
+  match b1 b2 b3 b4 b5 b6 b7 b8:
+    case False{} False{} False{} False{} False{} False{} False{} False{}: {==}
+    case False{} False{} False{} False{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} False{} False{} False{} True{} False{}: {==}
+    case False{} False{} False{} False{} False{} False{} True{} True{}: {==}
+    case False{} False{} False{} False{} False{} True{} False{} False{}: {==}
+    case False{} False{} False{} False{} False{} True{} False{} True{}: {==}
+    case False{} False{} False{} False{} False{} True{} True{} False{}: {==}
+    case False{} False{} False{} False{} False{} True{} True{} True{}: {==}
+    case False{} False{} False{} False{} True{} False{} False{} False{}: {==}
+    case False{} False{} False{} False{} True{} False{} False{} True{}: {==}
+    case False{} False{} False{} False{} True{} False{} True{} False{}: {==}
+    case False{} False{} False{} False{} True{} False{} True{} True{}: {==}
+    case False{} False{} False{} False{} True{} True{} False{} False{}: {==}
+    case False{} False{} False{} False{} True{} True{} False{} True{}: {==}
+    case False{} False{} False{} False{} True{} True{} True{} False{}: {==}
+    case False{} False{} False{} False{} True{} True{} True{} True{}: {==}
+    case False{} False{} False{} True{} False{} False{} False{} False{}: {==}
+    case False{} False{} False{} True{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} True{} False{} False{} True{} False{}: {==}
+    case False{} False{} False{} True{} False{} False{} True{} True{}: {==}
+    case False{} False{} False{} True{} False{} True{} False{} False{}: {==}
+    case False{} False{} False{} True{} False{} True{} False{} True{}: {==}
+    case False{} False{} False{} True{} False{} True{} True{} False{}: {==}
+    case False{} False{} False{} True{} False{} True{} True{} True{}: {==}
+    case False{} False{} False{} True{} True{} False{} False{} False{}: {==}
+    case False{} False{} False{} True{} True{} False{} False{} True{}: {==}
+    case False{} False{} False{} True{} True{} False{} True{} False{}: {==}
+    case False{} False{} False{} True{} True{} False{} True{} True{}: {==}
+    case False{} False{} False{} True{} True{} True{} False{} False{}: {==}
+    case False{} False{} False{} True{} True{} True{} False{} True{}: {==}
+    case False{} False{} False{} True{} True{} True{} True{} False{}: {==}
+    case False{} False{} False{} True{} True{} True{} True{} True{}: {==}
+    case False{} False{} True{} False{} False{} False{} False{} False{}: {==}
+    case False{} False{} True{} False{} False{} False{} False{} True{}: {==}
+    case False{} False{} True{} False{} False{} False{} True{} False{}: {==}
+    case False{} False{} True{} False{} False{} False{} True{} True{}: {==}
+    case False{} False{} True{} False{} False{} True{} False{} False{}: {==}
+    case False{} False{} True{} False{} False{} True{} False{} True{}: {==}
+    case False{} False{} True{} False{} False{} True{} True{} False{}: {==}
+    case False{} False{} True{} False{} False{} True{} True{} True{}: {==}
+    case False{} False{} True{} False{} True{} False{} False{} False{}: {==}
+    case False{} False{} True{} False{} True{} False{} False{} True{}: {==}
+    case False{} False{} True{} False{} True{} False{} True{} False{}: {==}
+    case False{} False{} True{} False{} True{} False{} True{} True{}: {==}
+    case False{} False{} True{} False{} True{} True{} False{} False{}: {==}
+    case False{} False{} True{} False{} True{} True{} False{} True{}: {==}
+    case False{} False{} True{} False{} True{} True{} True{} False{}: {==}
+    case False{} False{} True{} False{} True{} True{} True{} True{}: {==}
+    case False{} False{} True{} True{} False{} False{} False{} False{}: {==}
+    case False{} False{} True{} True{} False{} False{} False{} True{}: {==}
+    case False{} False{} True{} True{} False{} False{} True{} False{}: {==}
+    case False{} False{} True{} True{} False{} False{} True{} True{}: {==}
+    case False{} False{} True{} True{} False{} True{} False{} False{}: {==}
+    case False{} False{} True{} True{} False{} True{} False{} True{}: {==}
+    case False{} False{} True{} True{} False{} True{} True{} False{}: {==}
+    case False{} False{} True{} True{} False{} True{} True{} True{}: {==}
+    case False{} False{} True{} True{} True{} False{} False{} False{}: {==}
+    case False{} False{} True{} True{} True{} False{} False{} True{}: {==}
+    case False{} False{} True{} True{} True{} False{} True{} False{}: {==}
+    case False{} False{} True{} True{} True{} False{} True{} True{}: {==}
+    case False{} False{} True{} True{} True{} True{} False{} False{}: {==}
+    case False{} False{} True{} True{} True{} True{} False{} True{}: {==}
+    case False{} False{} True{} True{} True{} True{} True{} False{}: {==}
+    case False{} False{} True{} True{} True{} True{} True{} True{}: {==}
+    case False{} True{} False{} False{} False{} False{} False{} False{}: {==}
+    case False{} True{} False{} False{} False{} False{} False{} True{}: {==}
+    case False{} True{} False{} False{} False{} False{} True{} False{}: {==}
+    case False{} True{} False{} False{} False{} False{} True{} True{}: {==}
+    case False{} True{} False{} False{} False{} True{} False{} False{}: {==}
+    case False{} True{} False{} False{} False{} True{} False{} True{}: {==}
+    case False{} True{} False{} False{} False{} True{} True{} False{}: {==}
+    case False{} True{} False{} False{} False{} True{} True{} True{}: {==}
+    case False{} True{} False{} False{} True{} False{} False{} False{}: {==}
+    case False{} True{} False{} False{} True{} False{} False{} True{}: {==}
+    case False{} True{} False{} False{} True{} False{} True{} False{}: {==}
+    case False{} True{} False{} False{} True{} False{} True{} True{}: {==}
+    case False{} True{} False{} False{} True{} True{} False{} False{}: {==}
+    case False{} True{} False{} False{} True{} True{} False{} True{}: {==}
+    case False{} True{} False{} False{} True{} True{} True{} False{}: {==}
+    case False{} True{} False{} False{} True{} True{} True{} True{}: {==}
+    case False{} True{} False{} True{} False{} False{} False{} False{}: {==}
+    case False{} True{} False{} True{} False{} False{} False{} True{}: {==}
+    case False{} True{} False{} True{} False{} False{} True{} False{}: {==}
+    case False{} True{} False{} True{} False{} False{} True{} True{}: {==}
+    case False{} True{} False{} True{} False{} True{} False{} False{}: {==}
+    case False{} True{} False{} True{} False{} True{} False{} True{}: {==}
+    case False{} True{} False{} True{} False{} True{} True{} False{}: {==}
+    case False{} True{} False{} True{} False{} True{} True{} True{}: {==}
+    case False{} True{} False{} True{} True{} False{} False{} False{}: {==}
+    case False{} True{} False{} True{} True{} False{} False{} True{}: {==}
+    case False{} True{} False{} True{} True{} False{} True{} False{}: {==}
+    case False{} True{} False{} True{} True{} False{} True{} True{}: {==}
+    case False{} True{} False{} True{} True{} True{} False{} False{}: {==}
+    case False{} True{} False{} True{} True{} True{} False{} True{}: {==}
+    case False{} True{} False{} True{} True{} True{} True{} False{}: {==}
+    case False{} True{} False{} True{} True{} True{} True{} True{}: {==}
+    case False{} True{} True{} False{} False{} False{} False{} False{}: {==}
+    case False{} True{} True{} False{} False{} False{} False{} True{}: {==}
+    case False{} True{} True{} False{} False{} False{} True{} False{}: {==}
+    case False{} True{} True{} False{} False{} False{} True{} True{}: {==}
+    case False{} True{} True{} False{} False{} True{} False{} False{}: {==}
+    case False{} True{} True{} False{} False{} True{} False{} True{}: {==}
+    case False{} True{} True{} False{} False{} True{} True{} False{}: {==}
+    case False{} True{} True{} False{} False{} True{} True{} True{}: {==}
+    case False{} True{} True{} False{} True{} False{} False{} False{}: {==}
+    case False{} True{} True{} False{} True{} False{} False{} True{}: {==}
+    case False{} True{} True{} False{} True{} False{} True{} False{}: {==}
+    case False{} True{} True{} False{} True{} False{} True{} True{}: {==}
+    case False{} True{} True{} False{} True{} True{} False{} False{}: {==}
+    case False{} True{} True{} False{} True{} True{} False{} True{}: {==}
+    case False{} True{} True{} False{} True{} True{} True{} False{}: {==}
+    case False{} True{} True{} False{} True{} True{} True{} True{}: {==}
+    case False{} True{} True{} True{} False{} False{} False{} False{}: {==}
+    case False{} True{} True{} True{} False{} False{} False{} True{}: {==}
+    case False{} True{} True{} True{} False{} False{} True{} False{}: {==}
+    case False{} True{} True{} True{} False{} False{} True{} True{}: {==}
+    case False{} True{} True{} True{} False{} True{} False{} False{}: {==}
+    case False{} True{} True{} True{} False{} True{} False{} True{}: {==}
+    case False{} True{} True{} True{} False{} True{} True{} False{}: {==}
+    case False{} True{} True{} True{} False{} True{} True{} True{}: {==}
+    case False{} True{} True{} True{} True{} False{} False{} False{}: {==}
+    case False{} True{} True{} True{} True{} False{} False{} True{}: {==}
+    case False{} True{} True{} True{} True{} False{} True{} False{}: {==}
+    case False{} True{} True{} True{} True{} False{} True{} True{}: {==}
+    case False{} True{} True{} True{} True{} True{} False{} False{}: {==}
+    case False{} True{} True{} True{} True{} True{} False{} True{}: {==}
+    case False{} True{} True{} True{} True{} True{} True{} False{}: {==}
+    case False{} True{} True{} True{} True{} True{} True{} True{}: {==}
+    case True{} False{} False{} False{} False{} False{} False{} False{}: {==}
+    case True{} False{} False{} False{} False{} False{} False{} True{}: {==}
+    case True{} False{} False{} False{} False{} False{} True{} False{}: {==}
+    case True{} False{} False{} False{} False{} False{} True{} True{}: {==}
+    case True{} False{} False{} False{} False{} True{} False{} False{}: {==}
+    case True{} False{} False{} False{} False{} True{} False{} True{}: {==}
+    case True{} False{} False{} False{} False{} True{} True{} False{}: {==}
+    case True{} False{} False{} False{} False{} True{} True{} True{}: {==}
+    case True{} False{} False{} False{} True{} False{} False{} False{}: {==}
+    case True{} False{} False{} False{} True{} False{} False{} True{}: {==}
+    case True{} False{} False{} False{} True{} False{} True{} False{}: {==}
+    case True{} False{} False{} False{} True{} False{} True{} True{}: {==}
+    case True{} False{} False{} False{} True{} True{} False{} False{}: {==}
+    case True{} False{} False{} False{} True{} True{} False{} True{}: {==}
+    case True{} False{} False{} False{} True{} True{} True{} False{}: {==}
+    case True{} False{} False{} False{} True{} True{} True{} True{}: {==}
+    case True{} False{} False{} True{} False{} False{} False{} False{}: {==}
+    case True{} False{} False{} True{} False{} False{} False{} True{}: {==}
+    case True{} False{} False{} True{} False{} False{} True{} False{}: {==}
+    case True{} False{} False{} True{} False{} False{} True{} True{}: {==}
+    case True{} False{} False{} True{} False{} True{} False{} False{}: {==}
+    case True{} False{} False{} True{} False{} True{} False{} True{}: {==}
+    case True{} False{} False{} True{} False{} True{} True{} False{}: {==}
+    case True{} False{} False{} True{} False{} True{} True{} True{}: {==}
+    case True{} False{} False{} True{} True{} False{} False{} False{}: {==}
+    case True{} False{} False{} True{} True{} False{} False{} True{}: {==}
+    case True{} False{} False{} True{} True{} False{} True{} False{}: {==}
+    case True{} False{} False{} True{} True{} False{} True{} True{}: {==}
+    case True{} False{} False{} True{} True{} True{} False{} False{}: {==}
+    case True{} False{} False{} True{} True{} True{} False{} True{}: {==}
+    case True{} False{} False{} True{} True{} True{} True{} False{}: {==}
+    case True{} False{} False{} True{} True{} True{} True{} True{}: {==}
+    case True{} False{} True{} False{} False{} False{} False{} False{}: {==}
+    case True{} False{} True{} False{} False{} False{} False{} True{}: {==}
+    case True{} False{} True{} False{} False{} False{} True{} False{}: {==}
+    case True{} False{} True{} False{} False{} False{} True{} True{}: {==}
+    case True{} False{} True{} False{} False{} True{} False{} False{}: {==}
+    case True{} False{} True{} False{} False{} True{} False{} True{}: {==}
+    case True{} False{} True{} False{} False{} True{} True{} False{}: {==}
+    case True{} False{} True{} False{} False{} True{} True{} True{}: {==}
+    case True{} False{} True{} False{} True{} False{} False{} False{}: {==}
+    case True{} False{} True{} False{} True{} False{} False{} True{}: {==}
+    case True{} False{} True{} False{} True{} False{} True{} False{}: {==}
+    case True{} False{} True{} False{} True{} False{} True{} True{}: {==}
+    case True{} False{} True{} False{} True{} True{} False{} False{}: {==}
+    case True{} False{} True{} False{} True{} True{} False{} True{}: {==}
+    case True{} False{} True{} False{} True{} True{} True{} False{}: {==}
+    case True{} False{} True{} False{} True{} True{} True{} True{}: {==}
+    case True{} False{} True{} True{} False{} False{} False{} False{}: {==}
+    case True{} False{} True{} True{} False{} False{} False{} True{}: {==}
+    case True{} False{} True{} True{} False{} False{} True{} False{}: {==}
+    case True{} False{} True{} True{} False{} False{} True{} True{}: {==}
+    case True{} False{} True{} True{} False{} True{} False{} False{}: {==}
+    case True{} False{} True{} True{} False{} True{} False{} True{}: {==}
+    case True{} False{} True{} True{} False{} True{} True{} False{}: {==}
+    case True{} False{} True{} True{} False{} True{} True{} True{}: {==}
+    case True{} False{} True{} True{} True{} False{} False{} False{}: {==}
+    case True{} False{} True{} True{} True{} False{} False{} True{}: {==}
+    case True{} False{} True{} True{} True{} False{} True{} False{}: {==}
+    case True{} False{} True{} True{} True{} False{} True{} True{}: {==}
+    case True{} False{} True{} True{} True{} True{} False{} False{}: {==}
+    case True{} False{} True{} True{} True{} True{} False{} True{}: {==}
+    case True{} False{} True{} True{} True{} True{} True{} False{}: {==}
+    case True{} False{} True{} True{} True{} True{} True{} True{}: {==}
+    case True{} True{} False{} False{} False{} False{} False{} False{}: {==}
+    case True{} True{} False{} False{} False{} False{} False{} True{}: {==}
+    case True{} True{} False{} False{} False{} False{} True{} False{}: {==}
+    case True{} True{} False{} False{} False{} False{} True{} True{}: {==}
+    case True{} True{} False{} False{} False{} True{} False{} False{}: {==}
+    case True{} True{} False{} False{} False{} True{} False{} True{}: {==}
+    case True{} True{} False{} False{} False{} True{} True{} False{}: {==}
+    case True{} True{} False{} False{} False{} True{} True{} True{}: {==}
+    case True{} True{} False{} False{} True{} False{} False{} False{}: {==}
+    case True{} True{} False{} False{} True{} False{} False{} True{}: {==}
+    case True{} True{} False{} False{} True{} False{} True{} False{}: {==}
+    case True{} True{} False{} False{} True{} False{} True{} True{}: {==}
+    case True{} True{} False{} False{} True{} True{} False{} False{}: {==}
+    case True{} True{} False{} False{} True{} True{} False{} True{}: {==}
+    case True{} True{} False{} False{} True{} True{} True{} False{}: {==}
+    case True{} True{} False{} False{} True{} True{} True{} True{}: {==}
+    case True{} True{} False{} True{} False{} False{} False{} False{}: {==}
+    case True{} True{} False{} True{} False{} False{} False{} True{}: {==}
+    case True{} True{} False{} True{} False{} False{} True{} False{}: {==}
+    case True{} True{} False{} True{} False{} False{} True{} True{}: {==}
+    case True{} True{} False{} True{} False{} True{} False{} False{}: {==}
+    case True{} True{} False{} True{} False{} True{} False{} True{}: {==}
+    case True{} True{} False{} True{} False{} True{} True{} False{}: {==}
+    case True{} True{} False{} True{} False{} True{} True{} True{}: {==}
+    case True{} True{} False{} True{} True{} False{} False{} False{}: {==}
+    case True{} True{} False{} True{} True{} False{} False{} True{}: {==}
+    case True{} True{} False{} True{} True{} False{} True{} False{}: {==}
+    case True{} True{} False{} True{} True{} False{} True{} True{}: {==}
+    case True{} True{} False{} True{} True{} True{} False{} False{}: {==}
+    case True{} True{} False{} True{} True{} True{} False{} True{}: {==}
+    case True{} True{} False{} True{} True{} True{} True{} False{}: {==}
+    case True{} True{} False{} True{} True{} True{} True{} True{}: {==}
+    case True{} True{} True{} False{} False{} False{} False{} False{}: {==}
+    case True{} True{} True{} False{} False{} False{} False{} True{}: {==}
+    case True{} True{} True{} False{} False{} False{} True{} False{}: {==}
+    case True{} True{} True{} False{} False{} False{} True{} True{}: {==}
+    case True{} True{} True{} False{} False{} True{} False{} False{}: {==}
+    case True{} True{} True{} False{} False{} True{} False{} True{}: {==}
+    case True{} True{} True{} False{} False{} True{} True{} False{}: {==}
+    case True{} True{} True{} False{} False{} True{} True{} True{}: {==}
+    case True{} True{} True{} False{} True{} False{} False{} False{}: {==}
+    case True{} True{} True{} False{} True{} False{} False{} True{}: {==}
+    case True{} True{} True{} False{} True{} False{} True{} False{}: {==}
+    case True{} True{} True{} False{} True{} False{} True{} True{}: {==}
+    case True{} True{} True{} False{} True{} True{} False{} False{}: {==}
+    case True{} True{} True{} False{} True{} True{} False{} True{}: {==}
+    case True{} True{} True{} False{} True{} True{} True{} False{}: {==}
+    case True{} True{} True{} False{} True{} True{} True{} True{}: {==}
+    case True{} True{} True{} True{} False{} False{} False{} False{}: {==}
+    case True{} True{} True{} True{} False{} False{} False{} True{}: {==}
+    case True{} True{} True{} True{} False{} False{} True{} False{}: {==}
+    case True{} True{} True{} True{} False{} False{} True{} True{}: {==}
+    case True{} True{} True{} True{} False{} True{} False{} False{}: {==}
+    case True{} True{} True{} True{} False{} True{} False{} True{}: {==}
+    case True{} True{} True{} True{} False{} True{} True{} False{}: {==}
+    case True{} True{} True{} True{} False{} True{} True{} True{}: {==}
+    case True{} True{} True{} True{} True{} False{} False{} False{}: {==}
+    case True{} True{} True{} True{} True{} False{} False{} True{}: {==}
+    case True{} True{} True{} True{} True{} False{} True{} False{}: {==}
+    case True{} True{} True{} True{} True{} False{} True{} True{}: {==}
+    case True{} True{} True{} True{} True{} True{} False{} False{}: {==}
+    case True{} True{} True{} True{} True{} True{} False{} True{}: {==}
+    case True{} True{} True{} True{} True{} True{} True{} False{}: {==}
+    case True{} True{} True{} True{} True{} True{} True{} True{}: {==}
+
+def StrbyteInverseSpec(+s: String,
+  valid: {B.valid_byte_string(s) == True{} : Bool}) -> Type:
+  {strbyte_injective.render(B.strbyte(s, valid)) == s : String}
+
+def strbyte_injective.inverse(s: String,
+  +valid: {B.valid_byte_string(s) == True{} : Bool}) -> StrbyteInverseSpec(s, valid):
+  match s:
+    case SNil{}:
+      Empty.absurd(StrbyteInverseSpec(SNil{}, valid), H.hex_u32.false_true(valid))
+    case SCon{c1, SNil{}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SNil{}}, valid), H.hex_u32.false_true(valid))
+    case SCon{c1, SCon{c2, SNil{}}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SNil{}}}, valid), H.hex_u32.false_true(valid))
+    case SCon{c1, SCon{c2, SCon{c3, SNil{}}}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}, valid), H.hex_u32.false_true(valid))
+    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}, valid), H.hex_u32.false_true(valid))
+    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}, valid), H.hex_u32.false_true(valid))
+    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}, valid), H.hex_u32.false_true(valid))
+    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}, valid), H.hex_u32.false_true(valid))
+    case SCon{+c1, SCon{+c2, SCon{+c3, SCon{+c4, SCon{+c5, SCon{+c6, SCon{+c7, SCon{+c8, SNil{}}}}}}}}}:
+      p1 = H.hex_u32.head_true(B.is_binary_digit(c1), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
+      +e1 = H.hex_u32.tail_true(B.is_binary_digit(c1), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
+      p2 = H.hex_u32.head_true(B.is_binary_digit(c2), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
+      +e2 = H.hex_u32.tail_true(B.is_binary_digit(c2), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
+      p3 = H.hex_u32.head_true(B.is_binary_digit(c3), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c4, c5, c6, c7, c8]), e2)
+      +e3 = H.hex_u32.tail_true(B.is_binary_digit(c3), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c4, c5, c6, c7, c8]), e2)
+      p4 = H.hex_u32.head_true(B.is_binary_digit(c4), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c5, c6, c7, c8]), e3)
+      +e4 = H.hex_u32.tail_true(B.is_binary_digit(c4), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c5, c6, c7, c8]), e3)
+      p5 = H.hex_u32.head_true(B.is_binary_digit(c5), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c6, c7, c8]), e4)
+      +e5 = H.hex_u32.tail_true(B.is_binary_digit(c5), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c6, c7, c8]), e4)
+      p6 = H.hex_u32.head_true(B.is_binary_digit(c6), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c7, c8]), e5)
+      +e6 = H.hex_u32.tail_true(B.is_binary_digit(c6), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c7, c8]), e5)
+      p7 = H.hex_u32.head_true(B.is_binary_digit(c7), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c8]), e6)
+      +e7 = H.hex_u32.tail_true(B.is_binary_digit(c7), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c8]), e6)
+      p8 = H.hex_u32.head_true(B.is_binary_digit(c8), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), []), e7)
+      %strbyte_injective.char(c1, p1) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{_, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %strbyte_injective.char(c2, p2) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{_, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %strbyte_injective.char(c3, p3) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{strbyte_injective.bit_char(B.char_to_bit(c2)), SCon{_, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %strbyte_injective.char(c4, p4) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{strbyte_injective.bit_char(B.char_to_bit(c2)), SCon{strbyte_injective.bit_char(B.char_to_bit(c3)), SCon{_, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %strbyte_injective.char(c5, p5) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{strbyte_injective.bit_char(B.char_to_bit(c2)), SCon{strbyte_injective.bit_char(B.char_to_bit(c3)), SCon{strbyte_injective.bit_char(B.char_to_bit(c4)), SCon{_, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %strbyte_injective.char(c6, p6) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{strbyte_injective.bit_char(B.char_to_bit(c2)), SCon{strbyte_injective.bit_char(B.char_to_bit(c3)), SCon{strbyte_injective.bit_char(B.char_to_bit(c4)), SCon{strbyte_injective.bit_char(B.char_to_bit(c5)), SCon{_, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
+      %strbyte_injective.char(c7, p7) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{strbyte_injective.bit_char(B.char_to_bit(c2)), SCon{strbyte_injective.bit_char(B.char_to_bit(c3)), SCon{strbyte_injective.bit_char(B.char_to_bit(c4)), SCon{strbyte_injective.bit_char(B.char_to_bit(c5)), SCon{strbyte_injective.bit_char(B.char_to_bit(c6)), SCon{_, SCon{c8, SNil{}}}}}}}}} : String}
+      %strbyte_injective.char(c8, p8) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{strbyte_injective.bit_char(B.char_to_bit(c2)), SCon{strbyte_injective.bit_char(B.char_to_bit(c3)), SCon{strbyte_injective.bit_char(B.char_to_bit(c4)), SCon{strbyte_injective.bit_char(B.char_to_bit(c5)), SCon{strbyte_injective.bit_char(B.char_to_bit(c6)), SCon{strbyte_injective.bit_char(B.char_to_bit(c7)), SCon{_, SNil{}}}}}}}}} : String}
+      Equal.cong(U32, String, value => strbyte_injective.render(value),
+        B.strbyte.fold_bits([B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)], 0), B.byte8((B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8))),
+        strbyte_injective.fold_bits(B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)))
+    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), H.hex_u32.false_true(valid))
+
+def BinaryLaws.strbyte_injective(s1, s2, valid1, valid2, equal):
+  +v1 = valid1
+  +v2 = valid2
+  Equal.trans(String, s1, strbyte_injective.render(B.strbyte(s1, v1)), s2,
+    Equal.sym(String, strbyte_injective.render(B.strbyte(s1, v1)), s1,
+      strbyte_injective.inverse(s1, v1)),
+    Equal.trans(String, strbyte_injective.render(B.strbyte(s1, v1)),
+      strbyte_injective.render(B.strbyte(s2, v2)), s2,
+      Equal.cong(U32, String, value => strbyte_injective.render(value),
+        B.strbyte(s1, v1), B.strbyte(s2, v2), equal),
+      strbyte_injective.inverse(s2, v2)))
