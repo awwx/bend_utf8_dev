@@ -36,7 +36,7 @@ law utf8_can_encode_one:
 
 law utf8_encode_one:
   for +cp: U32
-  for valid: {U32.is_le(cp, 127) == True{} : Bool}
+  for valid: {UTF8.can_encode_one(cp) == True{} : Bool}
   {UTF8.encode_one(cp, valid) == cp : U32}
 
 
