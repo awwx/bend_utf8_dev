@@ -27,7 +27,6 @@ law bit8_value:
 # Provide an independent check of `bit8_value`: convert the booleans
 # to a Word(8n), then to a Nat, and then to a U32.
 
-# Word stores its least significant bit first.
 law bit8_value_word:
   for +b7: Bool
   for +b6: Bool
@@ -37,8 +36,10 @@ law bit8_value_word:
   for +b2: Bool
   for +b1: Bool
   for +b0: Bool
+  # Word stores its least significant bit first.
+  word = {WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WNil{}}}}}}}}} : Word(8n)}
   {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
-    U32.from_nat(Word.to_nat(8n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WNil{}}}}}}}}})) : U32}
+    U32.from_nat(Word.to_nat(8n, word)) : U32}
 
 # Decompose a byte value represented by a U32 < 256 into its eight
 # booleans, most significant first.
