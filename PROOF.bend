@@ -448,6 +448,38 @@ def hex_u32_complete(
 ) -> HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
   hex_u32.reference_values(c1, c2, c3, c4, c5, c6, c7, c8, valid, proofs)
 
+# Eight valid characters give eight individual digit proofs.
+def hex_u32.digit_proofs(
+  +c1: Char, +c2: Char, +c3: Char, +c4: Char,
+  +c5: Char, +c6: Char, +c7: Char, +c8: Char,
+  +valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool}
+) -> (
+  {H.is_hex_digit(c1) == True{} : Bool} &
+  {H.is_hex_digit(c2) == True{} : Bool} &
+  {H.is_hex_digit(c3) == True{} : Bool} &
+  {H.is_hex_digit(c4) == True{} : Bool} &
+  {H.is_hex_digit(c5) == True{} : Bool} &
+  {H.is_hex_digit(c6) == True{} : Bool} &
+  {H.is_hex_digit(c7) == True{} : Bool} &
+  {H.is_hex_digit(c8) == True{} : Bool}
+):
+  p1 = H.hex_u32.head_true(H.is_hex_digit(c1), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
+  +e1 = H.hex_u32.tail_true(H.is_hex_digit(c1), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
+  p2 = H.hex_u32.head_true(H.is_hex_digit(c2), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
+  +e2 = H.hex_u32.tail_true(H.is_hex_digit(c2), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
+  p3 = H.hex_u32.head_true(H.is_hex_digit(c3), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c4, c5, c6, c7, c8]), e2)
+  +e3 = H.hex_u32.tail_true(H.is_hex_digit(c3), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c4, c5, c6, c7, c8]), e2)
+  p4 = H.hex_u32.head_true(H.is_hex_digit(c4), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c5, c6, c7, c8]), e3)
+  +e4 = H.hex_u32.tail_true(H.is_hex_digit(c4), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c5, c6, c7, c8]), e3)
+  p5 = H.hex_u32.head_true(H.is_hex_digit(c5), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c6, c7, c8]), e4)
+  +e5 = H.hex_u32.tail_true(H.is_hex_digit(c5), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c6, c7, c8]), e4)
+  p6 = H.hex_u32.head_true(H.is_hex_digit(c6), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c7, c8]), e5)
+  +e6 = H.hex_u32.tail_true(H.is_hex_digit(c6), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c7, c8]), e5)
+  p7 = H.hex_u32.head_true(H.is_hex_digit(c7), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c8]), e6)
+  +e7 = H.hex_u32.tail_true(H.is_hex_digit(c7), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c8]), e6)
+  p8 = H.hex_u32.head_true(H.is_hex_digit(c8), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), []), e7)
+  (p1, p2, p3, p4, p5, p6, p7, p8)
+
 def hex_u32_agrees(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> HexU32Spec(s, valid):
   match s:
     case SNil{}:
@@ -469,7 +501,7 @@ def hex_u32_agrees(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) 
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       +v = valid
       hex_u32_complete(c1, c2, c3, c4, c5, c6, c7, c8, v,
-        H.hex_u32.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, v))
+        hex_u32.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, v))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
       Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), H.hex_u32.false_true(valid))
 
