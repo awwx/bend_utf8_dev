@@ -200,9 +200,9 @@ law byte_mask:
   {B.byte_mask(mask, byte, accepted) ==
     (U32.is_le(byte, 255) && mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
 
-# bit32
+# u32_byte4
 
-law bit32:
+law u32_byte4:
   for +b31: Bool
   for +b30: Bool
   for +b29: Bool
@@ -235,7 +235,7 @@ law bit32:
   for +b2: Bool
   for +b1: Bool
   for +b0: Bool
-  {B.bit32(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) ==
+  {B.u32_byte4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) ==
     ((b31, b30, b29, b28, b27, b26, b25, b24),
      (b23, b22, b21, b20, b19, b18, b17, b16),
      (b15, b14, b13, b12, b11, b10, b9, b8),

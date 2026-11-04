@@ -4,14 +4,20 @@ import ./binary.bend as B
 import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
 
-# Reference model: 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz.
+# UTF8 one byte shape
 #
-# Returns two U32 representing the two bytes, or None if the shape
-# doesn't match.
+# 00000000 00000000 00000000 0xxxyyyy -> 0xxxyyyy
+
+
+# UTF8 two byte shape
 #
-# Capacity includes overlong encodings of 0..127; shortest-form validity is separate.
+# 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz
 #
-# https://en.wikipedia.org/wiki/UTF-8#Description
+# Returns two U32 representing the two bytes if the shape matches, or
+# None if the shape doesn't match.
+#
+# Capacity includes overlong encodings of 0..127; shortest-form
+# validity is separate.
 
 def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
   match bits:
@@ -25,7 +31,7 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
       None{}
 
 def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
-  two_byte_shape.bits(B.bit32(cp))
+  two_byte_shape.bits(B.u32_byte4(cp))
 
 # The capacity test is determined by whether the reference model produced bytes.
 law utf8_can_encode_two:
