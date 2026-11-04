@@ -93,7 +93,12 @@ law utf8_has_two_byte_shape:
   ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
+# We require that `encode_as_two_bytes` be bijective between accepted
+# code points and pairs satisfying `has_two_byte_shape`, and we
+# specify that `decode_two_bytes` is exactly its inverse.
+
 # Decoding an encoded code point returns the original input.
+
 law utf8_decode_encode_as_two_bytes:
   for +cp: U32
   for +valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
@@ -103,6 +108,7 @@ law utf8_decode_encode_as_two_bytes:
     {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32})
 
 # Encoding a decoded pair returns the original bytes.
+
 law utf8_decode_two_bytes:
   for +b1: U32
   for +b2: U32
