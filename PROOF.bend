@@ -37,7 +37,7 @@ def utf8_proof.capacity_bits(+b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: B
 
 
 def utf8_proof.capacity_model_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) ->
-  {UTF8.can_encode_two(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))) : Bool}:
+  {UTF8.can_encode_two(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))) : Bool}:
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
@@ -70,10 +70,10 @@ def Laws.utf8_can_encode_two(cp):
 
 # Transfer the independently specified capacity result to the implementation.
 def utf8_proof.accepted(+cp: U32,
-  valid: {Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(cp)) == True{} : Bool}
+  valid: {Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)) == True{} : Bool}
 ) -> {UTF8.can_encode_two(cp) == True{} : Bool}:
   Equal.trans(Bool, UTF8.can_encode_two(cp),
-    Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(cp)), True{},
+    Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), True{},
     Laws.utf8_can_encode_two(cp), valid)
 
 def Laws.utf8_can_encode_one(cp):
@@ -1296,8 +1296,8 @@ def BinaryLaws.byte2_examples():
 
 
 def Utf8EncodeTwoSpec(+cp: U32,
-  valid: {Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(cp)) == True{} : Bool}) -> Type:
-  {Some{UTF8.encode_two(cp, utf8_proof.accepted(cp, valid))} == Laws.maybe_encode_two(cp) : Maybe<&1, U32 & U32>}
+  valid: {Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)) == True{} : Bool}) -> Type:
+  {Some{UTF8.encode_two(cp, utf8_proof.accepted(cp, valid))} == Laws.two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 def utf8_proof.table_pair(+low: Word(6n), +high: Word(5n),
   +valid: {UTF8.can_encode_two(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
@@ -1312,7 +1312,7 @@ def utf8_proof.table_pair(+low: Word(6n), +high: Word(5n),
       {==}
 
 def utf8_proof.encode_two_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
-  valid: {Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))) == True{} : Bool}) -> Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid):
+  valid: {Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))) == True{} : Bool}) -> Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
       Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
@@ -1363,7 +1363,7 @@ def utf8_proof.encode_two_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +
         utf8_proof.table_pair(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}, utf8_proof.capacity_bits(b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))
 
 def utf8_proof.encode_two_agrees(+cp: U32,
-  valid: {Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(cp)) == True{} : Bool}
+  valid: {Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)) == True{} : Bool}
 ) -> Utf8EncodeTwoSpec(cp, valid):
   match cp:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
@@ -1373,7 +1373,7 @@ def Laws.utf8_encode_two(cp, valid):
   +v = valid
   (utf8_proof.accepted(cp, v), utf8_proof.encode_two_agrees(cp, v))
 
-def Laws.maybe_encode_two_examples():
+def Laws.two_byte_shape_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==})
 
 def Laws.utf8_two_byte_shape(b1, b2):

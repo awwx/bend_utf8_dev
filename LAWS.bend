@@ -13,7 +13,7 @@ import ./binary_LAWS.bend as BinaryLaws
 #
 # https://en.wikipedia.org/wiki/UTF-8#Description
 
-def maybe_encode_two.bits(bits: Defs.Bit32()) -> Maybe<&1, U32 & U32>:
+def two_byte_shape.bits(bits: Defs.Bit32()) -> Maybe<&1, U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
@@ -24,13 +24,13 @@ def maybe_encode_two.bits(bits: Defs.Bit32()) -> Maybe<&1, U32 & U32>:
     case _:
       None{}
 
-def maybe_encode_two(cp: U32) -> Maybe<&1, U32 & U32>:
-  maybe_encode_two.bits(B.bit32(cp))
+def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
+  two_byte_shape.bits(B.bit32(cp))
 
 # The capacity test is determined by whether the reference model produced bytes.
 law utf8_can_encode_two:
   for +cp: U32
-  {UTF8.can_encode_two(cp) == Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)) : Bool}
+  {UTF8.can_encode_two(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
 
 law utf8_can_encode_one:
   for +cp: U32
@@ -59,9 +59,9 @@ law utf8_encode_one:
 # For every encodable code point, the bytes must equal the reference model.
 law utf8_encode_two:
   for +cp: U32
-  for valid: {Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)) == True{} : Bool}
+  for valid: {Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) == True{} : Bool}
   exs accepted: {UTF8.can_encode_two(cp) == True{} : Bool}
-  {Some{UTF8.encode_two(cp, accepted)} == maybe_encode_two(cp) : Maybe<&1, U32 & U32>}
+  {Some{UTF8.encode_two(cp, accepted)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 # Leading and continuation bytes have the table's literal prefix bits.
 law utf8_two_byte_shape:
@@ -98,13 +98,13 @@ law utf8_valid_two:
 law utf8_two_capacity:
   for +bits: Word(11n)
   +cp = codepoint11(bits)
-  {Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)) == True{} : Bool}
+  {Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) == True{} : Bool}
 
 law utf8_two_roundtrip:
   for +bits: Word(11n)
   +cp = codepoint11(bits)
   +accepted = Equal.trans(Bool, UTF8.can_encode_two(cp),
-    Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)), True{},
+    Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)), True{},
     utf8_can_encode_two(cp), utf8_two_capacity(bits))
   +b1 = B.first(UTF8.encode_two(cp, accepted))
   +b2 = B.second(UTF8.encode_two(cp, accepted))
@@ -134,11 +134,11 @@ law utf8_encoding_examples:
   {UTF8.valid_two(194, 127) == False{} : Bool} &
   {UTF8.valid_two(224, 128) == False{} : Bool}
 
-law maybe_encode_two_examples:
-  {maybe_encode_two(0) == Some{(192, 128)} : Maybe<&1, U32 & U32>} &
-  {maybe_encode_two(127) == Some{(193, 191)} : Maybe<&1, U32 & U32>} &
-  {maybe_encode_two(128) == Some{(194, 128)} : Maybe<&1, U32 & U32>} &
-  {maybe_encode_two(2047) == Some{(223, 191)} : Maybe<&1, U32 & U32>} &
-  {maybe_encode_two(2048) == None{} : Maybe<&1, U32 & U32>} &
-  {maybe_encode_two(65536) == None{} : Maybe<&1, U32 & U32>} &
-  {maybe_encode_two(4294967295) == None{} : Maybe<&1, U32 & U32>}
+law two_byte_shape_examples:
+  {two_byte_shape(0) == Some{(192, 128)} : Maybe<&1, U32 & U32>} &
+  {two_byte_shape(127) == Some{(193, 191)} : Maybe<&1, U32 & U32>} &
+  {two_byte_shape(128) == Some{(194, 128)} : Maybe<&1, U32 & U32>} &
+  {two_byte_shape(2047) == Some{(223, 191)} : Maybe<&1, U32 & U32>} &
+  {two_byte_shape(2048) == None{} : Maybe<&1, U32 & U32>} &
+  {two_byte_shape(65536) == None{} : Maybe<&1, U32 & U32>} &
+  {two_byte_shape(4294967295) == None{} : Maybe<&1, U32 & U32>}
