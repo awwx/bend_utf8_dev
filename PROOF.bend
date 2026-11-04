@@ -619,8 +619,32 @@ def Laws.utf8_has_one_byte_shape(byte):
   (accepted => utf8_proof.one_shape_witness(byte, accepted),
    representation => utf8_proof.one_shape_witness_accepted(byte, representation))
 
+def utf8_proof.overlong_if_true(+b1: U32, +b2: U32, +shape: Bool,
+  +checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
+  +valid: {shape == True{} : Bool}) ->
+  {UTF8.overlong_two.if(b1, b2, shape, checked) ==
+    UTF8.can_encode_one(UTF8.decode_two_bytes(b1, b2,
+      Equal.trans(Bool, UTF8.has_two_byte_shape(b1, b2), shape, True{}, checked, valid))) : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({False{} == UTF8.can_encode_one(UTF8.decode_two_bytes(b1, b2,
+        Equal.trans(Bool, UTF8.has_two_byte_shape(b1, b2), False{}, True{}, checked, valid))) : Bool},
+        H.hex_u32.false_true(valid))
+    case True{}: {==}
+
+def utf8_proof.overlong_if_false(+b1: U32, +b2: U32, +shape: Bool,
+  checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
+  invalid: {shape == False{} : Bool}) ->
+  {UTF8.overlong_two.if(b1, b2, shape, checked) == False{} : Bool}:
+  match shape:
+    case False{}: {==}
+    case True{}:
+      Empty.absurd({UTF8.overlong_two.if(b1, b2, True{}, checked) == False{} : Bool},
+        H.hex_u32.false_true(Equal.sym(Bool, True{}, False{}, invalid)))
+
 def Laws.utf8_overlong_two(b1, b2):
-  {==}
+  (valid => utf8_proof.overlong_if_true(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, valid),
+   invalid => utf8_proof.overlong_if_false(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, invalid))
 
 def Laws.utf8_valid_two(b1, b2):
   {==}
@@ -749,8 +773,12 @@ def utf8_proof.mask_second(+low: Word(6n)) ->
     Word.and(32n, word_join(6n, low, 26n, WCon{False{}, WCon{True{}, Word.zero(24n)}}), word_join(6n, word_ones(6n), 26n, Word.zero(26n))),
     word_join(6n, low, 26n, Word.zero(26n)), word_mask_fields(6n, low, 26n, WCon{False{}, WCon{True{}, Word.zero(24n)}}))
 
+# Unrestricted arithmetic expression used only to reason about payload bits.
+def utf8_proof.decode_payload(b1: U32, b2: U32) -> U32:
+  (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32)
+
 def utf8_proof.decode_fields(+low: Word(6n), +high: Word(5n)) ->
-  {UTF8.decode_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)) == utf8_proof.codepoint(low, high) : U32}:
+  {utf8_proof.decode_payload(utf8_proof.first_byte(high), utf8_proof.second_byte(low)) == utf8_proof.codepoint(low, high) : U32}:
   match low high:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}:
       %Equal.sym(U32, U32.and(utf8_proof.first_byte(high), 31), U32{word_join(5n, high, 27n, Word.zero(27n))}, utf8_proof.mask_first(high)) : {(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(_)))))) + U32.and(utf8_proof.second_byte(low), 63) : U32) == utf8_proof.codepoint(low, high) : U32}
@@ -912,11 +940,11 @@ def utf8_proof.shape_from_masks(+b1: U32, +b2: U32,
 
 def utf8_proof.overlong_from_facts(+cp: U32, +b1: U32, +b2: U32,
   shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
-  decoded: {UTF8.decode_two(b1, b2) == cp : U32}) ->
+  decoded: {utf8_proof.decode_payload(b1, b2) == cp : U32}) ->
   {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool}:
   %decoded : {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(_) : Bool}
-  %shape : {UTF8.overlong_two(b1, b2) == (_ && UTF8.can_encode_one(UTF8.decode_two(b1, b2))) : Bool}
-  {==}
+  utf8_proof.overlong_if_true(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, shape)
+
 
 def utf8_proof.valid_from_facts(+cp: U32, +b1: U32, +b2: U32,
   shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
@@ -951,13 +979,14 @@ def utf8_proof.range_from_facts(+low: Word(6n), +high: Word(5n),
           Bool.not(utf8_proof.fits_one_byte(high)), True{}, first, second), bool_and_true(Bool.not(utf8_proof.fits_one_byte(high))))))
 
 def Utf8RoundtripSpec(+cp: U32, +b1: U32, +b2: U32) -> Type:
-  {UTF8.decode_two(b1, b2) == cp : U32} &
-  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} &
-  {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
-  {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
-  {UTF8.valid_two(b1, b2) ==
-    ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&
-     (U32.is_ge(b2, 128) && U32.is_le(b2, 191))) : Bool}
+  Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
+    {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32} &
+    {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
+    {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
+    {UTF8.valid_two(b1, b2) ==
+      ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&
+       (U32.is_ge(b2, 128) && U32.is_le(b2, 191))) : Bool})
+
 
 def utf8_proof.fields_from_facts(+low: Word(6n), +high: Word(5n),
   first: {B.byte_mask("110xxxxx", utf8_proof.first_byte(high), {==}) == True{} : Bool} &
@@ -975,7 +1004,7 @@ def utf8_proof.fields_from_facts(+low: Word(6n), +high: Word(5n),
   +overlong = utf8_proof.overlong_from_facts(utf8_proof.codepoint(low, high), utf8_proof.first_byte(high), utf8_proof.second_byte(low), shape, decoded)
   +valid = utf8_proof.valid_from_facts(utf8_proof.codepoint(low, high), utf8_proof.first_byte(high), utf8_proof.second_byte(low), shape, overlong)
   range = utf8_proof.range_from_facts(low, high, range1, range2, small)
-  (decoded, shape, overlong,
+  (shape, decoded, overlong,
    Equal.trans(Bool, UTF8.valid_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)), Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(low, high))), U32.is_ge(utf8_proof.codepoint(low, high), 128), valid, large),
    Equal.trans(Bool, UTF8.valid_two(utf8_proof.first_byte(high), utf8_proof.second_byte(low)), Bool.not(UTF8.can_encode_one(utf8_proof.codepoint(low, high))),
      ((U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) &&
@@ -1799,8 +1828,106 @@ def Laws.utf8_has_two_byte_shape(b1, b2):
   (accepted => utf8_proof.shape_witness(b1, b2, accepted),
    representation => utf8_proof.shape_witness_accepted(b1, b2, representation))
 
-def Laws.utf8_decode_two(b1, b2):
-  {==}
+# Applying the payload calculation to a table result recovers its input.
+def utf8_proof.decode_model_result(shape: Maybe<&1, U32 & U32>) -> U32:
+  match shape:
+    case None{}: 0
+    case Some{(b1, b2)}: utf8_proof.decode_payload(b1, b2)
+
+def Utf8ModelDecodeSpec(+cp: U32) -> Type:
+  {utf8_proof.decode_model_result(Laws.two_byte_shape(cp)) == cp : U32}
+
+def utf8_proof.decode_model_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
+  accepted: {UTF8.can_encode_two(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}) -> Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))):
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      utf8_proof.decode_fields(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}})
+
+def utf8_proof.decode_model(+cp: U32,
+  accepted: {UTF8.can_encode_two(cp) == True{} : Bool}) -> Utf8ModelDecodeSpec(cp):
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.decode_model_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, accepted)
+
+# Any code point producing these bytes must equal their decoded payload.
+def utf8_proof.decode_model_produced(+cp: U32, +b1: U32, +b2: U32,
+  valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  +produced: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
+  {UTF8.decode_two_bytes(b1, b2, valid) == cp : U32}:
+  accepted = Equal.trans(Bool, UTF8.can_encode_two(cp),
+    Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), True{}, Laws.utf8_can_encode_two(cp),
+    Equal.cong(Maybe<&1, U32 & U32>, Bool, shape => Maybe.is_some(&1, U32 & U32, shape),
+      Laws.two_byte_shape(cp), Some{(b1, b2)}, produced))
+  Equal.trans(U32, UTF8.decode_two_bytes(b1, b2, valid),
+    utf8_proof.decode_model_result(Laws.two_byte_shape(cp)), cp,
+    Equal.sym(U32, utf8_proof.decode_model_result(Laws.two_byte_shape(cp)), UTF8.decode_two_bytes(b1, b2, valid),
+      Equal.cong(Maybe<&1, U32 & U32>, U32, shape => utf8_proof.decode_model_result(shape),
+        Laws.two_byte_shape(cp), Some{(b1, b2)}, produced)),
+    utf8_proof.decode_model(cp, accepted))
+
+# The shape law supplies existence; the inverse calculation identifies its witness.
+def utf8_proof.decode_result_produced(+cp: U32, +b1: U32, +b2: U32,
+  +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  +produced: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
+  {Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}:
+  Equal.trans(Maybe<&1, U32 & U32>, Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)),
+    Laws.two_byte_shape(cp), Some{(b1, b2)},
+    Equal.cong(U32, Maybe<&1, U32 & U32>, value => Laws.two_byte_shape(value),
+      UTF8.decode_two_bytes(b1, b2, valid), cp, utf8_proof.decode_model_produced(cp, b1, b2, valid, produced)), produced)
+
+def utf8_proof.decode_result_representation(+b1: U32, +b2: U32,
+  +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  representation: Utf8ShapeRepresentation(b1, b2)) ->
+  {Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}:
+  (cp, produced) = representation
+  utf8_proof.decode_result_produced(cp, b1, b2, valid, produced)
+
+def Laws.utf8_decode_two_bytes(b1, b2, valid):
+  (utf8_proof.decode_result_representation(b1, b2, valid, utf8_proof.shape_witness(b1, b2, valid)),
+   other => produced => Equal.sym(U32, UTF8.decode_two_bytes(b1, b2, valid), other,
+     utf8_proof.decode_model_produced(other, b1, b2, valid, produced)))
 
 def BinaryLaws.u32_byte4(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
   {==}

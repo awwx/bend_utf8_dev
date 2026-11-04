@@ -25,14 +25,21 @@ def encode_two(+cp: U32,
 def has_two_byte_shape(b1: U32, b2: U32) -> Bool:
   B.byte_mask("110xxxxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==})
 
-# Decode the payload; callers establish the two-byte shape separately.
-def decode_two(b1: U32, b2: U32) -> U32:
+# Decode only pairs with the two-byte shape, including overlong encodings.
+def decode_two_bytes(+b1: U32, +b2: U32,
+  valid: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> U32:
   (U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.and(b1, 31))))))) + U32.and(b2, 63) : U32)
+
+# Decode only after the shape test succeeds.
+def overlong_two.if(+b1: U32, +b2: U32, shape: Bool,
+  checked: {has_two_byte_shape(b1, b2) == shape : Bool}) -> Bool:
+  match shape:
+    case False{}: False{}
+    case True{}: can_encode_one(decode_two_bytes(b1, b2, checked))
 
 # The decoded code point also has a one-byte representation.
 def overlong_two(+b1: U32, +b2: U32) -> Bool:
-  has_two_byte_shape(b1, b2) &&
-  can_encode_one(decode_two(b1, b2))
+  overlong_two.if(b1, b2, has_two_byte_shape(b1, b2), {==})
 
 def valid_two(+b1: U32, +b2: U32) -> Bool:
   has_two_byte_shape(b1, b2) && Bool.not(overlong_two(b1, b2))

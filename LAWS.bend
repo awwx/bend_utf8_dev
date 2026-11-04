@@ -93,26 +93,27 @@ law utf8_has_two_byte_shape:
   ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
-# An eleven-bit payload covers exactly the two-byte encoding capacity.
-def codepoint11(bits: Word(11n)) -> U32:
-  match bits:
-    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}:
-      U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
-
-# Join the leading byte's five payload bits and the continuation's six bits.
-law utf8_decode_two:
+# The decoded code point is the unique input producing this byte pair.
+law utf8_decode_two_bytes:
   for +b1: U32
   for +b2: U32
-  {UTF8.decode_two(b1, b2) ==
-    (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32}
+  for +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
+  +cp = UTF8.decode_two_bytes(b1, b2, valid)
+  {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>} &
+  (@+other: U32 ->
+    {two_byte_shape(other) == Some{(b1, b2)} : Maybe<&1, U32 & U32>} ->
+    {other == cp : U32})
 
-# Overlong means that the same decoded code point fits in one byte.
+# Overlong means that a shaped pair decodes to a code point fitting in one byte.
+# A pair without the two-byte shape is not an overlong encoding.
 law utf8_overlong_two:
   for +b1: U32
   for +b2: U32
-  {UTF8.overlong_two(b1, b2) ==
-    (UTF8.has_two_byte_shape(b1, b2) &&
-     UTF8.can_encode_one(UTF8.decode_two(b1, b2))) : Bool}
+  (@valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} ->
+    {UTF8.overlong_two(b1, b2) ==
+      UTF8.can_encode_one(UTF8.decode_two_bytes(b1, b2, valid)) : Bool}) &
+  ({UTF8.has_two_byte_shape(b1, b2) == False{} : Bool} ->
+    {UTF8.overlong_two(b1, b2) == False{} : Bool})
 
 law utf8_valid_two:
   for +b1: U32
@@ -120,6 +121,12 @@ law utf8_valid_two:
   {UTF8.valid_two(b1, b2) ==
     (UTF8.has_two_byte_shape(b1, b2) &&
      Bool.not(UTF8.overlong_two(b1, b2))) : Bool}
+
+# An eleven-bit payload covers exactly the two-byte encoding capacity.
+def codepoint11(bits: Word(11n)) -> U32:
+  match bits:
+    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}:
+      U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
 
 # Every eleven-bit code point has a two-byte representation. It round-trips,
 # and is valid exactly when its code point needs more than one byte.
@@ -137,13 +144,13 @@ law utf8_two_roundtrip:
     utf8_can_encode_two(cp), utf8_two_capacity(bits))
   +b1 = B.first(UTF8.encode_two(cp, accepted))
   +b2 = B.second(UTF8.encode_two(cp, accepted))
-  {UTF8.decode_two(b1, b2) == cp : U32} &
-  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} &
-  {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
-  {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
-  {UTF8.valid_two(b1, b2) ==
-    ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&
-     (U32.is_ge(b2, 128) && U32.is_le(b2, 191))) : Bool}
+  Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
+    {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32} &
+    {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
+    {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
+    {UTF8.valid_two(b1, b2) ==
+      ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&
+       (U32.is_ge(b2, 128) && U32.is_le(b2, 191))) : Bool})
 
 law utf8_encoding_examples:
   {UTF8.encode_one(0, {==}) == 0 : U32} &
