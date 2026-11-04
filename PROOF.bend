@@ -527,9 +527,6 @@ def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mas
 def BinaryLaws.byte_mask_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==})
 
-def Laws.valid_utf8_one_byte_examples():
-  ({==}, {==}, {==})
-
 def Laws.utf8_encode_one(cp, valid):
   {==}
 

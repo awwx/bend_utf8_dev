@@ -70,14 +70,6 @@ def codepoint11(bits: Word(11n)) -> U32:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}:
       U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
 
-def valid_utf8_one_byte(b1: U32) -> Bool:
-  B.byte_mask("0xxxxxxx", b1, {==})
-
-law valid_utf8_one_byte_examples:
-  {valid_utf8_one_byte(0) == True{} : Bool} &
-  {valid_utf8_one_byte(127) == True{} : Bool} &
-  {valid_utf8_one_byte(128) == False{} : Bool}
-
 # Encoding functions expose the representation of a given code point.
 law utf8_encode_one:
   for +cp: U32
