@@ -4,9 +4,14 @@ import ./binary.bend as B
 import ./binary_LAWS.bend as BinaryLaws
 
 # Reference model: 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz.
-# The leading zeros enforce the input shape; any other shape returns None.
+#
+# Returns two U32 representing the two bytes, or None if the shape
+# doesn't match.
+#
 # Capacity includes overlong encodings of 0..127; shortest-form validity is separate.
+#
 # https://en.wikipedia.org/wiki/UTF-8#Description
+
 def maybe_encode_two.bits(bits: Defs.Bit32()) -> Maybe<&1, U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
