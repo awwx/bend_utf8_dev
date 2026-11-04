@@ -619,35 +619,35 @@ def Laws.utf8_has_one_byte_shape(byte):
   (accepted => utf8_proof.one_shape_witness(byte, accepted),
    representation => utf8_proof.one_shape_witness_accepted(byte, representation))
 
-def utf8_proof.overlong_if_true(+b1: U32, +b2: U32, +shape: Bool,
+def Laws.utf8_overlong_two_bytes(b1, b2, valid):
+  {==}
+
+def utf8_proof.valid_if_true(+b1: U32, +b2: U32, +shape: Bool,
   +checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
   +valid: {shape == True{} : Bool}) ->
-  {UTF8.overlong_two_bytes.if(b1, b2, shape, checked) ==
-    UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2,
+  {UTF8.valid_two_bytes.if(b1, b2, shape, checked) ==
+    Bool.not(UTF8.overlong_two_bytes(b1, b2,
       Equal.trans(Bool, UTF8.has_two_byte_shape(b1, b2), shape, True{}, checked, valid))) : Bool}:
   match shape:
     case False{}:
-      Empty.absurd({False{} == UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2,
+      Empty.absurd({False{} == Bool.not(UTF8.overlong_two_bytes(b1, b2,
         Equal.trans(Bool, UTF8.has_two_byte_shape(b1, b2), False{}, True{}, checked, valid))) : Bool},
         H.hex_u32.false_true(valid))
     case True{}: {==}
 
-def utf8_proof.overlong_if_false(+b1: U32, +b2: U32, +shape: Bool,
+def utf8_proof.valid_if_false(+b1: U32, +b2: U32, +shape: Bool,
   checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
   invalid: {shape == False{} : Bool}) ->
-  {UTF8.overlong_two_bytes.if(b1, b2, shape, checked) == False{} : Bool}:
+  {UTF8.valid_two_bytes.if(b1, b2, shape, checked) == False{} : Bool}:
   match shape:
     case False{}: {==}
     case True{}:
-      Empty.absurd({UTF8.overlong_two_bytes.if(b1, b2, True{}, checked) == False{} : Bool},
+      Empty.absurd({UTF8.valid_two_bytes.if(b1, b2, True{}, checked) == False{} : Bool},
         H.hex_u32.false_true(Equal.sym(Bool, True{}, False{}, invalid)))
 
-def Laws.utf8_overlong_two_bytes(b1, b2):
-  (valid => utf8_proof.overlong_if_true(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, valid),
-   invalid => utf8_proof.overlong_if_false(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, invalid))
-
 def Laws.utf8_valid_two_bytes(b1, b2):
-  {==}
+  (valid => utf8_proof.valid_if_true(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, valid),
+   invalid => utf8_proof.valid_if_false(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, invalid))
 
 # Prove UTF-8 encoding and decoding once for arbitrary payload fields.
 # Byte shape and range checks then inspect each field independently.
@@ -941,18 +941,17 @@ def utf8_proof.shape_from_masks(+b1: U32, +b2: U32,
 def utf8_proof.overlong_from_facts(+cp: U32, +b1: U32, +b2: U32,
   shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   decoded: {utf8_proof.decode_payload(b1, b2) == cp : U32}) ->
-  {UTF8.overlong_two_bytes(b1, b2) == UTF8.can_encode_as_one_byte(cp) : Bool}:
-  %decoded : {UTF8.overlong_two_bytes(b1, b2) == UTF8.can_encode_as_one_byte(_) : Bool}
-  utf8_proof.overlong_if_true(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, shape)
+  {UTF8.overlong_two_bytes(b1, b2, shape) == UTF8.can_encode_as_one_byte(cp) : Bool}:
+  %decoded : {UTF8.overlong_two_bytes(b1, b2, shape) == UTF8.can_encode_as_one_byte(_) : Bool}
+  {==}
 
 
 def utf8_proof.valid_from_facts(+cp: U32, +b1: U32, +b2: U32,
   shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
-  overlong: {UTF8.overlong_two_bytes(b1, b2) == UTF8.can_encode_as_one_byte(cp) : Bool}) ->
+  overlong: {UTF8.overlong_two_bytes(b1, b2, shape) == UTF8.can_encode_as_one_byte(cp) : Bool}) ->
   {UTF8.valid_two_bytes(b1, b2) == Bool.not(UTF8.can_encode_as_one_byte(cp)) : Bool}:
   %overlong : {UTF8.valid_two_bytes(b1, b2) == Bool.not(_) : Bool}
-  %shape : {UTF8.valid_two_bytes(b1, b2) == (_ && Bool.not(UTF8.overlong_two_bytes(b1, b2))) : Bool}
-  {==}
+  utf8_proof.valid_if_true(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, shape)
 
 def utf8_proof.range_from_facts(+low: Word(6n), +high: Word(5n),
   first: {(U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) == Bool.not(utf8_proof.fits_one_byte(high)) : Bool},
@@ -981,7 +980,7 @@ def utf8_proof.range_from_facts(+low: Word(6n), +high: Word(5n),
 def Utf8RoundtripSpec(+cp: U32, +b1: U32, +b2: U32) -> Type:
   Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
     {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32} &
-    {UTF8.overlong_two_bytes(b1, b2) == UTF8.can_encode_as_one_byte(cp) : Bool} &
+    {UTF8.overlong_two_bytes(b1, b2, shape) == UTF8.can_encode_as_one_byte(cp) : Bool} &
     {UTF8.valid_two_bytes(b1, b2) == U32.is_ge(cp, 128) : Bool} &
     {UTF8.valid_two_bytes(b1, b2) ==
       ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&

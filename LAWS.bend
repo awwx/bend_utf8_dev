@@ -117,23 +117,21 @@ law utf8_decode_two_bytes:
   Exists({UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}, accepted =>
     {UTF8.encode_as_two_bytes(cp, accepted) == (b1, b2) : U32 & U32})
 
-# Overlong means that a shaped pair decodes to a code point fitting in one byte.
-# A pair without the two-byte shape is not an overlong encoding.
+# Overlong means that the decoded code point fits in one byte.
 law utf8_overlong_two_bytes:
   for +b1: U32
   for +b2: U32
-  (@valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} ->
-    {UTF8.overlong_two_bytes(b1, b2) ==
-      UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid)) : Bool}) &
-  ({UTF8.has_two_byte_shape(b1, b2) == False{} : Bool} ->
-    {UTF8.overlong_two_bytes(b1, b2) == False{} : Bool})
+  for +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
+  {UTF8.overlong_two_bytes(b1, b2, valid) ==
+    UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid)) : Bool}
 
 law utf8_valid_two_bytes:
   for +b1: U32
   for +b2: U32
-  {UTF8.valid_two_bytes(b1, b2) ==
-    (UTF8.has_two_byte_shape(b1, b2) &&
-     Bool.not(UTF8.overlong_two_bytes(b1, b2))) : Bool}
+  (@valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} ->
+    {UTF8.valid_two_bytes(b1, b2) == Bool.not(UTF8.overlong_two_bytes(b1, b2, valid)) : Bool}) &
+  ({UTF8.has_two_byte_shape(b1, b2) == False{} : Bool} ->
+    {UTF8.valid_two_bytes(b1, b2) == False{} : Bool})
 
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
@@ -159,7 +157,7 @@ law utf8_two_roundtrip:
   +b2 = B.second(UTF8.encode_as_two_bytes(cp, accepted))
   Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
     {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32} &
-    {UTF8.overlong_two_bytes(b1, b2) == UTF8.can_encode_as_one_byte(cp) : Bool} &
+    {UTF8.overlong_two_bytes(b1, b2, shape) == UTF8.can_encode_as_one_byte(cp) : Bool} &
     {UTF8.valid_two_bytes(b1, b2) == U32.is_ge(cp, 128) : Bool} &
     {UTF8.valid_two_bytes(b1, b2) ==
       ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&
@@ -174,8 +172,8 @@ law utf8_encoding_examples:
   {UTF8.encode_as_two_bytes(128, {==}) == (194, 128) : U32 & U32} &
   {UTF8.encode_as_two_bytes(2047, {==}) == (223, 191) : U32 & U32} &
   {UTF8.can_encode_as_two_bytes(2048) == False{} : Bool} &
-  {UTF8.overlong_two_bytes(192, 128) == True{} : Bool} &
-  {UTF8.overlong_two_bytes(193, 191) == True{} : Bool} &
+  {UTF8.overlong_two_bytes(192, 128, {==}) == True{} : Bool} &
+  {UTF8.overlong_two_bytes(193, 191, {==}) == True{} : Bool} &
   {UTF8.valid_two_bytes(192, 128) == False{} : Bool} &
   {UTF8.valid_two_bytes(193, 191) == False{} : Bool} &
   {UTF8.valid_two_bytes(194, 128) == True{} : Bool} &
