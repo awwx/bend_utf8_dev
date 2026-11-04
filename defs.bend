@@ -5,6 +5,6 @@ def Bit8() -> Type:
   Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool
 
 # Bits are grouped into bytes, most significant byte and bit first.
-def Bit32() -> Type:
+def Byte4() -> Type:
   Bit8() & Bit8() & Bit8() & Bit8()
 

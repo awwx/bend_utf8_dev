@@ -239,7 +239,7 @@ law bit32:
     ((b31, b30, b29, b28, b27, b26, b25, b24),
      (b23, b22, b21, b20, b19, b18, b17, b16),
      (b15, b14, b13, b12, b11, b10, b9, b8),
-     (b7, b6, b5, b4, b3, b2, b1, b0)) : Defs.Bit32()}
+     (b7, b6, b5, b4, b3, b2, b1, b0)) : Defs.Byte4()}
 
 # Reference byte order: the high byte occupies bits 15..8, the low byte 7..0.
 # Split bits 15..8 and 7..0 into high and low bytes.

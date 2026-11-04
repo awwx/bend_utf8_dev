@@ -13,7 +13,7 @@ import ./binary_LAWS.bend as BinaryLaws
 #
 # https://en.wikipedia.org/wiki/UTF-8#Description
 
-def two_byte_shape.bits(bits: Defs.Bit32()) -> Maybe<&1, U32 & U32>:
+def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
