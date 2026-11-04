@@ -37,7 +37,7 @@ law utf8_can_encode_one:
 law utf8_encode_one:
   for +cp: U32
   for valid: {UTF8.can_encode_one(cp) == True{} : Bool}
-  {UTF8.encode_one(cp, valid) == cp : U32}
+  {Some{UTF8.encode_one(cp, valid)} == one_byte_shape(cp) : Maybe<&2, U32>}
 
 
 # UTF8 two byte shape
@@ -71,6 +71,11 @@ law utf8_can_encode_two:
   for +cp: U32
   {UTF8.can_encode_two(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
 
+law utf8_encode_two:
+  for +cp: U32
+  for valid: {UTF8.can_encode_two(cp) == True{} : Bool}
+  {Some{UTF8.encode_two(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
+
 
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
@@ -79,13 +84,6 @@ def codepoint11(bits: Word(11n)) -> U32:
       U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
 
 # Encoding functions expose the representation of a given code point.
-
-# For every encodable code point, the bytes must equal the reference model.
-law utf8_encode_two:
-  for +cp: U32
-  for valid: {Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) == True{} : Bool}
-  exs accepted: {UTF8.can_encode_two(cp) == True{} : Bool}
-  {Some{UTF8.encode_two(cp, accepted)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 # Leading and continuation bytes have the table's literal prefix bits.
 law utf8_two_byte_shape:
