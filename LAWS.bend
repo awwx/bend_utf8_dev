@@ -83,14 +83,14 @@ def codepoint11(bits: Word(11n)) -> U32:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}:
       U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
 
-# Encoding functions expose the representation of a given code point.
-
-# Leading and continuation bytes have the table's literal prefix bits.
-law utf8_two_byte_shape:
+# True exactly when the pair is produced by the two-byte encoding table.
+law utf8_has_two_byte_shape:
   for +b1: U32
   for +b2: U32
-  {UTF8.two_byte_shape(b1, b2) ==
-    (B.byte_mask("110xxxxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==})) : Bool}
+  representation = Exists(U32, cp =>
+    {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>})
+  ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
+  (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
 # Join the leading byte's five payload bits and the continuation's six bits.
 law utf8_decode_two:
@@ -104,14 +104,14 @@ law utf8_overlong_two:
   for +b1: U32
   for +b2: U32
   {UTF8.overlong_two(b1, b2) ==
-    (UTF8.two_byte_shape(b1, b2) &&
+    (UTF8.has_two_byte_shape(b1, b2) &&
      UTF8.can_encode_one(UTF8.decode_two(b1, b2))) : Bool}
 
 law utf8_valid_two:
   for +b1: U32
   for +b2: U32
   {UTF8.valid_two(b1, b2) ==
-    (UTF8.two_byte_shape(b1, b2) &&
+    (UTF8.has_two_byte_shape(b1, b2) &&
      Bool.not(UTF8.overlong_two(b1, b2))) : Bool}
 
 # Every eleven-bit code point has a two-byte representation. It round-trips,
@@ -131,7 +131,7 @@ law utf8_two_roundtrip:
   +b1 = B.first(UTF8.encode_two(cp, accepted))
   +b2 = B.second(UTF8.encode_two(cp, accepted))
   {UTF8.decode_two(b1, b2) == cp : U32} &
-  {UTF8.two_byte_shape(b1, b2) == True{} : Bool} &
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} &
   {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
   {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
   {UTF8.valid_two(b1, b2) ==

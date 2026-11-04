@@ -873,11 +873,11 @@ def bool_and_equal(+a: Bool, +b: Bool, +x: Bool, +y: Bool,
 def utf8_proof.shape_from_masks(+b1: U32, +b2: U32,
   first: {B.byte_mask("110xxxxx", b1, {==}) == True{} : Bool},
   second: {B.byte_mask("10xxxxxx", b2, {==}) == True{} : Bool}) ->
-  {UTF8.two_byte_shape(b1, b2) == True{} : Bool}:
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}:
   bool_and_equal(B.byte_mask("110xxxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), True{}, True{}, first, second)
 
 def utf8_proof.overlong_from_facts(+cp: U32, +b1: U32, +b2: U32,
-  shape: {UTF8.two_byte_shape(b1, b2) == True{} : Bool},
+  shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   decoded: {UTF8.decode_two(b1, b2) == cp : U32}) ->
   {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool}:
   %decoded : {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(_) : Bool}
@@ -885,7 +885,7 @@ def utf8_proof.overlong_from_facts(+cp: U32, +b1: U32, +b2: U32,
   {==}
 
 def utf8_proof.valid_from_facts(+cp: U32, +b1: U32, +b2: U32,
-  shape: {UTF8.two_byte_shape(b1, b2) == True{} : Bool},
+  shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   overlong: {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool}) ->
   {UTF8.valid_two(b1, b2) == Bool.not(UTF8.can_encode_one(cp)) : Bool}:
   %overlong : {UTF8.valid_two(b1, b2) == Bool.not(_) : Bool}
@@ -918,7 +918,7 @@ def utf8_proof.range_from_facts(+low: Word(6n), +high: Word(5n),
 
 def Utf8RoundtripSpec(+cp: U32, +b1: U32, +b2: U32) -> Type:
   {UTF8.decode_two(b1, b2) == cp : U32} &
-  {UTF8.two_byte_shape(b1, b2) == True{} : Bool} &
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} &
   {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
   {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
   {UTF8.valid_two(b1, b2) ==
@@ -1464,8 +1464,306 @@ def Laws.utf8_encode_two(cp, valid):
 def Laws.two_byte_shape_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==})
 
-def Laws.utf8_two_byte_shape(b1, b2):
-  {==}
+def bool_and_left_true(+left: Bool, -right: Bool, valid: {Bool.and(left, right) == True{} : Bool}) ->
+  {left == True{} : Bool}:
+  match left:
+    case False{}: valid
+    case True{}: {==}
+
+def bool_and_right_true(left: Bool, -right: Bool, valid: {Bool.and(left, right) == True{} : Bool}) ->
+  {right == True{} : Bool}:
+  match left:
+    case False{}: Empty.absurd({right == True{} : Bool}, H.hex_u32.false_true(valid))
+    case True{}: valid
+
+# Clear an arbitrary low field without enumerating its possible values.
+def word_mask_high(n: Nat, +low: Word(n), m: Nat, +high: Word(m), +mask: Word(m)) ->
+  {Word.and(Nat.add(n, m), word_join(n, low, m, high), word_join(n, Word.zero(n), m, mask)) ==
+    word_join(n, Word.zero(n), m, Word.and(m, high, mask)) : Word(Nat.add(n, m))}:
+  match n:
+    case 0n: {==}
+    case 1n+p:
+      match low:
+        case WCon{False{}, rest}:
+          Equal.cong(Word(Nat.add(p, m)), Word(1n+Nat.add(p, m)), w => WCon{False{}, w},
+            Word.and(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, Word.zero(p), m, mask)),
+            word_join(p, Word.zero(p), m, Word.and(m, high, mask)),
+            word_mask_high(p, rest, m, high, mask))
+        case WCon{True{}, rest}:
+          Equal.cong(Word(Nat.add(p, m)), Word(1n+Nat.add(p, m)), w => WCon{False{}, w},
+            Word.and(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, Word.zero(p), m, mask)),
+            word_join(p, Word.zero(p), m, Word.and(m, high, mask)),
+            word_mask_high(p, rest, m, high, mask))
+
+def utf8_proof.first_prefix(low: Word(5n), +p7: Bool, +p6: Bool, +p5: Bool) -> U32:
+  U32{word_join(5n, low, 27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}})}
+
+def utf8_proof.first_mask_parts(+byte: U32, m128: U32, m64: U32, m32: U32) -> Bool:
+  Bool.and(U32.is_le(byte, 255), Bool.and(U32.is_eq(m128, 128), Bool.and(U32.is_eq(m64, 64), Bool.and(Bool.or(U32.is_eq(m32, 0), False{}), True{}))))
+
+def utf8_proof.first_prefix_checks(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: Bool) ->
+  {utf8_proof.first_mask_parts(utf8_proof.first_prefix(low, p7, p6, p5), U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}))}, U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}))}, U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}))}) == Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))) : Bool}:
+  match p7 p6 p5:
+    case False{} False{} False{}: {==}
+    case False{} False{} True{}: {==}
+    case False{} True{} False{}: {==}
+    case False{} True{} True{}: {==}
+    case True{} False{} False{}: {==}
+    case True{} False{} True{}: {==}
+    case True{} True{} False{}: {==}
+    case True{} True{} True{}: {==}
+
+def utf8_proof.first_prefix_mask(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: Bool) ->
+  {B.byte_mask("110xxxxx", utf8_proof.first_prefix(low, p7, p6, p5), {==}) == Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))) : Bool}:
+  %Equal.sym(U32, U32.and(utf8_proof.first_prefix(low, p7, p6, p5), 128), U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(5n, low, 27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}), word_join(5n, Word.zero(5n), 27n, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}})),
+      word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}})),
+      word_mask_high(5n, low, 27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}))) : {utf8_proof.first_mask_parts(utf8_proof.first_prefix(low, p7, p6, p5), _, U32.and(utf8_proof.first_prefix(low, p7, p6, p5), 64), U32.and(utf8_proof.first_prefix(low, p7, p6, p5), 32)) == Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.first_prefix(low, p7, p6, p5), 64), U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(5n, low, 27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}), word_join(5n, Word.zero(5n), 27n, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}})),
+      word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}})),
+      word_mask_high(5n, low, 27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}))) : {utf8_proof.first_mask_parts(utf8_proof.first_prefix(low, p7, p6, p5), U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}))}, _, U32.and(utf8_proof.first_prefix(low, p7, p6, p5), 32)) == Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.first_prefix(low, p7, p6, p5), 32), U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(5n, low, 27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}), word_join(5n, Word.zero(5n), 27n, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}})),
+      word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}})),
+      word_mask_high(5n, low, 27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}))) : {utf8_proof.first_mask_parts(utf8_proof.first_prefix(low, p7, p6, p5), U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}))}, U32{word_join(5n, Word.zero(5n), 27n, Word.and(27n, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}))}, _) == Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))) : Bool}
+  utf8_proof.first_prefix_checks(low, p7, p6, p5)
+
+def utf8_proof.first_prefix_payload(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: Bool, valid: {Bool.and(p7, Bool.and(p6, Bool.not(p5))) == True{} : Bool}) ->
+  Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}):
+  match p7 p6 p5:
+    case False{} False{} False{}:
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} True{}:
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} False{}:
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} True{}:
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} False{}:
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} True{}:
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} False{}:
+      (low, {==})
+    case True{} True{} True{}:
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+
+def utf8_proof.first_payload_bits(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: Bool,
+  valid: {B.byte_mask("110xxxxx", utf8_proof.first_prefix(low, p7, p6, p5), {==}) == True{} : Bool}) -> Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}):
+  utf8_proof.first_prefix_payload(low, p7, p6, p5,
+    bool_and_right_true(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5))),
+      Equal.trans(Bool, Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))), B.byte_mask("110xxxxx", utf8_proof.first_prefix(low, p7, p6, p5), {==}), True{},
+        Equal.sym(Bool, B.byte_mask("110xxxxx", utf8_proof.first_prefix(low, p7, p6, p5), {==}), Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))),
+          utf8_proof.first_prefix_mask(low, p7, p6, p5)), valid)))
+
+def utf8_proof.first_payload_tuple(bits: Defs.Bit8(),
+  valid: {B.byte_mask("110xxxxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(5n), payload => {B.bit8_value(bits) == utf8_proof.first_byte(payload) : U32}):
+  match bits:
+    case (b7, b6, b5, b4, b3, b2, b1, b0):
+      utf8_proof.first_payload_bits(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WNil{}}}}}}, b7, b6, b5, valid)
+
+def utf8_proof.first_payload_finish(+byte: U32, -converted: U32,
+  equal: {converted == byte : U32},
+  result: Exists(Word(5n), payload => {converted == utf8_proof.first_byte(payload) : U32})) ->
+  Exists(Word(5n), payload => {byte == utf8_proof.first_byte(payload) : U32}):
+  (payload, matches) = result
+  (payload, Equal.trans(U32, byte, converted, utf8_proof.first_byte(payload),
+    Equal.sym(U32, converted, byte, equal), matches))
+
+def utf8_proof.first_payload(+byte: U32,
+  +valid: {B.byte_mask("110xxxxx", byte, {==}) == True{} : Bool}) ->
+  Exists(Word(5n), payload => {byte == utf8_proof.first_byte(payload) : U32}):
+  +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('1', byte, 64), Bool.and(B.byte_mask.bit('0', byte, 32), True{}))), valid)
+  +equal = BinaryLaws.bit8_value_bit8_roundtrip(byte, bounded)
+  result = utf8_proof.first_payload_tuple(B.bit8(byte, bounded),
+    Equal.trans(Bool, B.byte_mask("110xxxxx", B.bit8_value(B.bit8(byte, bounded)), {==}),
+      B.byte_mask("110xxxxx", byte, {==}), True{},
+      Equal.cong(U32, Bool, x => B.byte_mask("110xxxxx", x, {==}),
+        B.bit8_value(B.bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.first_payload_finish(byte, B.bit8_value(B.bit8(byte, bounded)), equal, result)
+
+def utf8_proof.second_prefix(low: Word(6n), +p7: Bool, +p6: Bool) -> U32:
+  U32{word_join(6n, low, 26n, WCon{p6, WCon{p7, Word.zero(24n)}})}
+
+def utf8_proof.second_mask_parts(+byte: U32, m128: U32, m64: U32) -> Bool:
+  Bool.and(U32.is_le(byte, 255), Bool.and(U32.is_eq(m128, 128), Bool.and(Bool.or(U32.is_eq(m64, 0), False{}), True{})))
+
+def utf8_proof.second_prefix_checks(+low: Word(6n), +p7: Bool, +p6: Bool) ->
+  {utf8_proof.second_mask_parts(utf8_proof.second_prefix(low, p7, p6), U32{word_join(6n, Word.zero(6n), 26n, Word.and(26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{False{}, WCon{True{}, Word.zero(24n)}}))}, U32{word_join(6n, Word.zero(6n), 26n, Word.and(26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{True{}, WCon{False{}, Word.zero(24n)}}))}) == Bool.and(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6))) : Bool}:
+  match p7 p6:
+    case False{} False{}: {==}
+    case False{} True{}: {==}
+    case True{} False{}: {==}
+    case True{} True{}: {==}
+
+def utf8_proof.second_prefix_mask(+low: Word(6n), +p7: Bool, +p6: Bool) ->
+  {B.byte_mask("10xxxxxx", utf8_proof.second_prefix(low, p7, p6), {==}) == Bool.and(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6))) : Bool}:
+  %Equal.sym(U32, U32.and(utf8_proof.second_prefix(low, p7, p6), 128), U32{word_join(6n, Word.zero(6n), 26n, Word.and(26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{False{}, WCon{True{}, Word.zero(24n)}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(6n, low, 26n, WCon{p6, WCon{p7, Word.zero(24n)}}), word_join(6n, Word.zero(6n), 26n, WCon{False{}, WCon{True{}, Word.zero(24n)}})),
+      word_join(6n, Word.zero(6n), 26n, Word.and(26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{False{}, WCon{True{}, Word.zero(24n)}})),
+      word_mask_high(6n, low, 26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{False{}, WCon{True{}, Word.zero(24n)}}))) : {utf8_proof.second_mask_parts(utf8_proof.second_prefix(low, p7, p6), _, U32.and(utf8_proof.second_prefix(low, p7, p6), 64)) == Bool.and(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.second_prefix(low, p7, p6), 64), U32{word_join(6n, Word.zero(6n), 26n, Word.and(26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{True{}, WCon{False{}, Word.zero(24n)}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(6n, low, 26n, WCon{p6, WCon{p7, Word.zero(24n)}}), word_join(6n, Word.zero(6n), 26n, WCon{True{}, WCon{False{}, Word.zero(24n)}})),
+      word_join(6n, Word.zero(6n), 26n, Word.and(26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{True{}, WCon{False{}, Word.zero(24n)}})),
+      word_mask_high(6n, low, 26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{True{}, WCon{False{}, Word.zero(24n)}}))) : {utf8_proof.second_mask_parts(utf8_proof.second_prefix(low, p7, p6), U32{word_join(6n, Word.zero(6n), 26n, Word.and(26n, WCon{p6, WCon{p7, Word.zero(24n)}}, WCon{False{}, WCon{True{}, Word.zero(24n)}}))}, _) == Bool.and(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6))) : Bool}
+  utf8_proof.second_prefix_checks(low, p7, p6)
+
+def utf8_proof.second_prefix_payload(+low: Word(6n), +p7: Bool, +p6: Bool, valid: {Bool.and(p7, Bool.not(p6)) == True{} : Bool}) ->
+  Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}):
+  match p7 p6:
+    case False{} False{}:
+      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{}:
+      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{}:
+      (low, {==})
+    case True{} True{}:
+      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), H.hex_u32.false_true(valid))
+
+def utf8_proof.second_payload_bits(+low: Word(6n), +p7: Bool, +p6: Bool,
+  valid: {B.byte_mask("10xxxxxx", utf8_proof.second_prefix(low, p7, p6), {==}) == True{} : Bool}) -> Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}):
+  utf8_proof.second_prefix_payload(low, p7, p6,
+    bool_and_right_true(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6)),
+      Equal.trans(Bool, Bool.and(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6))), B.byte_mask("10xxxxxx", utf8_proof.second_prefix(low, p7, p6), {==}), True{},
+        Equal.sym(Bool, B.byte_mask("10xxxxxx", utf8_proof.second_prefix(low, p7, p6), {==}), Bool.and(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6))),
+          utf8_proof.second_prefix_mask(low, p7, p6)), valid)))
+
+def utf8_proof.second_payload_tuple(bits: Defs.Bit8(),
+  valid: {B.byte_mask("10xxxxxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(6n), payload => {B.bit8_value(bits) == utf8_proof.second_byte(payload) : U32}):
+  match bits:
+    case (b7, b6, b5, b4, b3, b2, b1, b0):
+      utf8_proof.second_payload_bits(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, b7, b6, valid)
+
+def utf8_proof.second_payload_finish(+byte: U32, -converted: U32,
+  equal: {converted == byte : U32},
+  result: Exists(Word(6n), payload => {converted == utf8_proof.second_byte(payload) : U32})) ->
+  Exists(Word(6n), payload => {byte == utf8_proof.second_byte(payload) : U32}):
+  (payload, matches) = result
+  (payload, Equal.trans(U32, byte, converted, utf8_proof.second_byte(payload),
+    Equal.sym(U32, converted, byte, equal), matches))
+
+def utf8_proof.second_payload(+byte: U32,
+  +valid: {B.byte_mask("10xxxxxx", byte, {==}) == True{} : Bool}) ->
+  Exists(Word(6n), payload => {byte == utf8_proof.second_byte(payload) : U32}):
+  +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('0', byte, 64), True{})), valid)
+  +equal = BinaryLaws.bit8_value_bit8_roundtrip(byte, bounded)
+  result = utf8_proof.second_payload_tuple(B.bit8(byte, bounded),
+    Equal.trans(Bool, B.byte_mask("10xxxxxx", B.bit8_value(B.bit8(byte, bounded)), {==}),
+      B.byte_mask("10xxxxxx", byte, {==}), True{},
+      Equal.cong(U32, Bool, x => B.byte_mask("10xxxxxx", x, {==}),
+        B.bit8_value(B.bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.second_payload_finish(byte, B.bit8_value(B.bit8(byte, bounded)), equal, result)
+
+# Reassemble the eleven payload bits into a code-point witness.
+def utf8_proof.table_shape(+low: Word(6n), +high: Word(5n)) ->
+  {Laws.two_byte_shape(utf8_proof.codepoint(low, high)) ==
+    Some{(utf8_proof.first_byte(high), utf8_proof.second_byte(low))} : Maybe<&1, U32 & U32>}:
+  match low high:
+    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}: {==}
+
+def utf8_proof.table_shape_pair(+low: Word(6n), +high: Word(5n), +b1: U32, +b2: U32,
+  first: {b1 == utf8_proof.first_byte(high) : U32},
+  second: {b2 == utf8_proof.second_byte(low) : U32}) ->
+  {Laws.two_byte_shape(utf8_proof.codepoint(low, high)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}:
+  %Equal.sym(U32, b1, utf8_proof.first_byte(high), first) : {Laws.two_byte_shape(utf8_proof.codepoint(low, high)) == Some{(_, b2)} : Maybe<&1, U32 & U32>}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(low), second) : {Laws.two_byte_shape(utf8_proof.codepoint(low, high)) == Some{(utf8_proof.first_byte(high), _)} : Maybe<&1, U32 & U32>}
+  utf8_proof.table_shape(low, high)
+
+def Utf8ShapeRepresentation(+b1: U32, +b2: U32) -> Type:
+  Exists(U32, cp => {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>})
+
+def utf8_proof.shape_witness_fields(+b1: U32, +b2: U32,
+  first: Exists(Word(5n), high => {b1 == utf8_proof.first_byte(high) : U32}),
+  second: Exists(Word(6n), low => {b2 == utf8_proof.second_byte(low) : U32})) -> Utf8ShapeRepresentation(b1, b2):
+  (+high, first_equal) = first
+  (+low, second_equal) = second
+  (utf8_proof.codepoint(low, high), utf8_proof.table_shape_pair(low, high, b1, b2, first_equal, second_equal))
+
+def utf8_proof.shape_witness(+b1: U32, +b2: U32,
+  +accepted: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}) -> Utf8ShapeRepresentation(b1, b2):
+  utf8_proof.shape_witness_fields(b1, b2,
+    utf8_proof.first_payload(b1, bool_and_left_true(B.byte_mask("110xxxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), accepted)),
+    utf8_proof.second_payload(b2, bool_and_right_true(B.byte_mask("110xxxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), accepted)))
+
+# Every Some produced by the table has an accepted pair.
+def utf8_proof.model_shape_accepted(shape: Maybe<&1, U32 & U32>) -> Bool:
+  match shape:
+    case None{}: False{}
+    case Some{(b1, b2)}: UTF8.has_two_byte_shape(b1, b2)
+
+def utf8_proof.model_fields(+low: Word(6n), +high: Word(5n),
+  first_facts: {B.byte_mask("110xxxxx", utf8_proof.first_byte(high), {==}) == True{} : Bool} &
+  {(U32.is_ge(utf8_proof.first_byte(high), 194) && U32.is_le(utf8_proof.first_byte(high), 223)) == Bool.not(utf8_proof.fits_one_byte(high)) : Bool},
+  second_facts: {B.byte_mask("10xxxxxx", utf8_proof.second_byte(low), {==}) == True{} : Bool} &
+  {(U32.is_ge(utf8_proof.second_byte(low), 128) && U32.is_le(utf8_proof.second_byte(low), 191)) == True{} : Bool}) ->
+  {UTF8.has_two_byte_shape(utf8_proof.first_byte(high), utf8_proof.second_byte(low)) == True{} : Bool}:
+  (first, _) = first_facts
+  (second, _) = second_facts
+  utf8_proof.shape_from_masks(utf8_proof.first_byte(high), utf8_proof.second_byte(low), first, second)
+
+def utf8_proof.model_shape_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) ->
+  {utf8_proof.model_shape_accepted(Laws.two_byte_shape(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))) ==
+    Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))) : Bool}:
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      utf8_proof.model_fields(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}, utf8_proof.first_byte_facts(WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}), utf8_proof.second_byte_facts(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}))
+
+def utf8_proof.model_shape(cp: U32) ->
+  {utf8_proof.model_shape_accepted(Laws.two_byte_shape(cp)) ==
+    Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)) : Bool}:
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.model_shape_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
+
+def utf8_proof.model_pair_accepted(+cp: U32, +b1: U32, +b2: U32,
+  +produced: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}:
+  Equal.trans(Bool, UTF8.has_two_byte_shape(b1, b2), utf8_proof.model_shape_accepted(Laws.two_byte_shape(cp)), True{},
+    Equal.sym(Bool, utf8_proof.model_shape_accepted(Laws.two_byte_shape(cp)), UTF8.has_two_byte_shape(b1, b2),
+      Equal.cong(Maybe<&1, U32 & U32>, Bool, shape => utf8_proof.model_shape_accepted(shape),
+        Laws.two_byte_shape(cp), Some{(b1, b2)}, produced)),
+    Equal.trans(Bool, utf8_proof.model_shape_accepted(Laws.two_byte_shape(cp)),
+      Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), True{}, utf8_proof.model_shape(cp),
+      Equal.cong(Maybe<&1, U32 & U32>, Bool, shape => Maybe.is_some(&1, U32 & U32, shape),
+        Laws.two_byte_shape(cp), Some{(b1, b2)}, produced)))
+
+def utf8_proof.shape_witness_accepted(+b1: U32, +b2: U32, representation: Utf8ShapeRepresentation(b1, b2)) ->
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}:
+  (cp, produced) = representation
+  utf8_proof.model_pair_accepted(cp, b1, b2, produced)
+
+def Laws.utf8_has_two_byte_shape(b1, b2):
+  (accepted => utf8_proof.shape_witness(b1, b2, accepted),
+   representation => utf8_proof.shape_witness_accepted(b1, b2, representation))
 
 def Laws.utf8_decode_two(b1, b2):
   {==}

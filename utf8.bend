@@ -18,7 +18,7 @@ def encode_two(+cp: U32,
   ((192 + U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(cp)))))) : U32),
    (128 + U32.and(cp, 63) : U32))
 
-def two_byte_shape(b1: U32, b2: U32) -> Bool:
+def has_two_byte_shape(b1: U32, b2: U32) -> Bool:
   B.byte_mask("110xxxxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==})
 
 # Decode the payload; callers establish the two-byte shape separately.
@@ -27,11 +27,11 @@ def decode_two(b1: U32, b2: U32) -> U32:
 
 # The decoded code point also has a one-byte representation.
 def overlong_two(+b1: U32, +b2: U32) -> Bool:
-  two_byte_shape(b1, b2) &&
+  has_two_byte_shape(b1, b2) &&
   can_encode_one(decode_two(b1, b2))
 
 def valid_two(+b1: U32, +b2: U32) -> Bool:
-  two_byte_shape(b1, b2) && Bool.not(overlong_two(b1, b2))
+  has_two_byte_shape(b1, b2) && Bool.not(overlong_two(b1, b2))
 
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
