@@ -2,7 +2,9 @@ import Base
 import ./defs.bend as Defs
 import ./binary.bend as B
 
-# A byte's tuple is most significant bit first; all higher U32 bits are zero.
+# Given 8 booleans used as bits, most significant bit first, convert
+# to its U32 value 0..255.  Higher U32 bits are zero.
+
 law bit8_value:
   for +b7: Bool
   for +b6: Bool
@@ -21,6 +23,22 @@ law bit8_value:
      Bool.to_u32(b2) * 4 +
      Bool.to_u32(b1) * 2 +
      Bool.to_u32(b0) * 1 : U32) : U32}
+
+# Provide an independent check of `bit8_value`: convert the booleans
+# to a Word(8n), then to a Nat, and then to a U32.
+
+# Word stores its least significant bit first.
+law bit8_value_word:
+  for +b7: Bool
+  for +b6: Bool
+  for +b5: Bool
+  for +b4: Bool
+  for +b3: Bool
+  for +b2: Bool
+  for +b1: Bool
+  for +b0: Bool
+  {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    U32.from_nat(Word.to_nat(8n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WNil{}}}}}}}}})) : U32}
 
 # Decompose a byte value represented by a U32 < 256 into its eight
 # booleans, most significant first.
