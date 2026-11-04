@@ -17,7 +17,7 @@ def strbyte.fold_bits(bits: +List<Bool>, acc: U32) -> U32:
     case Nil{}:
       acc
     case Con{bit, rest}:
-      strbyte.fold_bits(rest, (acc * 2 + Bool.to_u32(bit) : U32))
+      strbyte.fold_bits(rest, (U32.shl(acc) + Bool.to_u32(bit) : U32))
 
 def strbyte(+s: String, valid: {valid_byte_string(s) == True{} : Bool}) -> U32:
   match s:
