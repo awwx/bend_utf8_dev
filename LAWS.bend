@@ -64,7 +64,7 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
 def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
   two_byte_shape.bits(B.u32_byte4(cp))
 
-# Specification for utf8.can_encode_two: if should return True iff
+# Specification for utf8.can_encode_two: it should return True iff
 # two_byte_shape matches.
 
 law utf8_can_encode_two:
