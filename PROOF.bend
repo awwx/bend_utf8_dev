@@ -7,28 +7,6 @@ import ./hexdigits.bend as H
 import ./binary.bend as B
 import ./utf8.bend as UTF8
 
-# Bind the specification's abstract operations to the selected implementation.
-def Laws.utf8.can_encode_one(cp):
-  UTF8.can_encode_one(cp)
-
-def Laws.utf8.can_encode_two(cp):
-  UTF8.can_encode_two(cp)
-
-def Laws.utf8.encode_one(cp, valid):
-  UTF8.encode_one(cp, valid)
-
-def Laws.utf8.two_byte_shape(b1, b2):
-  UTF8.two_byte_shape(b1, b2)
-
-def Laws.utf8.decode_two(b1, b2):
-  UTF8.decode_two(b1, b2)
-
-def Laws.utf8.overlong_two(b1, b2):
-  UTF8.overlong_two(b1, b2)
-
-def Laws.valid_utf8_two_bytes(b1, b2):
-  UTF8.valid_two(b1, b2)
-
 # State the membership specification as a type for the bit-level lemma.
 def HexDigitSpec(+c: Char) -> Type:
   {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, HexLaws.hex_digits(), c) : Bool}
@@ -91,7 +69,7 @@ def Laws.utf8_can_encode_two(cp):
       utf8_proof.capacity_model_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
 
 # Translate the model's existence proof into the implementation's range proof.
-def Laws.utf8.encode_two(cp, valid):
+def Laws.encode_two(cp, valid):
   UTF8.encode_two(cp,
     Equal.trans(Bool, UTF8.can_encode_two(cp),
       Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(cp)), True{},
@@ -1318,7 +1296,7 @@ def BinaryLaws.byte2_examples():
 
 def Utf8EncodeTwoSpec(+cp: U32,
   valid: {Maybe.is_some(&1, U32 & U32, Laws.maybe_encode_two(cp)) == True{} : Bool}) -> Type:
-  {Some{Laws.utf8.encode_two(cp, valid)} == Laws.maybe_encode_two(cp) : Maybe<&1, U32 & U32>}
+  {Some{Laws.encode_two(cp, valid)} == Laws.maybe_encode_two(cp) : Maybe<&1, U32 & U32>}
 
 def utf8_proof.table_pair(+low: Word(6n), +high: Word(5n),
   +valid: {UTF8.can_encode_two(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
