@@ -24,12 +24,15 @@ def one_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&2, U32>:
 def one_byte_shape(cp: U32) -> Maybe<&2, U32>:
   one_byte_shape.bits(B.u32_byte4(cp))
 
-# Specification for utf8.can_encode_one: it should return True iff
-# one_byte_shape matches and returns a Some.
+# Specification for whether we can encode a codepoint as one byte: yes
+# iff one_byte_shape matches.
+
+def can_encode_as_one_byte(cp: U32) -> Bool:
+  Maybe.is_some(&2, U32, one_byte_shape(cp))
 
 law utf8_can_encode_one:
   for +cp: U32
-  {UTF8.can_encode_one(cp) == Maybe.is_some(&2, U32, one_byte_shape(cp)) : Bool}
+  {UTF8.can_encode_one(cp) == can_encode_as_one_byte(cp) : Bool}
 
 law utf8_encode_one:
   for +cp: U32
