@@ -31,6 +31,11 @@ law utf8_can_encode_one:
   for +cp: U32
   {UTF8.can_encode_one(cp) == Maybe.is_some(&2, U32, one_byte_shape(cp)) : Bool}
 
+law utf8_encode_one:
+  for +cp: U32
+  for valid: {U32.is_le(cp, 127) == True{} : Bool}
+  {UTF8.encode_one(cp, valid) == cp : U32}
+
 
 # UTF8 two byte shape
 #
@@ -71,10 +76,6 @@ def codepoint11(bits: Word(11n)) -> U32:
       U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
 
 # Encoding functions expose the representation of a given code point.
-law utf8_encode_one:
-  for +cp: U32
-  for valid: {U32.is_le(cp, 127) == True{} : Bool}
-  {UTF8.encode_one(cp, valid) == cp : U32}
 
 # For every encodable code point, the bytes must equal the reference model.
 law utf8_encode_two:
