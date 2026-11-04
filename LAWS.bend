@@ -32,14 +32,6 @@ law utf8_can_encode_two:
   for +cp: U32
   {UTF8.can_encode_two(cp) == Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)) : Bool}
 
-# Adapter from the reference model's existence proof to the implementation's
-# range proof. PROOF.bend fills it using utf8_can_encode_two; an ordinary
-# definition here cannot use that law before it has been filled.
-law encode_two:
-  for +cp: U32
-  for valid: {Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)) == True{} : Bool}
-  U32 & U32
-
 law utf8_can_encode_one:
   for +cp: U32
   {UTF8.can_encode_one(cp) == U32.is_le(cp, 127) : Bool}
@@ -68,7 +60,8 @@ law utf8_encode_one:
 law utf8_encode_two:
   for +cp: U32
   for valid: {Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)) == True{} : Bool}
-  {Some{encode_two(cp, valid)} == maybe_encode_two(cp) : Maybe<&1, U32 & U32>}
+  exs accepted: {UTF8.can_encode_two(cp) == True{} : Bool}
+  {Some{UTF8.encode_two(cp, accepted)} == maybe_encode_two(cp) : Maybe<&1, U32 & U32>}
 
 # Leading and continuation bytes have the table's literal prefix bits.
 law utf8_two_byte_shape:
@@ -110,8 +103,11 @@ law utf8_two_capacity:
 law utf8_two_roundtrip:
   for +bits: Word(11n)
   +cp = codepoint11(bits)
-  +b1 = B.first(encode_two(cp, utf8_two_capacity(bits)))
-  +b2 = B.second(encode_two(cp, utf8_two_capacity(bits)))
+  +accepted = Equal.trans(Bool, UTF8.can_encode_two(cp),
+    Maybe.is_some(&1, U32 & U32, maybe_encode_two(cp)), True{},
+    utf8_can_encode_two(cp), utf8_two_capacity(bits))
+  +b1 = B.first(UTF8.encode_two(cp, accepted))
+  +b2 = B.second(UTF8.encode_two(cp, accepted))
   {UTF8.decode_two(b1, b2) == cp : U32} &
   {UTF8.two_byte_shape(b1, b2) == True{} : Bool} &
   {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
@@ -124,10 +120,10 @@ law utf8_encoding_examples:
   {UTF8.encode_one(0, {==}) == 0 : U32} &
   {UTF8.encode_one(127, {==}) == 127 : U32} &
   {UTF8.can_encode_one(128) == False{} : Bool} &
-  {encode_two(0, {==}) == (192, 128) : U32 & U32} &
-  {encode_two(127, {==}) == (193, 191) : U32 & U32} &
-  {encode_two(128, {==}) == (194, 128) : U32 & U32} &
-  {encode_two(2047, {==}) == (223, 191) : U32 & U32} &
+  {UTF8.encode_two(0, {==}) == (192, 128) : U32 & U32} &
+  {UTF8.encode_two(127, {==}) == (193, 191) : U32 & U32} &
+  {UTF8.encode_two(128, {==}) == (194, 128) : U32 & U32} &
+  {UTF8.encode_two(2047, {==}) == (223, 191) : U32 & U32} &
   {UTF8.can_encode_two(2048) == False{} : Bool} &
   {UTF8.overlong_two(192, 128) == True{} : Bool} &
   {UTF8.overlong_two(193, 191) == True{} : Bool} &
