@@ -12,6 +12,10 @@ def encode_one(+cp: U32,
   valid: {can_encode_one(cp) == True{} : Bool}) -> U32:
   cp
 
+# A one-byte encoding has the same value as its code point (0..127).
+def has_one_byte_shape(byte: U32) -> Bool:
+  can_encode_one(byte)
+
 # Deliberately permits overlong encodings of code points 0..127.
 def encode_two(+cp: U32,
   valid: {can_encode_two(cp) == True{} : Bool}) -> U32 & U32:

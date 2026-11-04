@@ -39,6 +39,14 @@ law utf8_encode_one:
   for valid: {UTF8.can_encode_one(cp) == True{} : Bool}
   {Some{UTF8.encode_one(cp, valid)} == one_byte_shape(cp) : Maybe<&2, U32>}
 
+# True exactly when the byte is produced by the one-byte encoding table.
+law utf8_has_one_byte_shape:
+  for +byte: U32
+  representation = Exists(U32, cp =>
+    {one_byte_shape(cp) == Some{byte} : Maybe<&2, U32>})
+  ({UTF8.has_one_byte_shape(byte) == True{} : Bool} -> representation) &
+  (representation -> {UTF8.has_one_byte_shape(byte) == True{} : Bool})
+
 
 # UTF8 two byte shape
 #

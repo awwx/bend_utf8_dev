@@ -585,6 +585,40 @@ def Laws.utf8_encode_one(cp, valid):
       utf8_proof.encode_one_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
 
 
+# A one-byte encoding preserves the code point, so the byte itself is a witness.
+def Utf8OneShapeRepresentation(+byte: U32) -> Type:
+  Exists(U32, cp => {Laws.one_byte_shape(cp) == Some{byte} : Maybe<&2, U32>})
+
+def utf8_proof.one_shape_witness(+byte: U32,
+  accepted: {UTF8.has_one_byte_shape(byte) == True{} : Bool}) -> Utf8OneShapeRepresentation(byte):
+  (byte, Equal.sym(Maybe<&2, U32>, Some{byte}, Laws.one_byte_shape(byte),
+    Laws.utf8_encode_one(byte, accepted)))
+
+# Reuse the capacity and encoding proofs to recover the produced byte's value.
+def utf8_proof.one_model_byte_accepted(+cp: U32, +byte: U32,
+  +produced: {Laws.one_byte_shape(cp) == Some{byte} : Maybe<&2, U32>}) ->
+  {UTF8.has_one_byte_shape(byte) == True{} : Bool}:
+  +accepted = Equal.trans(Bool, UTF8.can_encode_one(cp), Laws.can_encode_as_one_byte(cp), True{},
+    Laws.utf8_can_encode_one(cp),
+    Equal.cong(Maybe<&2, U32>, Bool, shape => Maybe.is_some(&2, U32, shape),
+      Laws.one_byte_shape(cp), Some{byte}, produced))
+  equal = Equal.cong(Maybe<&2, U32>, U32, shape => Maybe.default(&2, U32, shape, 0),
+    Some{cp}, Some{byte},
+    Equal.trans(Maybe<&2, U32>, Some{cp}, Laws.one_byte_shape(cp), Some{byte},
+      Laws.utf8_encode_one(cp, accepted), produced))
+  Equal.trans(Bool, UTF8.has_one_byte_shape(byte), UTF8.has_one_byte_shape(cp), True{},
+    Equal.sym(Bool, UTF8.has_one_byte_shape(cp), UTF8.has_one_byte_shape(byte),
+      Equal.cong(U32, Bool, value => UTF8.has_one_byte_shape(value), cp, byte, equal)), accepted)
+
+def utf8_proof.one_shape_witness_accepted(+byte: U32, representation: Utf8OneShapeRepresentation(byte)) ->
+  {UTF8.has_one_byte_shape(byte) == True{} : Bool}:
+  (cp, produced) = representation
+  utf8_proof.one_model_byte_accepted(cp, byte, produced)
+
+def Laws.utf8_has_one_byte_shape(byte):
+  (accepted => utf8_proof.one_shape_witness(byte, accepted),
+   representation => utf8_proof.one_shape_witness_accepted(byte, representation))
+
 def Laws.utf8_overlong_two(b1, b2):
   {==}
 
