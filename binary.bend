@@ -19,7 +19,7 @@ def strbyte.fold_bits(bits: +List<Bool>, acc: U32) -> U32:
     case Con{bit, rest}:
       strbyte.fold_bits(rest, (U32.shl(acc) + Bool.to_u32(bit) : U32))
 
-def strbyte(+s: String, valid: {valid_byte_string(s) == True{} : Bool}) -> U32:
+def strbyte(+s: String, -valid: {valid_byte_string(s) == True{} : Bool}) -> U32:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       strbyte.fold_bits([char_to_bit(c1), char_to_bit(c2), char_to_bit(c3), char_to_bit(c4), char_to_bit(c5), char_to_bit(c6), char_to_bit(c7), char_to_bit(c8)], 0)
@@ -42,7 +42,7 @@ def byte_mask.bit(+c: Char, +byte: U32, +weight: U32) -> Bool:
 # The proof is the last argument: byte_mask("01xxxxxx", byte, {==}).
 # U32 is the numeric carrier; values outside the byte range do not match.
 def byte_mask(+mask: String, +byte: U32,
-  valid: {is_valid_byte_mask(mask) == True{} : Bool}) -> Bool:
+  -valid: {is_valid_byte_mask(mask) == True{} : Bool}) -> Bool:
   match mask:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       Bool.and(U32.is_le(byte, 255), Bool.and(byte_mask.bit(c1, byte, 128), Bool.and(byte_mask.bit(c2, byte, 64), Bool.and(byte_mask.bit(c3, byte, 32), Bool.and(byte_mask.bit(c4, byte, 16), Bool.and(byte_mask.bit(c5, byte, 8), Bool.and(byte_mask.bit(c6, byte, 4), Bool.and(byte_mask.bit(c7, byte, 2), Bool.and(byte_mask.bit(c8, byte, 1), True{})))))))))
@@ -52,7 +52,7 @@ def byte_mask(+mask: String, +byte: U32,
 # Eight bits, most significant first. U32 is unsigned, so <=255 establishes
 # the full byte range 0..255. The final argument is a proof, not a runtime test.
 def bit8(+byte: U32,
-  valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Defs.Bit8():
+  -valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Defs.Bit8():
   (U32.is_ne(U32.and(byte, 128), 0),
    U32.is_ne(U32.and(byte, 64), 0),
    U32.is_ne(U32.and(byte, 32), 0),
@@ -70,7 +70,7 @@ def bit8_value(bit8: Defs.Bit8()) -> U32:
 
 # Split a sixteen-bit number into high and low bytes (big endian).
 def u32_byte2(+value: U32,
-  valid: {U32.is_le(value, 65535) == True{} : Bool}) -> U32 & U32:
+  -valid: {U32.is_le(value, 65535) == True{} : Bool}) -> U32 & U32:
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       (bit8_value((b15, b14, b13, b12, b11, b10, b9, b8)),

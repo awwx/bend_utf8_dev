@@ -46,7 +46,7 @@ law bit8_value_word:
 
 law bit8:
   for +byte: U32
-  for valid: {U32.is_le(byte, 255) == True{} : Bool}
+  for -valid: {U32.is_le(byte, 255) == True{} : Bool}
   {B.bit8(byte, valid) ==
     (U32.is_ne(U32.and(byte, 128), 0),
      U32.is_ne(U32.and(byte, 64), 0),
@@ -276,7 +276,7 @@ law u32_byte2:
   for +b2: Bool
   for +b1: Bool
   for +b0: Bool
-  for valid: {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}
+  for -valid: {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}
   {B.u32_byte2(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, valid) ==
     (B.bit8_value((b15, b14, b13, b12, b11, b10, b9, b8)), B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0))) : U32 & U32}
 

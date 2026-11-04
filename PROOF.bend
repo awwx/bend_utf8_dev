@@ -260,7 +260,7 @@ def HexLaws.is_hex_digit(c):
       hex_digit_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
 
 # Compare every implemented digit conversion with the independent table.
-def DecodeSpec(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) -> Type:
+def DecodeSpec(+c: Char, -valid: {H.is_hex_digit(c) == True{} : Bool}) -> Type:
   {Some{H.decode(H.HexDigitChar{c, valid})} == HexLaws.decode_spec(c) : Maybe<&2, HexLaws.Nibble()>}
 
 law decode_bits:
@@ -422,11 +422,11 @@ def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) 
 def HexLaws.is_valid_hex_u32_input(s):
   {==}
 
-def HexU32Spec(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
+def HexU32Spec(+s: String, -valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
   {H.hex_u32(s, valid) == HexLaws.hex_u32_spec(s) : U32}
 
 def hex_u32.reference_values(+c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
+  -valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
   proofs: {H.is_hex_digit(c1) == True{} : Bool} & {H.is_hex_digit(c2) == True{} : Bool} & {H.is_hex_digit(c3) == True{} : Bool} & {H.is_hex_digit(c4) == True{} : Bool} & {H.is_hex_digit(c5) == True{} : Bool} & {H.is_hex_digit(c6) == True{} : Bool} & {H.is_hex_digit(c7) == True{} : Bool} & {H.is_hex_digit(c8) == True{} : Bool}) ->
   {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([HexLaws.decode_value_spec(c1), HexLaws.decode_value_spec(c2), HexLaws.decode_value_spec(c3), HexLaws.decode_value_spec(c4), HexLaws.decode_value_spec(c5), HexLaws.decode_value_spec(c6), HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}:
   match proofs:
@@ -443,7 +443,7 @@ def hex_u32.reference_values(+c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Ch
 
 def hex_u32_complete(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  +valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
+  -valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
   proofs: {H.is_hex_digit(c1) == True{} : Bool} & {H.is_hex_digit(c2) == True{} : Bool} & {H.is_hex_digit(c3) == True{} : Bool} & {H.is_hex_digit(c4) == True{} : Bool} & {H.is_hex_digit(c5) == True{} : Bool} & {H.is_hex_digit(c6) == True{} : Bool} & {H.is_hex_digit(c7) == True{} : Bool} & {H.is_hex_digit(c8) == True{} : Bool}
 ) -> HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
   hex_u32.reference_values(c1, c2, c3, c4, c5, c6, c7, c8, valid, proofs)
@@ -490,7 +490,7 @@ def BinaryLaws.is_valid_byte_mask(mask):
   {==}
 
 def ByteMaskSpec(+mask: String, +byte: U32,
-  valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> Type:
+  -valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> Type:
   {B.byte_mask(mask, byte, valid) == (U32.is_le(byte, 255) && BinaryLaws.mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
 
 def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> ByteMaskSpec(mask, byte, valid):
@@ -520,7 +520,7 @@ def BinaryLaws.byte_mask_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==})
 
 def Utf8EncodeOneSpec(+cp: U32,
-  valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}) -> Type:
+  -valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}) -> Type:
   {Some{UTF8.encode_as_one_byte(cp, valid)} == Laws.one_byte_shape(cp) : Maybe<&2, U32>}
 
 def utf8_proof.encode_as_one_byte_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
@@ -623,7 +623,7 @@ def Laws.utf8_overlong_two_bytes(b1, b2, valid):
   {==}
 
 def utf8_proof.valid_if_true(+b1: U32, +b2: U32, +shape: Bool,
-  +checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
+  -checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
   +valid: {shape == True{} : Bool}) ->
   {UTF8.valid_two_bytes.if(b1, b2, shape, checked) ==
     Bool.not(UTF8.overlong_two_bytes(b1, b2,
@@ -636,7 +636,7 @@ def utf8_proof.valid_if_true(+b1: U32, +b2: U32, +shape: Bool,
     case True{}: {==}
 
 def utf8_proof.valid_if_false(+b1: U32, +b2: U32, +shape: Bool,
-  checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
+  -checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
   invalid: {shape == False{} : Bool}) ->
   {UTF8.valid_two_bytes.if(b1, b2, shape, checked) == False{} : Bool}:
   match shape:
@@ -740,7 +740,7 @@ def utf8_proof.mask_codepoint(+low: Word(6n), +high: Word(5n)) ->
     word_mask_fields(6n, low, 26n, word_join(5n, high, 21n, Word.zero(21n))))
 
 def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
-  valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
+  -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
   {UTF8.first(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.first_byte(high) : U32}:
   match low high:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}:
@@ -750,7 +750,7 @@ def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
         word_add_fields(5n, high, 27n, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}))
 
 def utf8_proof.encode_second(+low: Word(6n), +high: Word(5n),
-  valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
+  -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
   {UTF8.second(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.second_byte(low) : U32}:
   Equal.trans(U32,
     (128 + U32.and(utf8_proof.codepoint(low, high), 63) : U32),
@@ -939,7 +939,7 @@ def utf8_proof.shape_from_masks(+b1: U32, +b2: U32,
   bool_and_equal(B.byte_mask("110xxxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), True{}, True{}, first, second)
 
 def utf8_proof.overlong_from_facts(+cp: U32, +b1: U32, +b2: U32,
-  shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  -shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   decoded: {utf8_proof.decode_payload(b1, b2) == cp : U32}) ->
   {UTF8.overlong_two_bytes(b1, b2, shape) == UTF8.can_encode_as_one_byte(cp) : Bool}:
   %decoded : {UTF8.overlong_two_bytes(b1, b2, shape) == UTF8.can_encode_as_one_byte(_) : Bool}
@@ -1047,7 +1047,7 @@ def BinaryLaws.bit8_examples():
   ({==}, {==}, {==})
 
 def Bit8ValueRoundtripSpec(+byte: U32,
-  valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Type:
+  -valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Type:
   {B.bit8_value(B.bit8(byte, valid)) == byte : U32}
 
 # Any set bit above bit 7 contradicts the byte-range premise. Once those
@@ -1401,7 +1401,7 @@ def BinaryLaws.bit8_value_bit8_roundtrip(byte, valid):
       bit8_value_roundtrip_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
 
 def Byte2RoundtripSpec(+value: U32,
-  +valid: {U32.is_le(value, 65535) == True{} : Bool}) -> Type:
+  -valid: {U32.is_le(value, 65535) == True{} : Bool}) -> Type:
   {B.byte2_u32(B.first(B.u32_byte2(value, valid)),
                B.second(B.u32_byte2(value, valid))) == value : U32}
 
@@ -1452,11 +1452,11 @@ def BinaryLaws.byte2_examples():
 
 
 def Utf8EncodeTwoSpec(+cp: U32,
-  valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) -> Type:
+  -valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) -> Type:
   {Some{UTF8.encode_as_two_bytes(cp, valid)} == Laws.two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 def utf8_proof.table_pair(+low: Word(6n), +high: Word(5n),
-  +valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
+  -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
   {UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) ==
     (utf8_proof.first_byte(high), utf8_proof.second_byte(low)) : U32 & U32}:
   match low high:
@@ -1892,7 +1892,7 @@ def utf8_proof.decode_model(+cp: U32,
 
 # Any code point producing these bytes must equal their decoded payload.
 def utf8_proof.decode_model_produced(+cp: U32, +b1: U32, +b2: U32,
-  valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  -valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   +produced: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
   {UTF8.decode_two_bytes(b1, b2, valid) == cp : U32}:
   accepted = Equal.trans(Bool, UTF8.can_encode_as_two_bytes(cp),
@@ -1908,7 +1908,7 @@ def utf8_proof.decode_model_produced(+cp: U32, +b1: U32, +b2: U32,
 
 # The shape law supplies existence; the inverse calculation identifies its witness.
 def utf8_proof.decode_result_produced(+cp: U32, +b1: U32, +b2: U32,
-  +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  -valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   +produced: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
   {Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}:
   Equal.trans(Maybe<&1, U32 & U32>, Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)),
@@ -1917,7 +1917,7 @@ def utf8_proof.decode_result_produced(+cp: U32, +b1: U32, +b2: U32,
       UTF8.decode_two_bytes(b1, b2, valid), cp, utf8_proof.decode_model_produced(cp, b1, b2, valid, produced)), produced)
 
 def utf8_proof.decode_result_representation(+b1: U32, +b2: U32,
-  +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  -valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   representation: Utf8ShapeRepresentation(b1, b2)) ->
   {Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}:
   (cp, produced) = representation
@@ -1932,7 +1932,7 @@ def Laws.utf8_decode_encode_as_two_bytes(cp, valid):
   (shape, utf8_proof.decode_model_produced(cp, b1, b2, shape, produced))
 
 def utf8_proof.encode_decoded(+b1: U32, +b2: U32,
-  +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  -valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   +produced: {Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
   Exists({UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, valid)) == True{} : Bool}, accepted =>
     {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, valid), accepted) == (b1, b2) : U32 & U32}):
@@ -2552,7 +2552,7 @@ def strbyte_injective.render(value: U32) -> String:
       SCon{strbyte_injective.bit_char(b7), SCon{strbyte_injective.bit_char(b6), SCon{strbyte_injective.bit_char(b5), SCon{strbyte_injective.bit_char(b4), SCon{strbyte_injective.bit_char(b3), SCon{strbyte_injective.bit_char(b2), SCon{strbyte_injective.bit_char(b1), SCon{strbyte_injective.bit_char(b0), SNil{}}}}}}}}}
 
 def StrbyteInverseSpec(+s: String,
-  valid: {B.valid_byte_string(s) == True{} : Bool}) -> Type:
+  -valid: {B.valid_byte_string(s) == True{} : Bool}) -> Type:
   {strbyte_injective.render(B.strbyte(s, valid)) == s : String}
 
 def strbyte_injective.inverse(s: String,

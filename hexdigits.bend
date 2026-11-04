@@ -4,9 +4,9 @@ def is_hex_digit(+c: Char) -> Bool:
   +code = Char.to_u32(c)
   Char.is_digit(c) || Bool.and(U32.is_ge(code, 65), U32.is_le(code, 70))
 
-# A reusable character packaged with live evidence that it is a hex digit.
+# A reusable character packaged with erased evidence that it is a hex digit.
 type HexDigitChar is Data:
-  HexDigitChar{char: Char, valid: {is_hex_digit(char) == True{} : Bool}}
+  HexDigitChar{char: Char, -valid: {is_hex_digit(char) == True{} : Bool}}
 
 # Four-bit words use least-significant-bit-first WCon fields.
 def word4_from_u32(n: U32) -> Word(4n):
@@ -104,21 +104,33 @@ def hex_u32.fold_digits(digits: +List<HexDigitChar>, acc: U32) -> U32:
 
 def hex_u32.combine(
   +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  proofs: {is_hex_digit(c1) == True{} : Bool} & {is_hex_digit(c2) == True{} : Bool} & {is_hex_digit(c3) == True{} : Bool} & {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}
+  -proofs: {is_hex_digit(c1) == True{} : Bool} & {is_hex_digit(c2) == True{} : Bool} & {is_hex_digit(c3) == True{} : Bool} & {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}
 ) -> U32:
-  match proofs:
-    case (p1, p2, p3, p4, p5, p6, p7, p8):
-      hex_u32.fold_digits([
-        HexDigitChar{c1, p1},
-        HexDigitChar{c2, p2},
-        HexDigitChar{c3, p3},
-        HexDigitChar{c4, p4},
-        HexDigitChar{c5, p5},
-        HexDigitChar{c6, p6},
-        HexDigitChar{c7, p7},
-        HexDigitChar{c8, p8}], 0)
+  -p1 = Pair.fst({is_hex_digit(c1) == True{} : Bool}, {is_hex_digit(c2) == True{} : Bool} & {is_hex_digit(c3) == True{} : Bool} & {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, proofs)
+  -rest1 = Pair.snd({is_hex_digit(c1) == True{} : Bool}, {is_hex_digit(c2) == True{} : Bool} & {is_hex_digit(c3) == True{} : Bool} & {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, proofs)
+  -p2 = Pair.fst({is_hex_digit(c2) == True{} : Bool}, {is_hex_digit(c3) == True{} : Bool} & {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest1)
+  -rest2 = Pair.snd({is_hex_digit(c2) == True{} : Bool}, {is_hex_digit(c3) == True{} : Bool} & {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest1)
+  -p3 = Pair.fst({is_hex_digit(c3) == True{} : Bool}, {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest2)
+  -rest3 = Pair.snd({is_hex_digit(c3) == True{} : Bool}, {is_hex_digit(c4) == True{} : Bool} & {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest2)
+  -p4 = Pair.fst({is_hex_digit(c4) == True{} : Bool}, {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest3)
+  -rest4 = Pair.snd({is_hex_digit(c4) == True{} : Bool}, {is_hex_digit(c5) == True{} : Bool} & {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest3)
+  -p5 = Pair.fst({is_hex_digit(c5) == True{} : Bool}, {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest4)
+  -rest5 = Pair.snd({is_hex_digit(c5) == True{} : Bool}, {is_hex_digit(c6) == True{} : Bool} & {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest4)
+  -p6 = Pair.fst({is_hex_digit(c6) == True{} : Bool}, {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest5)
+  -rest6 = Pair.snd({is_hex_digit(c6) == True{} : Bool}, {is_hex_digit(c7) == True{} : Bool} & {is_hex_digit(c8) == True{} : Bool}, rest5)
+  -p7 = Pair.fst({is_hex_digit(c7) == True{} : Bool}, {is_hex_digit(c8) == True{} : Bool}, rest6)
+  -rest7 = Pair.snd({is_hex_digit(c7) == True{} : Bool}, {is_hex_digit(c8) == True{} : Bool}, rest6)
+  hex_u32.fold_digits([
+    HexDigitChar{c1, p1},
+    HexDigitChar{c2, p2},
+    HexDigitChar{c3, p3},
+    HexDigitChar{c4, p4},
+    HexDigitChar{c5, p5},
+    HexDigitChar{c6, p6},
+    HexDigitChar{c7, p7},
+    HexDigitChar{c8, rest7}], 0)
 
-def hex_u32(+s: String, valid: {is_valid_hex_u32(s) == True{} : Bool}) -> U32:
+def hex_u32(+s: String, -valid: {is_valid_hex_u32(s) == True{} : Bool}) -> U32:
   match s:
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       hex_u32.combine(c1, c2, c3, c4, c5, c6, c7, c8,

@@ -9,7 +9,7 @@ def can_encode_as_two_bytes(+cp: U32) -> Bool:
   U32.is_le(cp, 2047)
 
 def encode_as_one_byte(+cp: U32,
-  valid: {can_encode_as_one_byte(cp) == True{} : Bool}) -> U32:
+  -valid: {can_encode_as_one_byte(cp) == True{} : Bool}) -> U32:
   cp
 
 # A one-byte encoding has the same value as its code point (0..127).
@@ -18,7 +18,7 @@ def has_one_byte_shape(byte: U32) -> Bool:
 
 # Deliberately permits overlong encodings of code points 0..127.
 def encode_as_two_bytes(+cp: U32,
-  valid: {can_encode_as_two_bytes(cp) == True{} : Bool}) -> U32 & U32:
+  -valid: {can_encode_as_two_bytes(cp) == True{} : Bool}) -> U32 & U32:
   ((192 + U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(cp)))))) : U32),
    (128 + U32.and(cp, 63) : U32))
 
@@ -27,17 +27,17 @@ def has_two_byte_shape(b1: U32, b2: U32) -> Bool:
 
 # Decode only pairs with the two-byte shape, including overlong encodings.
 def decode_two_bytes(+b1: U32, +b2: U32,
-  valid: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> U32:
+  -valid: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> U32:
   (U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.and(b1, 31))))))) + U32.and(b2, 63) : U32)
 
 # The decoded code point also has a one-byte representation.
 def overlong_two_bytes(+b1: U32, +b2: U32,
-  valid: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> Bool:
+  -valid: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> Bool:
   can_encode_as_one_byte(decode_two_bytes(b1, b2, valid))
 
 # Test the shape before checking whether the encoding is shortest.
 def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
-  checked: {has_two_byte_shape(b1, b2) == shape : Bool}) -> Bool:
+  -checked: {has_two_byte_shape(b1, b2) == shape : Bool}) -> Bool:
   match shape:
     case False{}: False{}
     case True{}: Bool.not(overlong_two_bytes(b1, b2, checked))

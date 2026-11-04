@@ -121,7 +121,7 @@ law utf8_decode_two_bytes:
 law utf8_overlong_two_bytes:
   for +b1: U32
   for +b2: U32
-  for +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
+  for -valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
   {UTF8.overlong_two_bytes(b1, b2, valid) ==
     UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid)) : Bool}
 
