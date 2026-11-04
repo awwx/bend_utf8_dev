@@ -76,13 +76,6 @@ law utf8_encode_two:
   for valid: {UTF8.can_encode_two(cp) == True{} : Bool}
   {Some{UTF8.encode_two(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
-
-# An eleven-bit payload covers exactly the two-byte encoding capacity.
-def codepoint11(bits: Word(11n)) -> U32:
-  match bits:
-    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}:
-      U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
-
 # True exactly when the pair is produced by the two-byte encoding table.
 law utf8_has_two_byte_shape:
   for +b1: U32
@@ -91,6 +84,12 @@ law utf8_has_two_byte_shape:
     {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>})
   ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
+
+# An eleven-bit payload covers exactly the two-byte encoding capacity.
+def codepoint11(bits: Word(11n)) -> U32:
+  match bits:
+    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}:
+      U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
 
 # Join the leading byte's five payload bits and the continuation's six bits.
 law utf8_decode_two:
