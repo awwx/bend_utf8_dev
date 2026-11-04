@@ -30,14 +30,14 @@ def one_byte_shape(cp: U32) -> Maybe<&2, U32>:
 def can_encode_as_one_byte(cp: U32) -> Bool:
   Maybe.is_some(&2, U32, one_byte_shape(cp))
 
-law utf8_can_encode_one:
+law utf8_can_encode_as_one_byte:
   for +cp: U32
-  {UTF8.can_encode_one(cp) == can_encode_as_one_byte(cp) : Bool}
+  {UTF8.can_encode_as_one_byte(cp) == can_encode_as_one_byte(cp) : Bool}
 
-law utf8_encode_one:
+law utf8_encode_as_one_byte:
   for +cp: U32
-  for valid: {UTF8.can_encode_one(cp) == True{} : Bool}
-  {Some{UTF8.encode_one(cp, valid)} == one_byte_shape(cp) : Maybe<&2, U32>}
+  for valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}
+  {Some{UTF8.encode_as_one_byte(cp, valid)} == one_byte_shape(cp) : Maybe<&2, U32>}
 
 # True exactly when the byte is produced by the one-byte encoding table.
 law utf8_has_one_byte_shape:
@@ -72,17 +72,17 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
 def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
   two_byte_shape.bits(B.u32_byte4(cp))
 
-# Specification for utf8.can_encode_two: it should return True iff
+# Specification for utf8.can_encode_as_two_bytes: it should return True iff
 # two_byte_shape matches.
 
-law utf8_can_encode_two:
+law utf8_can_encode_as_two_bytes:
   for +cp: U32
-  {UTF8.can_encode_two(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
+  {UTF8.can_encode_as_two_bytes(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
 
-law utf8_encode_two:
+law utf8_encode_as_two_bytes:
   for +cp: U32
-  for valid: {UTF8.can_encode_two(cp) == True{} : Bool}
-  {Some{UTF8.encode_two(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
+  for valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
+  {Some{UTF8.encode_as_two_bytes(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 # True exactly when the pair is produced by the two-byte encoding table.
 law utf8_has_two_byte_shape:
@@ -94,11 +94,11 @@ law utf8_has_two_byte_shape:
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
 # Decoding an encoded code point returns the original input.
-law utf8_decode_encode_two:
+law utf8_decode_encode_as_two_bytes:
   for +cp: U32
-  for +valid: {UTF8.can_encode_two(cp) == True{} : Bool}
-  +b1 = B.first(UTF8.encode_two(cp, valid))
-  +b2 = B.second(UTF8.encode_two(cp, valid))
+  for +valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
+  +b1 = B.first(UTF8.encode_as_two_bytes(cp, valid))
+  +b2 = B.second(UTF8.encode_as_two_bytes(cp, valid))
   Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
     {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32})
 
@@ -108,26 +108,26 @@ law utf8_decode_two_bytes:
   for +b2: U32
   for +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
   +cp = UTF8.decode_two_bytes(b1, b2, valid)
-  Exists({UTF8.can_encode_two(cp) == True{} : Bool}, accepted =>
-    {UTF8.encode_two(cp, accepted) == (b1, b2) : U32 & U32})
+  Exists({UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_two_bytes(cp, accepted) == (b1, b2) : U32 & U32})
 
 # Overlong means that a shaped pair decodes to a code point fitting in one byte.
 # A pair without the two-byte shape is not an overlong encoding.
-law utf8_overlong_two:
+law utf8_overlong_two_bytes:
   for +b1: U32
   for +b2: U32
   (@valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} ->
-    {UTF8.overlong_two(b1, b2) ==
-      UTF8.can_encode_one(UTF8.decode_two_bytes(b1, b2, valid)) : Bool}) &
+    {UTF8.overlong_two_bytes(b1, b2) ==
+      UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid)) : Bool}) &
   ({UTF8.has_two_byte_shape(b1, b2) == False{} : Bool} ->
-    {UTF8.overlong_two(b1, b2) == False{} : Bool})
+    {UTF8.overlong_two_bytes(b1, b2) == False{} : Bool})
 
-law utf8_valid_two:
+law utf8_valid_two_bytes:
   for +b1: U32
   for +b2: U32
-  {UTF8.valid_two(b1, b2) ==
+  {UTF8.valid_two_bytes(b1, b2) ==
     (UTF8.has_two_byte_shape(b1, b2) &&
-     Bool.not(UTF8.overlong_two(b1, b2))) : Bool}
+     Bool.not(UTF8.overlong_two_bytes(b1, b2))) : Bool}
 
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
@@ -146,36 +146,36 @@ law utf8_two_capacity:
 law utf8_two_roundtrip:
   for +bits: Word(11n)
   +cp = codepoint11(bits)
-  +accepted = Equal.trans(Bool, UTF8.can_encode_two(cp),
+  +accepted = Equal.trans(Bool, UTF8.can_encode_as_two_bytes(cp),
     Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)), True{},
-    utf8_can_encode_two(cp), utf8_two_capacity(bits))
-  +b1 = B.first(UTF8.encode_two(cp, accepted))
-  +b2 = B.second(UTF8.encode_two(cp, accepted))
+    utf8_can_encode_as_two_bytes(cp), utf8_two_capacity(bits))
+  +b1 = B.first(UTF8.encode_as_two_bytes(cp, accepted))
+  +b2 = B.second(UTF8.encode_as_two_bytes(cp, accepted))
   Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
     {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32} &
-    {UTF8.overlong_two(b1, b2) == UTF8.can_encode_one(cp) : Bool} &
-    {UTF8.valid_two(b1, b2) == U32.is_ge(cp, 128) : Bool} &
-    {UTF8.valid_two(b1, b2) ==
+    {UTF8.overlong_two_bytes(b1, b2) == UTF8.can_encode_as_one_byte(cp) : Bool} &
+    {UTF8.valid_two_bytes(b1, b2) == U32.is_ge(cp, 128) : Bool} &
+    {UTF8.valid_two_bytes(b1, b2) ==
       ((U32.is_ge(b1, 194) && U32.is_le(b1, 223)) &&
        (U32.is_ge(b2, 128) && U32.is_le(b2, 191))) : Bool})
 
 law utf8_encoding_examples:
-  {UTF8.encode_one(0, {==}) == 0 : U32} &
-  {UTF8.encode_one(127, {==}) == 127 : U32} &
-  {UTF8.can_encode_one(128) == False{} : Bool} &
-  {UTF8.encode_two(0, {==}) == (192, 128) : U32 & U32} &
-  {UTF8.encode_two(127, {==}) == (193, 191) : U32 & U32} &
-  {UTF8.encode_two(128, {==}) == (194, 128) : U32 & U32} &
-  {UTF8.encode_two(2047, {==}) == (223, 191) : U32 & U32} &
-  {UTF8.can_encode_two(2048) == False{} : Bool} &
-  {UTF8.overlong_two(192, 128) == True{} : Bool} &
-  {UTF8.overlong_two(193, 191) == True{} : Bool} &
-  {UTF8.valid_two(192, 128) == False{} : Bool} &
-  {UTF8.valid_two(193, 191) == False{} : Bool} &
-  {UTF8.valid_two(194, 128) == True{} : Bool} &
-  {UTF8.valid_two(223, 191) == True{} : Bool} &
-  {UTF8.valid_two(194, 127) == False{} : Bool} &
-  {UTF8.valid_two(224, 128) == False{} : Bool}
+  {UTF8.encode_as_one_byte(0, {==}) == 0 : U32} &
+  {UTF8.encode_as_one_byte(127, {==}) == 127 : U32} &
+  {UTF8.can_encode_as_one_byte(128) == False{} : Bool} &
+  {UTF8.encode_as_two_bytes(0, {==}) == (192, 128) : U32 & U32} &
+  {UTF8.encode_as_two_bytes(127, {==}) == (193, 191) : U32 & U32} &
+  {UTF8.encode_as_two_bytes(128, {==}) == (194, 128) : U32 & U32} &
+  {UTF8.encode_as_two_bytes(2047, {==}) == (223, 191) : U32 & U32} &
+  {UTF8.can_encode_as_two_bytes(2048) == False{} : Bool} &
+  {UTF8.overlong_two_bytes(192, 128) == True{} : Bool} &
+  {UTF8.overlong_two_bytes(193, 191) == True{} : Bool} &
+  {UTF8.valid_two_bytes(192, 128) == False{} : Bool} &
+  {UTF8.valid_two_bytes(193, 191) == False{} : Bool} &
+  {UTF8.valid_two_bytes(194, 128) == True{} : Bool} &
+  {UTF8.valid_two_bytes(223, 191) == True{} : Bool} &
+  {UTF8.valid_two_bytes(194, 127) == False{} : Bool} &
+  {UTF8.valid_two_bytes(224, 128) == False{} : Bool}
 
 law two_byte_shape_examples:
   {two_byte_shape(0) == Some{(192, 128)} : Maybe<&1, U32 & U32>} &

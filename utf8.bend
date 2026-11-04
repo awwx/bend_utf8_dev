@@ -2,23 +2,23 @@ import Base
 import ./binary.bend as B
 
 # Encoding capacity is separate from shortest-form validity.
-def can_encode_one(+cp: U32) -> Bool:
+def can_encode_as_one_byte(+cp: U32) -> Bool:
   U32.is_le(cp, 127)
 
-def can_encode_two(+cp: U32) -> Bool:
+def can_encode_as_two_bytes(+cp: U32) -> Bool:
   U32.is_le(cp, 2047)
 
-def encode_one(+cp: U32,
-  valid: {can_encode_one(cp) == True{} : Bool}) -> U32:
+def encode_as_one_byte(+cp: U32,
+  valid: {can_encode_as_one_byte(cp) == True{} : Bool}) -> U32:
   cp
 
 # A one-byte encoding has the same value as its code point (0..127).
 def has_one_byte_shape(byte: U32) -> Bool:
-  can_encode_one(byte)
+  can_encode_as_one_byte(byte)
 
 # Deliberately permits overlong encodings of code points 0..127.
-def encode_two(+cp: U32,
-  valid: {can_encode_two(cp) == True{} : Bool}) -> U32 & U32:
+def encode_as_two_bytes(+cp: U32,
+  valid: {can_encode_as_two_bytes(cp) == True{} : Bool}) -> U32 & U32:
   ((192 + U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(cp)))))) : U32),
    (128 + U32.and(cp, 63) : U32))
 
@@ -31,18 +31,18 @@ def decode_two_bytes(+b1: U32, +b2: U32,
   (U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.and(b1, 31))))))) + U32.and(b2, 63) : U32)
 
 # Decode only after the shape test succeeds.
-def overlong_two.if(+b1: U32, +b2: U32, shape: Bool,
+def overlong_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
   checked: {has_two_byte_shape(b1, b2) == shape : Bool}) -> Bool:
   match shape:
     case False{}: False{}
-    case True{}: can_encode_one(decode_two_bytes(b1, b2, checked))
+    case True{}: can_encode_as_one_byte(decode_two_bytes(b1, b2, checked))
 
 # The decoded code point also has a one-byte representation.
-def overlong_two(+b1: U32, +b2: U32) -> Bool:
-  overlong_two.if(b1, b2, has_two_byte_shape(b1, b2), {==})
+def overlong_two_bytes(+b1: U32, +b2: U32) -> Bool:
+  overlong_two_bytes.if(b1, b2, has_two_byte_shape(b1, b2), {==})
 
-def valid_two(+b1: U32, +b2: U32) -> Bool:
-  has_two_byte_shape(b1, b2) && Bool.not(overlong_two(b1, b2))
+def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
+  has_two_byte_shape(b1, b2) && Bool.not(overlong_two_bytes(b1, b2))
 
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
