@@ -6,7 +6,31 @@ import ./binary_LAWS.bend as BinaryLaws
 
 # UTF8 one byte shape
 #
-# 00000000 00000000 00000000 0xxxyyyy -> 0xxxyyyy
+# 00000000 00000000 00000000 0yyyzzzz -> 0yyyzzzz
+#
+#
+# Returns Some U32 representing the byte if the shape matches, or None
+# if the shape doesn't match.
+
+def one_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&2, U32>:
+  match bits:
+    case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (False{}, y1, y2, y3, z1, z2, z3, z4)):
+      Some{B.bit8_value((False{}, y1, y2, y3, z1, z2, z3, z4))}
+    case _:
+      None{}
+
+def one_byte_shape(cp: U32) -> Maybe<&2, U32>:
+  one_byte_shape.bits(B.u32_byte4(cp))
+
+# Specification for utf8.can_encode_one: it should return True iff
+# one_byte_shape matches and returns a Some.
+
+law utf8_can_encode_one:
+  for +cp: U32
+  {UTF8.can_encode_one(cp) == Maybe.is_some(&2, U32, one_byte_shape(cp)) : Bool}
 
 
 # UTF8 two byte shape
@@ -37,10 +61,6 @@ def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
 law utf8_can_encode_two:
   for +cp: U32
   {UTF8.can_encode_two(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
-
-law utf8_can_encode_one:
-  for +cp: U32
-  {UTF8.can_encode_one(cp) == U32.is_le(cp, 127) : Bool}
 
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
