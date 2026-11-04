@@ -1924,10 +1924,33 @@ def utf8_proof.decode_result_representation(+b1: U32, +b2: U32,
   (cp, produced) = representation
   utf8_proof.decode_result_produced(cp, b1, b2, valid, produced)
 
+def Laws.utf8_decode_encode_two(cp, valid):
+  +b1 = B.first(UTF8.encode_two(cp, valid))
+  +b2 = B.second(UTF8.encode_two(cp, valid))
+  +produced = Equal.sym(Maybe<&1, U32 & U32>, Some{UTF8.encode_two(cp, valid)}, Laws.two_byte_shape(cp),
+    Laws.utf8_encode_two(cp, valid))
+  +shape = utf8_proof.model_pair_accepted(cp, b1, b2, produced)
+  (shape, utf8_proof.decode_model_produced(cp, b1, b2, shape, produced))
+
+def utf8_proof.encode_decoded(+b1: U32, +b2: U32,
+  +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  +produced: {Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
+  Exists({UTF8.can_encode_two(UTF8.decode_two_bytes(b1, b2, valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_two(UTF8.decode_two_bytes(b1, b2, valid), accepted) == (b1, b2) : U32 & U32}):
+  +cp = UTF8.decode_two_bytes(b1, b2, valid)
+  +accepted = Equal.trans(Bool, UTF8.can_encode_two(cp),
+    Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), True{}, Laws.utf8_can_encode_two(cp),
+    Equal.cong(Maybe<&1, U32 & U32>, Bool, shape => Maybe.is_some(&1, U32 & U32, shape),
+      Laws.two_byte_shape(cp), Some{(b1, b2)}, produced))
+  (accepted, Equal.cong(Maybe<&1, U32 & U32>, U32 & U32,
+    shape => Maybe.default(&1, U32 & U32, shape, (0, 0)),
+    Some{UTF8.encode_two(cp, accepted)}, Some{(b1, b2)},
+    Equal.trans(Maybe<&1, U32 & U32>, Some{UTF8.encode_two(cp, accepted)},
+      Laws.two_byte_shape(cp), Some{(b1, b2)}, Laws.utf8_encode_two(cp, accepted), produced)))
+
 def Laws.utf8_decode_two_bytes(b1, b2, valid):
-  (utf8_proof.decode_result_representation(b1, b2, valid, utf8_proof.shape_witness(b1, b2, valid)),
-   other => produced => Equal.sym(U32, UTF8.decode_two_bytes(b1, b2, valid), other,
-     utf8_proof.decode_model_produced(other, b1, b2, valid, produced)))
+  utf8_proof.encode_decoded(b1, b2, valid,
+    utf8_proof.decode_result_representation(b1, b2, valid, utf8_proof.shape_witness(b1, b2, valid)))
 
 def BinaryLaws.u32_byte4(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
   {==}

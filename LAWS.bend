@@ -93,16 +93,23 @@ law utf8_has_two_byte_shape:
   ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
-# The decoded code point is the unique input producing this byte pair.
+# Decoding an encoded code point returns the original input.
+law utf8_decode_encode_two:
+  for +cp: U32
+  for +valid: {UTF8.can_encode_two(cp) == True{} : Bool}
+  +b1 = B.first(UTF8.encode_two(cp, valid))
+  +b2 = B.second(UTF8.encode_two(cp, valid))
+  Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
+    {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32})
+
+# Encoding a decoded pair returns the original bytes.
 law utf8_decode_two_bytes:
   for +b1: U32
   for +b2: U32
   for +valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
   +cp = UTF8.decode_two_bytes(b1, b2, valid)
-  {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>} &
-  (@+other: U32 ->
-    {two_byte_shape(other) == Some{(b1, b2)} : Maybe<&1, U32 & U32>} ->
-    {other == cp : U32})
+  Exists({UTF8.can_encode_two(cp) == True{} : Bool}, accepted =>
+    {UTF8.encode_two(cp, accepted) == (b1, b2) : U32 & U32})
 
 # Overlong means that a shaped pair decodes to a code point fitting in one byte.
 # A pair without the two-byte shape is not an overlong encoding.
