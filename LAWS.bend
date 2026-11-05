@@ -9,7 +9,7 @@ import ./binary_LAWS.bend as BinaryLaws
 # encodings such as overlong encodings, encodings of surrogate code
 # points, and encodings of code points values above U+10FFFF.
 
-# UTF8 one-byte shape
+# UTF-8 one-byte shape
 #
 # 00000000 00000000 00000000 0yyyzzzz -> 0yyyzzzz
 #
@@ -53,7 +53,7 @@ law utf8_has_one_byte_shape:
   (representation -> {UTF8.has_one_byte_shape(byte) == True{} : Bool})
 
 
-# UTF8 two-byte shape
+# UTF-8 two-byte shape
 #
 # 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz
 #
