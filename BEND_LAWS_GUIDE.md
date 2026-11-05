@@ -251,7 +251,8 @@ to produce it:
   out.
 - **Quantify over a fixed-width `Word(n)`** to state "any value in this
   range" with no bound proof needed. *Example:* `for +bits: Word(11n)`
-  covers exactly the eleven-bit code points.
+  covers exactly the eleven-bit values, such as the code points that fit in
+  two UTF-8 bytes.
 - **Quantify over the unused high bits** to say they are ignored. *Example:*
   `for rest_high: Word(24n)` shows that a byte-packing function discards
   everything above bit 7.
@@ -444,16 +445,20 @@ pass that proof to a function.
 
 ### 5.9 Laws can use other laws as proof terms
 
-A law may build a needed proof from other laws inside its own statement:
-
-```bend
-+accepted = Equal.trans(Bool, UTF8.can_encode_as_two_bytes(cp),
-  Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)), True{},
-  utf8_can_encode_as_two_bytes(cp), utf8_two_capacity(bits))
-```
+A law may build a proof that its statement needs, such as the proof
+argument of a function it calls, from other laws inside its own statement.
 
 In `PROOF.bend`, laws are likewise reused as lemmas by calling
-`Laws.name(...)`.
+`Laws.name(...)`. *Example:* given `produced`, a proof that the reference
+table maps `cp` to `Some{(b1, b2)}`, a proof obtains evidence that `cp` is
+accepted by chaining the capacity law with that fact:
+
+```bend
+accepted = Equal.trans(Bool, UTF8.can_encode_as_two_bytes(cp),
+  Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), True{}, Laws.utf8_can_encode_as_two_bytes(cp),
+  Equal.cong(Maybe<&1, U32 & U32>, Bool, shape => Maybe.is_some(&1, U32 & U32, shape),
+    Laws.two_byte_shape(cp), Some{(b1, b2)}, produced))
+```
 
 ---
 
