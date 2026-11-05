@@ -27,13 +27,13 @@ def has_two_byte_shape(b1: U32, b2: U32) -> Bool:
 
 # Decode only pairs with the two-byte shape, including overlong encodings.
 def decode_two_bytes(+b1: U32, +b2: U32,
-  -valid: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> U32:
+  -valid_shape: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> U32:
   (U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.shl(U32.and(b1, 31))))))) + U32.and(b2, 63) : U32)
 
 # The decoded code point also has a one-byte representation.
 def overlong_two_bytes(+b1: U32, +b2: U32,
-  -valid: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> Bool:
-  can_encode_as_one_byte(decode_two_bytes(b1, b2, valid))
+  -valid_shape: {has_two_byte_shape(b1, b2) == True{} : Bool}) -> Bool:
+  can_encode_as_one_byte(decode_two_bytes(b1, b2, valid_shape))
 
 # Test the shape before checking whether the encoding is shortest.
 def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
