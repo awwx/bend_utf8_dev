@@ -136,6 +136,14 @@ def is_surrogate_code_point(+cp: U32) -> Bool:
   U32.is_ge(cp, H.hex_u32("0000D800", {==})) &&
   U32.is_le(cp, H.hex_u32("0000DFFF", {==}))
 
+law is_surrogate_code_point_examples:
+  {is_surrogate_code_point(H.hex_u32("00000000", {==})) == False{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("0000D7FF", {==})) == False{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("0000D800", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("0000DC00", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("0000DFFF", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("0000E000", {==})) == False{} : Bool}
+
 # A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
 # surrogate code points.
 

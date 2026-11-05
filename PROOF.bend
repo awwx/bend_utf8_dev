@@ -1072,6 +1072,9 @@ def Laws.utf8_two_roundtrip(bits):
 def Laws.utf8_encoding_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==}, {==})
 
+def Laws.is_surrogate_code_point_examples():
+  ({==}, {==}, {==}, {==}, {==}, {==})
+
 def BinaryLaws.bit8(byte, valid):
   {==}
 
