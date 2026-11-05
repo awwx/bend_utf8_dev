@@ -4,6 +4,7 @@ import ./binary.bend as B
 import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
 import ./hexdigits.bend as H
+import ./func_LAWS.bend as Func
 
 # Surrogate code points are U+D800..U+DFFF.
 
@@ -79,23 +80,12 @@ law utf8_has_one_byte_shape:
 # code points and bytes satisfying `has_one_byte_shape`, and we specify
 # that `decode_one_byte` is exactly its inverse.
 
-# Decoding an encoded code point returns the original input.
-
-law utf8_decode_encode_as_one_byte:
-  for +cp: U32
-  for +valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}
-  +byte = UTF8.encode_as_one_byte(cp, valid)
-  Exists({UTF8.has_one_byte_shape(byte) == True{} : Bool}, shape =>
-    {UTF8.decode_one_byte(byte, shape) == cp : U32})
-
-# Encoding a decoded byte returns the original byte.
-
-law utf8_encode_decode_as_one_byte:
-  for +byte: U32
-  for +valid_shape: {UTF8.has_one_byte_shape(byte) == True{} : Bool}
-  +cp = UTF8.decode_one_byte(byte, valid_shape)
-  Exists({UTF8.can_encode_as_one_byte(cp) == True{} : Bool}, accepted =>
-    {UTF8.encode_as_one_byte(cp, accepted) == byte : U32})
+law utf8_one_byte_inverse:
+  Func.Bijection(U32, U32,
+    cp => UTF8.can_encode_as_one_byte(cp),
+    byte => UTF8.has_one_byte_shape(byte),
+    cp => valid => UTF8.encode_as_one_byte(cp, valid),
+    byte => valid => UTF8.decode_one_byte(byte, valid))
 
 # No one-byte encoding is overlong.
 
@@ -156,27 +146,15 @@ law utf8_has_two_byte_shape:
 
 # We require that `encode_as_two_bytes` be bijective between accepted
 # code points and byte pairs satisfying `has_two_byte_shape`, and we
-# specify that `decode_two_bytes` is exactly its inverse.
+# specify that `decode_two_bytes` is exactly its inverse.  A pair `p`
+# stands for its bytes `B.first(p)` and `B.second(p)`.
 
-# Decoding an encoded code point returns the original input.
-
-law utf8_decode_encode_as_two_bytes:
-  for +cp: U32
-  for +valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
-  +b1 = B.first(UTF8.encode_as_two_bytes(cp, valid))
-  +b2 = B.second(UTF8.encode_as_two_bytes(cp, valid))
-  Exists({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}, shape =>
-    {UTF8.decode_two_bytes(b1, b2, shape) == cp : U32})
-
-# Encoding a decoded pair returns the original bytes.
-
-law utf8_encode_decode_as_two_bytes:
-  for +b1: U32
-  for +b2: U32
-  for +valid_shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
-  +cp = UTF8.decode_two_bytes(b1, b2, valid_shape)
-  Exists({UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}, accepted =>
-    {UTF8.encode_as_two_bytes(cp, accepted) == (b1, b2) : U32 & U32})
+law utf8_two_byte_inverse:
+  Func.Bijection(U32, U32 & U32,
+    cp => UTF8.can_encode_as_two_bytes(cp),
+    p => UTF8.has_two_byte_shape(B.first(p), B.second(p)),
+    cp => valid => UTF8.encode_as_two_bytes(cp, valid),
+    p => valid => UTF8.decode_two_bytes(B.first(p), B.second(p), valid))
 
 # Overlong means that the decoded code point fits in one byte.
 law utf8_overlong_two_bytes:
