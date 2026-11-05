@@ -4,7 +4,12 @@ import ./binary.bend as B
 import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
 
-# UTF8 one byte shape
+# By a "byte shape" we mean a series of bytes that has the correct bit
+# pattern for a UTF-8 encoding, including not excluding invalid UTF-8
+# encodings such as overlong encodings, encodings of surrogate code
+# points, and encodings of code points values above U+10FFFF.
+
+# UTF8 one-byte shape
 #
 # 00000000 00000000 00000000 0yyyzzzz -> 0yyyzzzz
 #
@@ -24,8 +29,8 @@ def one_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&2, U32>:
 def one_byte_shape(cp: U32) -> Maybe<&2, U32>:
   one_byte_shape.bits(B.u32_byte4(cp))
 
-# Specification for whether we can encode a codepoint as one byte: yes
-# iff one_byte_shape matches.
+# A code point can be encoded as one byte iff iff one_byte_shape
+# matches.
 
 def can_encode_as_one_byte(cp: U32) -> Bool:
   Maybe.is_some(&2, U32, one_byte_shape(cp))
@@ -48,7 +53,7 @@ law utf8_has_one_byte_shape:
   (representation -> {UTF8.has_one_byte_shape(byte) == True{} : Bool})
 
 
-# UTF8 two byte shape
+# UTF8 two-byte shape
 #
 # 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz
 #
@@ -72,12 +77,17 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
 def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
   two_byte_shape.bits(B.u32_byte4(cp))
 
-# Specification for utf8.can_encode_as_two_bytes: it should return True iff
+# Specification for UTF8.can_encode_as_two_bytes: it returns True iff
 # two_byte_shape matches.
 
 law utf8_can_encode_as_two_bytes:
   for +cp: U32
   {UTF8.can_encode_as_two_bytes(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
+
+# Given a code point and a proof that the code point can be encoded in
+# a UTF-8 two-byte shape (as specified by two_byte_shape above),
+# `UTF8.encode_as_two_bytes` returns the two bytes of the shape
+# directly as U32 values without needing to use a Maybe.
 
 law utf8_encode_as_two_bytes:
   for +cp: U32
