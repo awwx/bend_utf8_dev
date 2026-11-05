@@ -5,9 +5,9 @@ import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
 
 # By a "byte shape" we mean a series of bytes that has the correct bit
-# pattern for a UTF-8 encoding, including not excluding invalid UTF-8
-# encodings such as overlong encodings, encodings of surrogate code
-# points, and encodings of code points values above U+10FFFF.
+# pattern for a UTF-8 encoding.  This includes invalid UTF-8 encodings
+# such as overlong encodings, encodings of surrogate code points, and
+# encodings of code points values above U+10FFFF.
 
 # UTF-8 one-byte shape
 #
