@@ -54,14 +54,21 @@ law decode:
   exs accepted: {H.is_hex_digit(c) == True{} : Bool}
   {Some{H.decode(H.HexDigitChar{c, accepted})} == decode_spec(c) : Maybe<&2, Nibble()>}
 
-# A valid input to hex_u32 is a string of exactly eight characters,
+# A valid input to hex_u32 is a string of one to eight characters,
 # each of which is a valid hexadecimal digit.
 
 law is_valid_hex_u32_input:
   for +s: String
   {H.is_valid_hex_u32(s) ==
-    (Nat.is_eq(String.length(s), 8n) &&
+    ((Nat.is_ge(String.length(s), 1n) && Nat.is_le(String.length(s), 8n)) &&
      List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s))) : Bool}
+
+law is_valid_hex_u32_examples:
+  {H.is_valid_hex_u32("") == False{} : Bool} &
+  {H.is_valid_hex_u32("0") == True{} : Bool} &
+  {H.is_valid_hex_u32("FFFFFFFF") == True{} : Bool} &
+  {H.is_valid_hex_u32("100000000") == False{} : Bool} &
+  {H.is_valid_hex_u32("G") == False{} : Bool}
 
 # Decode the characters using the reference table, in textual order.
 def hex_nibbles_spec(s: String) -> +List<Nibble>:
@@ -74,7 +81,9 @@ def nibble_list_value(nibbles: +List<Nibble>) -> U32:
     ~(acc => n => (acc * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)),
     nibbles, 0)
 
-# The first digit has weight 16^7; the last has weight 1.
+# The last digit has weight 1 and each digit to its left 16 times the
+# weight of the one after it, so fewer than eight digits read as if
+# padded on the left with '0'.
 def hex_u32_spec(s: String) -> U32:
   nibble_list_value(hex_nibbles_spec(s))
 
@@ -85,4 +94,10 @@ law hex_u32:
   {H.hex_u32(s, accepted) == hex_u32_spec(s) : U32}
 
 law example_zero:
-  {H.hex_u32("00000000", {==}) == 0 : U32}
+  {H.hex_u32("0", {==}) == 0 : U32}
+
+law hex_u32_padding_examples:
+  {H.hex_u32("A", {==}) == 10 : U32} &
+  {H.hex_u32("0000000A", {==}) == 10 : U32} &
+  {H.hex_u32("10FFFF", {==}) == 1114111 : U32} &
+  {H.hex_u32("FFFFFFFF", {==}) == 4294967295 : U32}

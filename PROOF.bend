@@ -422,91 +422,39 @@ def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) 
 def HexLaws.is_valid_hex_u32_input(s):
   {==}
 
+def HexLaws.is_valid_hex_u32_examples():
+  ({==}, {==}, {==}, {==}, {==})
+
 def HexU32Spec(+s: String, -valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
   {H.hex_u32(s, valid) == HexLaws.hex_u32_spec(s) : U32}
 
-def hex_u32.reference_values(+c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  -valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
-  proofs: {H.is_hex_digit(c1) == True{} : Bool} & {H.is_hex_digit(c2) == True{} : Bool} & {H.is_hex_digit(c3) == True{} : Bool} & {H.is_hex_digit(c4) == True{} : Bool} & {H.is_hex_digit(c5) == True{} : Bool} & {H.is_hex_digit(c6) == True{} : Bool} & {H.is_hex_digit(c7) == True{} : Bool} & {H.is_hex_digit(c8) == True{} : Bool}) ->
-  {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([HexLaws.decode_value_spec(c1), HexLaws.decode_value_spec(c2), HexLaws.decode_value_spec(c3), HexLaws.decode_value_spec(c4), HexLaws.decode_value_spec(c5), HexLaws.decode_value_spec(c6), HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}:
-  match proofs:
-    case (p1, p2, p3, p4, p5, p6, p7, p8):
-      %decode_value_agrees(c1, p1) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([_, HexLaws.decode_value_spec(c2), HexLaws.decode_value_spec(c3), HexLaws.decode_value_spec(c4), HexLaws.decode_value_spec(c5), HexLaws.decode_value_spec(c6), HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}
-      %decode_value_agrees(c2, p2) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), _, HexLaws.decode_value_spec(c3), HexLaws.decode_value_spec(c4), HexLaws.decode_value_spec(c5), HexLaws.decode_value_spec(c6), HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}
-      %decode_value_agrees(c3, p3) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), _, HexLaws.decode_value_spec(c4), HexLaws.decode_value_spec(c5), HexLaws.decode_value_spec(c6), HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}
-      %decode_value_agrees(c4, p4) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), _, HexLaws.decode_value_spec(c5), HexLaws.decode_value_spec(c6), HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}
-      %decode_value_agrees(c5, p5) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), _, HexLaws.decode_value_spec(c6), HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}
-      %decode_value_agrees(c6, p6) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), H.decode(H.HexDigitChar{c5, p5}), _, HexLaws.decode_value_spec(c7), HexLaws.decode_value_spec(c8)]) : U32}
-      %decode_value_agrees(c7, p7) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), H.decode(H.HexDigitChar{c5, p5}), H.decode(H.HexDigitChar{c6, p6}), _, HexLaws.decode_value_spec(c8)]) : U32}
-      %decode_value_agrees(c8, p8) : {H.hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid) == HexLaws.nibble_list_value([H.decode(H.HexDigitChar{c1, p1}), H.decode(H.HexDigitChar{c2, p2}), H.decode(H.HexDigitChar{c3, p3}), H.decode(H.HexDigitChar{c4, p4}), H.decode(H.HexDigitChar{c5, p5}), H.decode(H.HexDigitChar{c6, p6}), H.decode(H.HexDigitChar{c7, p7}), _]) : U32}
-      {==}
-
-def hex_u32_complete(
-  +c1: Char, +c2: Char, +c3: Char, +c4: Char, +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  -valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool},
-  proofs: {H.is_hex_digit(c1) == True{} : Bool} & {H.is_hex_digit(c2) == True{} : Bool} & {H.is_hex_digit(c3) == True{} : Bool} & {H.is_hex_digit(c4) == True{} : Bool} & {H.is_hex_digit(c5) == True{} : Bool} & {H.is_hex_digit(c6) == True{} : Bool} & {H.is_hex_digit(c7) == True{} : Bool} & {H.is_hex_digit(c8) == True{} : Bool}
-) -> HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid):
-  hex_u32.reference_values(c1, c2, c3, c4, c5, c6, c7, c8, valid, proofs)
-
-# Eight valid characters give eight individual digit proofs.
-def hex_u32.digit_proofs(
-  +c1: Char, +c2: Char, +c3: Char, +c4: Char,
-  +c5: Char, +c6: Char, +c7: Char, +c8: Char,
-  +valid: {H.is_valid_hex_u32(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}) == True{} : Bool}
-) -> (
-  {H.is_hex_digit(c1) == True{} : Bool} &
-  {H.is_hex_digit(c2) == True{} : Bool} &
-  {H.is_hex_digit(c3) == True{} : Bool} &
-  {H.is_hex_digit(c4) == True{} : Bool} &
-  {H.is_hex_digit(c5) == True{} : Bool} &
-  {H.is_hex_digit(c6) == True{} : Bool} &
-  {H.is_hex_digit(c7) == True{} : Bool} &
-  {H.is_hex_digit(c8) == True{} : Bool}
-):
-  p1 = H.hex_u32.head_true(H.is_hex_digit(c1), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
-  +e1 = H.hex_u32.tail_true(H.is_hex_digit(c1), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
-  p2 = H.hex_u32.head_true(H.is_hex_digit(c2), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
-  +e2 = H.hex_u32.tail_true(H.is_hex_digit(c2), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
-  p3 = H.hex_u32.head_true(H.is_hex_digit(c3), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c4, c5, c6, c7, c8]), e2)
-  +e3 = H.hex_u32.tail_true(H.is_hex_digit(c3), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c4, c5, c6, c7, c8]), e2)
-  p4 = H.hex_u32.head_true(H.is_hex_digit(c4), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c5, c6, c7, c8]), e3)
-  +e4 = H.hex_u32.tail_true(H.is_hex_digit(c4), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c5, c6, c7, c8]), e3)
-  p5 = H.hex_u32.head_true(H.is_hex_digit(c5), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c6, c7, c8]), e4)
-  +e5 = H.hex_u32.tail_true(H.is_hex_digit(c5), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c6, c7, c8]), e4)
-  p6 = H.hex_u32.head_true(H.is_hex_digit(c6), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c7, c8]), e5)
-  +e6 = H.hex_u32.tail_true(H.is_hex_digit(c6), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c7, c8]), e5)
-  p7 = H.hex_u32.head_true(H.is_hex_digit(c7), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c8]), e6)
-  +e7 = H.hex_u32.tail_true(H.is_hex_digit(c7), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), [c8]), e6)
-  p8 = H.hex_u32.head_true(H.is_hex_digit(c8), List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), []), e7)
-  (p1, p2, p3, p4, p5, p6, p7, p8)
-
-def hex_u32_agrees(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> HexU32Spec(s, valid):
+# combine folds the reference nibbles of s onto any accumulator.
+def hex_u32.combine_agrees(
+  +s: String,
+  +valid: {List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s)) == True{} : Bool},
+  +acc: U32
+) -> {H.hex_u32.combine(s, valid, acc) ==
+  List.foldl(~&2, ~HexLaws.Nibble, ~U32, ~(total => n => (total * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)), HexLaws.hex_nibbles_spec(s), acc) : U32}:
   match s:
     case SNil{}:
-      Empty.absurd(HexU32Spec(SNil{}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SNil{}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SNil{}}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SCon{c2, SNil{}}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SNil{}}}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SNil{}}}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}, valid), H.hex_u32.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
-      +v = valid
-      hex_u32_complete(c1, c2, c3, c4, c5, c6, c7, c8, v,
-        hex_u32.digit_proofs(c1, c2, c3, c4, c5, c6, c7, c8, v))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
-      Empty.absurd(HexU32Spec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), H.hex_u32.false_true(valid))
+      {==}
+    case SCon{c, rest}:
+      -rest_ok = List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(rest))
+      +digit_ok = H.hex_u32.head_true(H.is_hex_digit(c), rest_ok, valid)
+      +step = (acc * 16 + H.word4_to_u32(H.decode(H.HexDigitChar{c, digit_ok})) : U32)
+      %decode_value_agrees(c, digit_ok) : {H.hex_u32.combine(SCon{c, rest}, valid, acc) ==
+        List.foldl(~&2, ~HexLaws.Nibble, ~U32, ~(total => n => (total * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)), HexLaws.hex_nibbles_spec(rest),
+          (acc * 16 + U32.from_nat(Word.to_nat(4n, _)) : U32)) : U32}
+      hex_u32.combine_agrees(rest, H.hex_u32.tail_true(H.is_hex_digit(c), rest_ok, valid), step)
+
+def hex_u32_agrees(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> HexU32Spec(s, valid):
+  hex_u32.combine_agrees(s, H.hex_u32.all_digits(s, valid), 0)
 
 def HexLaws.example_zero():
   {==}
+
+def HexLaws.hex_u32_padding_examples():
+  ({==}, {==}, {==}, {==})
 
 # Binary input validation and byte conversion.
 def BinaryLaws.is_binary_digit(c):

@@ -25,11 +25,12 @@ def decode(digit: HexDigitChar) -> Word(4n):
       word4_from_u32(Bool.pick(U32, Char.is_digit(c),
         U32.sub(code, 48), U32.sub(code, 55)))
 
+# One to eight characters, each a hex digit.
 def is_valid_hex_u32(+s: String) -> Bool:
-  Nat.is_eq(String.length(s), 8n) &&
+  (Nat.is_ge(String.length(s), 1n) && Nat.is_le(String.length(s), 8n)) &&
   List.all(~&2, ~Char, ~(c => is_hex_digit(c)), String.to_list(s))
 
-# A live proof of False == True rules out invalid input lengths.
+# A live proof of False == True is a contradiction.
 def hex_u32.NotTrue(b: Bool) -> Type:
   match b:
     case False{}:
@@ -62,25 +63,44 @@ def hex_u32.tail_true(
     case True{}:
       e
 
+# Project the right conjunct's proof from a true conjunction.
+def hex_u32.and_right(
+  left: Bool, -right: Bool,
+  e: {Bool.and(left, right) == True{} : Bool}
+) -> {right == True{} : Bool}:
+  match left:
+    case False{}:
+      Empty.absurd({right == True{} : Bool}, hex_u32.false_true(e))
+    case True{}:
+      e
+
+# A valid input's characters are all hex digits.
+def hex_u32.all_digits(
+  +s: String,
+  valid: {is_valid_hex_u32(s) == True{} : Bool}
+) -> {List.all(~&2, ~Char, ~(c => is_hex_digit(c)), String.to_list(s)) == True{} : Bool}:
+  hex_u32.and_right(
+    Nat.is_ge(String.length(s), 1n) && Nat.is_le(String.length(s), 8n),
+    List.all(~&2, ~Char, ~(c => is_hex_digit(c)), String.to_list(s)),
+    valid)
+
 # Fold validated characters into acc, most significant digit first. Each step
 # splits List.all's conjunction into the head digit's proof and the tail's.
 def hex_u32.combine(
-  cs: +List<Char>,
-  -valid: {List.all(~&2, ~Char, ~(c => is_hex_digit(c)), cs) == True{} : Bool},
+  +s: String,
+  -valid: {List.all(~&2, ~Char, ~(c => is_hex_digit(c)), String.to_list(s)) == True{} : Bool},
   acc: U32
 ) -> U32:
-  match cs:
-    case Nil{}:
+  match s:
+    case SNil{}:
       acc
-    case Con{c, rest}:
-      -rest_ok = List.all(~&2, ~Char, ~(c => is_hex_digit(c)), rest)
+    case SCon{c, rest}:
+      -rest_ok = List.all(~&2, ~Char, ~(c => is_hex_digit(c)), String.to_list(rest))
       digit = decode(HexDigitChar{c, hex_u32.head_true(is_hex_digit(c), rest_ok, valid)})
       hex_u32.combine(rest, hex_u32.tail_true(is_hex_digit(c), rest_ok, valid),
         (acc * 16 + word4_to_u32(digit) : U32))
 
+# Digits are read most significant first, so fewer than eight digits
+# read as if padded on the left with '0'.
 def hex_u32(+s: String, -valid: {is_valid_hex_u32(s) == True{} : Bool}) -> U32:
-  match s:
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
-      hex_u32.combine([c1, c2, c3, c4, c5, c6, c7, c8], valid, 0)
-    case _:
-      0
+  hex_u32.combine(s, hex_u32.all_digits(s, valid), 0)

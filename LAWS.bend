@@ -133,23 +133,23 @@ law utf8_decode_two_bytes:
 # Surrogate code points are U+D800..U+DFFF.
 
 def is_surrogate_code_point(+cp: U32) -> Bool:
-  U32.is_ge(cp, H.hex_u32("0000D800", {==})) &&
-  U32.is_le(cp, H.hex_u32("0000DFFF", {==}))
+  U32.is_ge(cp, H.hex_u32("D800", {==})) &&
+  U32.is_le(cp, H.hex_u32("DFFF", {==}))
 
 law is_surrogate_code_point_examples:
-  {is_surrogate_code_point(H.hex_u32("00000000", {==})) == False{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("0000D7FF", {==})) == False{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("0000D800", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("0000DC00", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("0000DFFF", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("0000E000", {==})) == False{} : Bool}
+  {is_surrogate_code_point(H.hex_u32("0000", {==})) == False{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("D7FF", {==})) == False{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("D800", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("DC00", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("DFFF", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("E000", {==})) == False{} : Bool}
 
 # A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
 # surrogate code points.
 
 def is_unicode_scalar(+cp: U32) -> Bool:
-  U32.is_ge(cp, H.hex_u32("00000000", {==})) &&
-  U32.is_le(cp, H.hex_u32("0010FFFF", {==})) &&
+  U32.is_ge(cp, H.hex_u32("000000", {==})) &&
+  U32.is_le(cp, H.hex_u32("10FFFF", {==})) &&
   Bool.not(is_surrogate_code_point(cp))
 
 # Overlong means that the decoded code point fits in one byte.
