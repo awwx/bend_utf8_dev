@@ -21,6 +21,10 @@ def decode_one_byte(+byte: U32,
   -valid_shape: {has_one_byte_shape(byte) == True{} : Bool}) -> U32:
   byte
 
+# Every byte with the one-byte shape is a valid encoding.
+def valid_one_byte(+byte: U32) -> Bool:
+  has_one_byte_shape(byte)
+
 # Deliberately permits overlong encodings of code points 0..127.
 def encode_as_two_bytes(+cp: U32,
   -valid: {can_encode_as_two_bytes(cp) == True{} : Bool}) -> U32 & U32:

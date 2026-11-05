@@ -92,6 +92,28 @@ law utf8_one_byte_inverse:
 def overlong_one_byte(b1: U32) -> Bool:
   False{}
 
+# A valid one-byte encoding has the one-byte shape, and if it does
+# have the one-byte shape, it is not overlong and decodes to a Unicode
+# scalar.
+#
+# Testing the shape first supplies the proof that decoding needs.
+
+def valid_one_byte.if(+byte: U32, shape: Bool,
+  -checked: {UTF8.has_one_byte_shape(byte) == shape : Bool}) -> Bool:
+  match shape:
+    case False{}:
+      False{}
+    case True{}:
+      Bool.not(overlong_one_byte(byte)) &&
+      is_unicode_scalar(UTF8.decode_one_byte(byte, checked))
+
+def valid_one_byte(+byte: U32) -> Bool:
+  valid_one_byte.if(byte, UTF8.has_one_byte_shape(byte), {==})
+
+law utf8_valid_one_byte:
+  for +byte: U32
+  {UTF8.valid_one_byte(byte) == valid_one_byte(byte) : Bool}
+
 # UTF-8 two-byte shape
 #
 # 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz
