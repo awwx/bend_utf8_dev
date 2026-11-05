@@ -75,6 +75,28 @@ law utf8_has_one_byte_shape:
   ({UTF8.has_one_byte_shape(byte) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_one_byte_shape(byte) == True{} : Bool})
 
+# We require that `encode_as_one_byte` be bijective between accepted
+# code points and bytes satisfying `has_one_byte_shape`, and we specify
+# that `decode_one_byte` is exactly its inverse.
+
+# Decoding an encoded code point returns the original input.
+
+law utf8_decode_encode_as_one_byte:
+  for +cp: U32
+  for +valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}
+  +byte = UTF8.encode_as_one_byte(cp, valid)
+  Exists({UTF8.has_one_byte_shape(byte) == True{} : Bool}, shape =>
+    {UTF8.decode_one_byte(byte, shape) == cp : U32})
+
+# Encoding a decoded byte returns the original byte.
+
+law utf8_decode_one_byte:
+  for +byte: U32
+  for +valid_shape: {UTF8.has_one_byte_shape(byte) == True{} : Bool}
+  +cp = UTF8.decode_one_byte(byte, valid_shape)
+  Exists({UTF8.can_encode_as_one_byte(cp) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_one_byte(cp, accepted) == byte : U32})
+
 # No one-byte encoding is overlong.
 
 def overlong_one_byte(b1: U32) -> Bool:

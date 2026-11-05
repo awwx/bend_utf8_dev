@@ -599,6 +599,12 @@ def Laws.utf8_has_one_byte_shape(byte):
   (accepted => utf8_proof.one_shape_witness(byte, accepted),
    representation => utf8_proof.one_shape_witness_accepted(byte, representation))
 
+def Laws.utf8_decode_encode_as_one_byte(cp, valid):
+  (valid, {==})
+
+def Laws.utf8_decode_one_byte(byte, valid_shape):
+  (valid_shape, {==})
+
 def Laws.utf8_overlong_two_bytes(b1, b2, valid):
   {==}
 
