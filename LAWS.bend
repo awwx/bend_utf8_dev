@@ -90,7 +90,7 @@ law utf8_decode_encode_as_one_byte:
 
 # Encoding a decoded byte returns the original byte.
 
-law utf8_decode_one_byte:
+law utf8_encode_decode_as_one_byte:
   for +byte: U32
   for +valid_shape: {UTF8.has_one_byte_shape(byte) == True{} : Bool}
   +cp = UTF8.decode_one_byte(byte, valid_shape)
@@ -170,7 +170,7 @@ law utf8_decode_encode_as_two_bytes:
 
 # Encoding a decoded pair returns the original bytes.
 
-law utf8_decode_two_bytes:
+law utf8_encode_decode_as_two_bytes:
   for +b1: U32
   for +b2: U32
   for +valid_shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}

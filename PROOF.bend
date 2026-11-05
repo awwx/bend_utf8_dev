@@ -602,7 +602,7 @@ def Laws.utf8_has_one_byte_shape(byte):
 def Laws.utf8_decode_encode_as_one_byte(cp, valid):
   (valid, {==})
 
-def Laws.utf8_decode_one_byte(byte, valid_shape):
+def Laws.utf8_encode_decode_as_one_byte(byte, valid_shape):
   (valid_shape, {==})
 
 def Laws.utf8_overlong_two_bytes(b1, b2, valid):
@@ -1936,7 +1936,7 @@ def utf8_proof.encode_decoded(+b1: U32, +b2: U32,
     Equal.trans(Maybe<&1, U32 & U32>, Some{UTF8.encode_as_two_bytes(cp, accepted)},
       Laws.two_byte_shape(cp), Some{(b1, b2)}, Laws.utf8_encode_as_two_bytes(cp, accepted), produced)))
 
-def Laws.utf8_decode_two_bytes(b1, b2, valid):
+def Laws.utf8_encode_decode_as_two_bytes(b1, b2, valid):
   utf8_proof.encode_decoded(b1, b2, valid,
     utf8_proof.decode_result_representation(b1, b2, valid, utf8_proof.shape_witness(b1, b2, valid)))
 
