@@ -5,6 +5,28 @@ import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
 import ./hexdigits.bend as H
 
+# Surrogate code points are U+D800..U+DFFF.
+
+def is_surrogate_code_point(+cp: U32) -> Bool:
+  U32.is_ge(cp, H.hex_u32("D800", {==})) &&
+  U32.is_le(cp, H.hex_u32("DFFF", {==}))
+
+law is_surrogate_code_point_examples:
+  {is_surrogate_code_point(H.hex_u32("0000", {==})) == False{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("D7FF", {==})) == False{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("D800", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("DC00", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("DFFF", {==})) == True{} : Bool} &
+  {is_surrogate_code_point(H.hex_u32("E000", {==})) == False{} : Bool}
+
+# A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
+# surrogate code points.
+
+def is_unicode_scalar(+cp: U32) -> Bool:
+  U32.is_ge(cp, H.hex_u32("000000", {==})) &&
+  U32.is_le(cp, H.hex_u32("10FFFF", {==})) &&
+  Bool.not(is_surrogate_code_point(cp))
+
 # By a "byte shape" we mean a series of bytes that has the correct bit
 # pattern for a UTF-8 encoding.  This includes invalid UTF-8 encodings
 # such as overlong encodings, encodings of surrogate code points, and
@@ -53,6 +75,10 @@ law utf8_has_one_byte_shape:
   ({UTF8.has_one_byte_shape(byte) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_one_byte_shape(byte) == True{} : Bool})
 
+# No one-byte encoding is overlong.
+
+def overlong_one_byte(b1: U32) -> Bool:
+  False{}
 
 # UTF-8 two-byte shape
 #
@@ -129,28 +155,6 @@ law utf8_decode_two_bytes:
   +cp = UTF8.decode_two_bytes(b1, b2, valid_shape)
   Exists({UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}, accepted =>
     {UTF8.encode_as_two_bytes(cp, accepted) == (b1, b2) : U32 & U32})
-
-# Surrogate code points are U+D800..U+DFFF.
-
-def is_surrogate_code_point(+cp: U32) -> Bool:
-  U32.is_ge(cp, H.hex_u32("D800", {==})) &&
-  U32.is_le(cp, H.hex_u32("DFFF", {==}))
-
-law is_surrogate_code_point_examples:
-  {is_surrogate_code_point(H.hex_u32("0000", {==})) == False{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("D7FF", {==})) == False{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("D800", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("DC00", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("DFFF", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("E000", {==})) == False{} : Bool}
-
-# A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
-# surrogate code points.
-
-def is_unicode_scalar(+cp: U32) -> Bool:
-  U32.is_ge(cp, H.hex_u32("000000", {==})) &&
-  U32.is_le(cp, H.hex_u32("10FFFF", {==})) &&
-  Bool.not(is_surrogate_code_point(cp))
 
 # Overlong means that the decoded code point fits in one byte.
 law utf8_overlong_two_bytes:
