@@ -3,6 +3,7 @@ import ./defs.bend as Defs
 import ./binary.bend as B
 import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
+import ./hexdigits.bend as H
 
 # By a "byte shape" we mean a series of bytes that has the correct bit
 # pattern for a UTF-8 encoding.  This includes invalid UTF-8 encodings
@@ -128,6 +129,20 @@ law utf8_decode_two_bytes:
   +cp = UTF8.decode_two_bytes(b1, b2, valid_shape)
   Exists({UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}, accepted =>
     {UTF8.encode_as_two_bytes(cp, accepted) == (b1, b2) : U32 & U32})
+
+# Surrogate code points are U+D800..U+DFFF.
+
+def is_surrogate_code_point(+cp: U32) -> Bool:
+  U32.is_ge(cp, H.hex_u32("0000D800", {==})) &&
+  U32.is_le(cp, H.hex_u32("0000DFFF", {==}))
+
+# A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
+# surrogate code points.
+
+def is_unicode_scalar(+cp: U32) -> Bool:
+  U32.is_ge(cp, H.hex_u32("00000000", {==})) &&
+  U32.is_le(cp, H.hex_u32("0010FFFF", {==})) &&
+  Bool.not(is_surrogate_code_point(cp))
 
 # Overlong means that the decoded code point fits in one byte.
 law utf8_overlong_two_bytes:
