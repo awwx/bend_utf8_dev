@@ -710,20 +710,6 @@ def utf8_proof.valid_if_true(+b1: U32, +b2: U32, +shape: Bool,
         H.hex_u32.false_true(valid))
     case True{}: {==}
 
-def utf8_proof.valid_if_false(+b1: U32, +b2: U32, +shape: Bool,
-  -checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
-  invalid: {shape == False{} : Bool}) ->
-  {UTF8.valid_two_bytes.if(b1, b2, shape, checked) == False{} : Bool}:
-  match shape:
-    case False{}: {==}
-    case True{}:
-      Empty.absurd({UTF8.valid_two_bytes.if(b1, b2, True{}, checked) == False{} : Bool},
-        H.hex_u32.false_true(Equal.sym(Bool, True{}, False{}, invalid)))
-
-def Laws.utf8_valid_two_bytes(b1, b2):
-  (valid => utf8_proof.valid_if_true(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, valid),
-   invalid => utf8_proof.valid_if_false(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, invalid))
-
 # Prove UTF-8 encoding and decoding once for arbitrary payload fields.
 # Byte shape and range checks then inspect each field independently.
 # Low bits precede high bits in the underlying Word representation.
@@ -2043,6 +2029,119 @@ def utf8_proof.two_encode_decode(p: U32 & U32,
 def Laws.utf8_two_byte_inverse():
   (cp => +valid => utf8_proof.two_decode_encode(cp, valid),
    p => +valid => utf8_proof.two_encode_decode(p, valid))
+
+# Code points up to 2047 are scalars.  A set high bit contradicts the
+# bound.  Otherwise the low eleven bits are split until the range check
+# computes.
+def utf8_proof.two_capacity_scalar_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
+  accepted: {UTF8.can_encode_as_two_bytes(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}) ->
+  {Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}:
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      match b10 b9 b8 b7 b6 b5 b4 b3 b2 b1 b0:
+        case True{} _ _ _ _ _ _ _ _ _ _: {==}
+        case False{} True{} _ _ _ _ _ _ _ _ _: {==}
+        case False{} False{} True{} _ _ _ _ _ _ _ _: {==}
+        case False{} False{} False{} True{} _ _ _ _ _ _ _: {==}
+        case False{} False{} False{} False{} True{} _ _ _ _ _ _: {==}
+        case False{} False{} False{} False{} False{} True{} _ _ _ _ _: {==}
+        case False{} False{} False{} False{} False{} False{} True{} _ _ _ _: {==}
+        case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: {==}
+        case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: {==}
+        case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: {==}
+        case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: {==}
+        case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}: {==}
+
+def utf8_proof.two_capacity_scalar(+cp: U32,
+  accepted: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) ->
+  {Laws.is_unicode_scalar(cp) == True{} : Bool}:
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.two_capacity_scalar_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, accepted)
+
+def utf8_proof.exists_witness(-A: Type, -P: @-x: A -> Type, e: Exists(A, P)) -> A:
+  (x, holds) = e
+  x
+
+# The right-inverse half of the bijection law makes the decoded value
+# encodable, so it is at most 2047.
+def utf8_proof.two_decoded_scalar(+b1: U32, +b2: U32,
+  checked: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}) ->
+  {Laws.is_unicode_scalar(UTF8.decode_two_bytes(b1, b2, checked)) == True{} : Bool}:
+  utf8_proof.two_capacity_scalar(UTF8.decode_two_bytes(b1, b2, checked),
+    utf8_proof.exists_witness(
+      {UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, checked)) == True{} : Bool},
+      accepted => {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, checked), accepted) == (b1, b2) : U32 & U32},
+      utf8_proof.two_encode_decode((b1, b2), checked)))
+
+# With the scalar check proved True, the specification's conjunction
+# reduces to the implementation's overlong test.
+def utf8_proof.valid_two_bytes_true(+b1: U32, +b2: U32,
+  checked: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}) ->
+  {Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)) ==
+    (Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)) &&
+     Laws.is_unicode_scalar(UTF8.decode_two_bytes(b1, b2, checked))) : Bool}:
+  +scalar = Equal.sym(Bool, Laws.is_unicode_scalar(UTF8.decode_two_bytes(b1, b2, checked)), True{},
+    utf8_proof.two_decoded_scalar(b1, b2, checked))
+  %scalar : {Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)) ==
+    (Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)) && _) : Bool}
+  Equal.sym(Bool, Bool.and(Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)), True{}),
+    Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)),
+    bool_and_true(Bool.not(UTF8.overlong_two_bytes(b1, b2, checked))))
+
+# Split on the shape the same way the specification does.
+def utf8_proof.valid_two_bytes_if(+b1: U32, +b2: U32, shape: Bool,
+  checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool}) ->
+  {UTF8.valid_two_bytes.if(b1, b2, shape, checked) ==
+    Laws.valid_two_bytes.if(b1, b2, shape, checked) : Bool}:
+  match shape:
+    case False{}: {==}
+    case True{}: utf8_proof.valid_two_bytes_true(b1, b2, checked)
+
+def Laws.utf8_valid_two_bytes(b1, b2):
+  utf8_proof.valid_two_bytes_if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==})
 
 def BinaryLaws.u32_byte4(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
   {==}
