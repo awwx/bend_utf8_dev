@@ -429,6 +429,17 @@ def maximal_subpart(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
   maximal_subpart.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, subpart)
 
+# A buffer has only one maximal subpart.
+
+law maximal_subpart_unique:
+  for +b1: U32
+  for +more: List<&2, U32>
+  for +s1: List<&2, U32>
+  for +s2: List<&2, U32>
+  for p1: maximal_subpart(b1, more, s1)
+  for p2: maximal_subpart(b1, more, s2)
+  {s1 == s2 : List<&2, U32>}
+
 # Decoding the first code point of a complete buffer
 # --------------------------------------------------
 #
@@ -468,17 +479,6 @@ def decodes_first(bytes: List<&2, U32>,
       {result == None{} : Maybe<&1, U32 & List<&2, U32>>}
     case +b1 <> +more:
       decodes_first.found(b1, more, next_scalar(b1 <> more), result)
-
-# A buffer has only one maximal subpart.
-
-law maximal_subpart_unique:
-  for +b1: U32
-  for +more: List<&2, U32>
-  for +s1: List<&2, U32>
-  for +s2: List<&2, U32>
-  for p1: maximal_subpart(b1, more, s1)
-  for p2: maximal_subpart(b1, more, s2)
-  {s1 == s2 : List<&2, U32>}
 
 # Decoding the first code point of a buffer has only one result.
 
