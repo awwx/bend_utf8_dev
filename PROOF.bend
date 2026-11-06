@@ -3611,6 +3611,31 @@ def utf8_proof.append_same_left(+s1: List<&2, U32>, +s2: List<&2, U32>, +rest: L
   %Equal.sym(List<&2, U32>, s1, s2, same) : {List.append(&2, U32, _, rest) == bytes : List<&2, U32>}
   e
 
+def Laws.decodes_first_empty(result, decoded):
+  decoded
+
+def utf8_proof.found_some(+b1: U32, +more: List<&2, U32>,
+  found: Maybe<&1, U32 & List<&2, U32>>, result: Maybe<&1, U32 & List<&2, U32>>,
+  decoded: Laws.decodes_first.found(b1, more, found, result)) ->
+  {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}:
+  match found:
+    case Some{x}:
+      %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, result, Some{x}, decoded) :
+        {Maybe.is_some(&1, U32 & List<&2, U32>, _) == True{} : Bool}
+      {==}
+    case None{}:
+      (sub, more1) = decoded
+      (rest, more2) = more1
+      (maximal, more3) = more2
+      (split, produced) = more3
+      %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, result,
+          Some{(Laws.replacement_char(), rest)}, produced) :
+        {Maybe.is_some(&1, U32 & List<&2, U32>, _) == True{} : Bool}
+      {==}
+
+def Laws.decodes_first_nonempty(b1, more, result, decoded):
+  utf8_proof.found_some(b1, more, Laws.next_scalar(b1 <> more), result, decoded)
+
 def utf8_proof.replaced_unique(+b1: U32, +more: List<&2, U32>,
   r1: Maybe<&1, U32 & List<&2, U32>>, r2: Maybe<&1, U32 & List<&2, U32>>,
   d1: Laws.decodes_first.replaced(b1, more, r1),

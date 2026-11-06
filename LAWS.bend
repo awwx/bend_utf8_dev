@@ -489,6 +489,22 @@ def decodes_first(bytes: List<&2, U32>,
     case +b1 <> +more:
       decodes_first.found(b1, more, next_scalar(b1 <> more), result)
 
+# Decoding the first code point of an empty buffer gives None.
+
+law decodes_first_empty:
+  for result: Maybe<&1, U32 & List<&2, U32>>
+  for decoded: decodes_first([], result)
+  {result == None{} : Maybe<&1, U32 & List<&2, U32>>}
+
+# Decoding the first code point of a non-empty buffer gives Some.
+
+law decodes_first_nonempty:
+  for +b1: U32
+  for +more: List<&2, U32>
+  for result: Maybe<&1, U32 & List<&2, U32>>
+  for decoded: decodes_first(b1 <> more, result)
+  {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}
+
 # Decoding the first code point of a buffer has only one result.
 
 law decodes_first_unique:
