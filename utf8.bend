@@ -54,25 +54,187 @@ def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
 def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
   valid_two_bytes.if(b1, b2, has_two_byte_shape(b1, b2), {==})
 
-# Streaming decoder (not yet implemented).  These placeholders only give
-# the laws in LAWS.bend something to name; the state type is the
-# implementation's choice.
+# Streaming decoder
+# -----------------
+#
+# A simple decoder that reads one byte at a time.  Its state is the
+# pending bytes of a sequence that has begun but not yet finished.
 
 def DecodeState() -> Type:
-  Unit
-
-def begins_valid_sequence(seq: List<&2, U32>) -> Bool:
-  False{}
+  List<&2, U32>
 
 def decode_start() -> DecodeState():
+  Nil{}
+
+def code_point_to_string(cp: U32) -> String:
+  SCon{Chr{cp}, SNil{}}
+
+# U+FFFD REPLACEMENT CHARACTER, as a one-character string.
+def replacement_char_string() -> String:
+  code_point_to_string(65533)
+
+# `False == True` is impossible.
+def false_true.motive(b: Bool) -> Type:
+  match b:
+    case False{}:
+      Unit
+    case True{}:
+      Empty
+
+def false_true(e: {False{} == True{} : Bool}) -> Empty:
+  %e : false_true.motive(_)
   Unit{}
 
-def decode_buffer(state: DecodeState(), buffer: List<&2, U32>) ->
-  Maybe<&1, DecodeState() & String>:
-  None{}
+# A valid two-byte sequence has the two-byte shape, which decoding needs.
+def valid_two_bytes.has_shape.if(+b1: U32, +b2: U32, shape: Bool,
+  checked: {has_two_byte_shape(b1, b2) == shape : Bool},
+  valid: {valid_two_bytes.if(b1, b2, shape, checked) == True{} : Bool}) ->
+  {has_two_byte_shape(b1, b2) == True{} : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({has_two_byte_shape(b1, b2) == True{} : Bool}, false_true(valid))
+    case True{}:
+      checked
 
+def valid_two_bytes.has_shape(+b1: U32, +b2: U32,
+  valid: {valid_two_bytes(b1, b2) == True{} : Bool}) ->
+  {has_two_byte_shape(b1, b2) == True{} : Bool}:
+  valid_two_bytes.has_shape.if(b1, b2, has_two_byte_shape(b1, b2), {==}, valid)
+
+# The scalar that a valid one-byte sequence encodes, or None.
+def one_byte_scalar.if(+byte: U32, valid: Bool,
+  -checked: {valid_one_byte(byte) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{decode_one_byte(byte, checked)}
+
+def one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
+  one_byte_scalar.if(byte, valid_one_byte(byte), {==})
+
+# The scalar that a valid two-byte sequence encodes, or None.
+def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
+  -checked: {valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{decode_two_bytes(b1, b2, valid_two_bytes.has_shape(b1, b2, checked))}
+
+def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
+  two_byte_scalar.if(b1, b2, valid_two_bytes(b1, b2), {==})
+
+# The scalar that `seq` encodes when `seq` is exactly one valid sequence,
+# otherwise None.
+def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
+  match seq:
+    case +b1 <> Nil{}:
+      one_byte_scalar(b1)
+    case +b1 <> +b2 <> Nil{}:
+      two_byte_scalar(b1, b2)
+    case _:
+      None{}
+
+# Whether some bytes, possibly none, can follow `seq` to make a valid
+# sequence.  Whether a lead byte can begin a two-byte sequence does not
+# depend on which continuation byte follows, so 0x80 stands for them all.
+def begins_valid_sequence(seq: List<&2, U32>) -> Bool:
+  match seq:
+    case Nil{}:
+      True{}
+    case +b1 <> Nil{}:
+      valid_one_byte(b1) || valid_two_bytes(b1, 128)
+    case +b1 <> +b2 <> Nil{}:
+      valid_two_bytes(b1, b2)
+    case _:
+      False{}
+
+# The text now resolved, and the new pending bytes.
+def decode_buffer.Step() -> Type:
+  String & List<&2, U32>
+
+def decode_buffer.prepend(text: String, step: decode_buffer.Step()) ->
+  decode_buffer.Step():
+  (more, pending) = step
+  (text ++ more, pending)
+
+# `seq` is the pending bytes followed by the new byte.  Emit a complete
+# sequence, keep a sequence that can still complete, or else do
+# `otherwise`.
+def decode_buffer.advance(seq: List<&2, U32>, scalar: Maybe<&2, U32>,
+  begins: Bool, otherwise: Unit -> decode_buffer.Step()) -> decode_buffer.Step():
+  match scalar begins:
+    case Some{cp} _:
+      (code_point_to_string(cp), Nil{})
+    case None{} True{}:
+      ("", seq)
+    case None{} False{}:
+      otherwise(Unit{})
+
+# A byte with nothing pending; on its own it is either a sequence, the
+# start of one, or replaced.
+def decode_buffer.start(+b: U32) -> decode_buffer.Step():
+  +seq = {[b] : List<&2, U32>}
+  decode_buffer.advance(seq, sequence_scalar(seq), begins_valid_sequence(seq),
+    u => (replacement_char_string(), Nil{}))
+
+# A byte after pending bytes.  If it cannot continue them, the pending
+# bytes are replaced and the byte starts afresh.
+def decode_buffer.extend(pending: List<&2, U32>, +b: U32) -> decode_buffer.Step():
+  +seq = List.append(&2, U32, pending, [b])
+  decode_buffer.advance(seq, sequence_scalar(seq), begins_valid_sequence(seq),
+    u => decode_buffer.prepend(replacement_char_string(), decode_buffer.start(b)))
+
+def decode_buffer.step(pending: List<&2, U32>, +b: U32) -> decode_buffer.Step():
+  match pending:
+    case Nil{}:
+      decode_buffer.start(b)
+    case p <> ps:
+      decode_buffer.extend(p <> ps, b)
+
+def decode_buffer.then(stepped: decode_buffer.Step(),
+  rest: List<&2, U32> -> decode_buffer.Step()) -> decode_buffer.Step():
+  (text, pending) = stepped
+  decode_buffer.prepend(text, rest(pending))
+
+def decode_buffer.bytes(bytes: List<&2, U32>, pending: List<&2, U32>) ->
+  decode_buffer.Step():
+  match bytes:
+    case Nil{}:
+      ("", pending)
+    case +b <> rest:
+      decode_buffer.then(decode_buffer.step(pending, b),
+        p => decode_buffer.bytes(rest, p))
+
+def decode_buffer.all_bytes(bytes: List<&2, U32>) -> Bool:
+  List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
+
+def decode_buffer.result(step: decode_buffer.Step()) ->
+  Maybe<&1, DecodeState() & String>:
+  (text, pending) = step
+  Some{(pending, text)}
+
+def decode_buffer.if(state: DecodeState(), +buffer: List<&2, U32>, ok: Bool) ->
+  Maybe<&1, DecodeState() & String>:
+  match ok:
+    case False{}:
+      None{}
+    case True{}:
+      decode_buffer.result(decode_buffer.bytes(buffer, state))
+
+# Decode the next buffer, or None if it holds a value above 255.
+def decode_buffer(state: DecodeState(), +buffer: List<&2, U32>) ->
+  Maybe<&1, DecodeState() & String>:
+  decode_buffer.if(state, buffer, decode_buffer.all_bytes(buffer))
+
+# An unfinished sequence at the end of the input is replaced.
 def decode_done(state: DecodeState()) -> String:
-  ""
+  match state:
+    case Nil{}:
+      ""
+    case p <> ps:
+      replacement_char_string()
 
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
