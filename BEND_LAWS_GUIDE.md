@@ -545,6 +545,18 @@ it. Periodically look for unused definitions.
   receives the proof it needs.
 - **Erasure has to be consistent along a call chain.** A function receiving
   an erased proof can only pass it to parameters that are themselves erased.
+- **Mark an equality proof `+` to use it more than once.**
+  - **Why this works:** equalities are Data, so they can be copied.
+  - **Without `+`:** a proof can be used only once, whether it is rewritten
+    with or passed on. A second use fails with "consumed more than once".
+  - **`-` doesn't help:** an erased proof can't be passed to a live
+    argument, such as `Equal.cong`'s `e`.
+  - **Not every value can be copied:** a pair (`A & B`), or a `Maybe` of
+    one, is a Type rather than Data, so it can't be marked `+`.
+  - *Example:* cons injectivity takes
+    `+e: {h1 <> t1 == h2 <> t2 : List<&2, U32>}`. The same equality then
+    gives both `h1 == h2` (by `Equal.cong` with a head function) and
+    `t1 == t2` (by `Equal.cong` with `List.tail`).
 
 ### 7.2 Branching on Bool, with evidence
 
