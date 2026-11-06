@@ -3611,6 +3611,60 @@ def utf8_proof.append_same_left(+s1: List<&2, U32>, +s2: List<&2, U32>, +rest: L
   %Equal.sym(List<&2, U32>, s1, s2, same) : {List.append(&2, U32, _, rest) == bytes : List<&2, U32>}
   e
 
+# The replaced result, given the maximal subpart: U+FFFD and the bytes
+# after the subpart, which its `is_prefix` clause supplies.
+def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
+  -checked: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
+  +sub: List<&2, U32>, +rest: List<&2, U32>,
+  +split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>},
+  facts: {UTF8.begins_valid_sequence(sub) == True{} : Bool} &
+    Laws.maximal_subpart.longest(sub, Laws.next_byte_after(b1 <> more, sub))) ->
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
+      Laws.maximal_subpart.sequence_prefix(b1, more, checked, subpart) &
+      {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
+      {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>}))):
+  (Some{(Laws.replacement_char(), rest)}, (sub, (rest, (((rest, split), facts), (split, {==})))))
+
+def utf8_proof.replaced_from.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
+  -checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
+  +sub: List<&2, U32>, maximal: Laws.maximal_subpart.if(b1, more, begins, checked, sub)) ->
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
+      Laws.maximal_subpart.if(b1, more, begins, checked, subpart) &
+      {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
+      {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>}))):
+  match begins:
+    case True{}:
+      (prefix, facts) = maximal
+      (rest, split) = prefix
+      utf8_proof.replaced_from.sequence(b1, more, checked, sub, rest, split, facts)
+    case False{}:
+      (Some{(Laws.replacement_char(), more)}, ([b1], (more, ({==}, ({==}, {==})))))
+
+def utf8_proof.replaced_from(+b1: U32, +more: List<&2, U32>,
+  found: Exists(List<&2, U32>, subpart => Laws.maximal_subpart(b1, more, subpart))) ->
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result => Laws.decodes_first.replaced(b1, more, result)):
+  (+sub, maximal) = found
+  utf8_proof.replaced_from.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, sub, maximal)
+
+def utf8_proof.found_exists(+b1: U32, +more: List<&2, U32>,
+  found: Maybe<&1, U32 & List<&2, U32>>,
+  checked: {Laws.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result => Laws.decodes_first.found(b1, more, found, result)):
+  match found:
+    case Some{x}:
+      (Some{x}, {==})
+    case None{}:
+      utf8_proof.replaced_from(b1, more, Laws.maximal_subpart_exists(b1, more, checked))
+
+def Laws.decodes_first_exists(bytes):
+  match bytes:
+    case Nil{}:
+      (None{}, {==})
+    case +b1 <> +more:
+      utf8_proof.found_exists(b1, more, Laws.next_scalar(b1 <> more), {==})
+
 def Laws.decodes_first_empty(result, decoded):
   decoded
 

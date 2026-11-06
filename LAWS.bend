@@ -505,6 +505,12 @@ law decodes_first_nonempty:
   for decoded: decodes_first(b1 <> more, result)
   {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}
 
+# Decoding the first code point of any buffer has a result.
+
+law decodes_first_exists:
+  for +bytes: List<&2, U32>
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result => decodes_first(bytes, result))
+
 # Decoding the first code point of a buffer has only one result.
 
 law decodes_first_unique:
