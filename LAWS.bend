@@ -228,10 +228,15 @@ law utf8_valid_two_bytes:
 def code_point_to_string(cp: U32) -> String:
   SCon{Chr{cp}, SNil{}}
 
+# U+FFFD REPLACEMENT CHARACTER.
+
+def replacement_char() -> U32:
+  H.hex_u32("FFFD", {==})
+
 # U+FFFD REPLACEMENT CHARACTER, as a one-character string.
 
 def replacement_char_string() -> String:
-  code_point_to_string(H.hex_u32("FFFD", {==}))
+  code_point_to_string(replacement_char())
 
 # Valid sequences
 # ---------------
@@ -300,6 +305,35 @@ def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
 def is_valid_sequence(seq: List<&2, U32>) -> Bool:
   Maybe.is_some(&2, U32, sequence_scalar(seq))
 
+# The scalar that a valid sequence at the front of `bytes` encodes,
+# and the bytes after that sequence; or None if `bytes` does not begin
+# with a valid sequence.  `bytes` holds values 0..255.
+
+def next_scalar.found(scalar: Maybe<&2, U32>, rest: List<&2, U32>,
+  otherwise: List<&2, U32> -> Maybe<&1, U32 & List<&2, U32>>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match scalar:
+    case Some{cp}:
+      Some{(cp, rest)}
+    case None{}:
+      otherwise(rest)
+
+def next_scalar.two(+b1: U32, rest: List<&2, U32>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match rest:
+    case Nil{}:
+      None{}
+    case +b2 <> after:
+      next_scalar.found(two_byte_scalar(b1, b2), after, r => None{})
+
+def next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
+  match bytes:
+    case Nil{}:
+      None{}
+    case +b1 <> rest:
+      next_scalar.found(one_byte_scalar(b1), rest,
+        r => next_scalar.two(b1, r))
+
 # `UTF8.begins_valid_sequence(seq)` returns True iff `seq` begins a
 # valid sequence: there exists zero or more bytes which when added to
 # `seq` makes it a valid sequence.
@@ -315,6 +349,158 @@ law utf8_begins_valid_sequence:
     {is_valid_sequence(List.append(&2, U32, seq, rest)) == True{} : Bool})
   ({UTF8.begins_valid_sequence(seq) == True{} : Bool} -> completion) &
   (completion -> {UTF8.begins_valid_sequence(seq) == True{} : Bool})
+
+# Maximal subparts
+# ----------------
+
+# `prefix` is a prefix of `bytes`.
+
+def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
+  Exists(List<&2, U32>, rest =>
+    {List.append(&2, U32, prefix, rest) == bytes : List<&2, U32>})
+
+# The byte in `bytes` that follows `prefix`, or None if `bytes` ends
+# there.  Only meaningful when `prefix` is a prefix of `bytes`; only its
+# length is used.
+
+def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
+  Maybe<&2, U32>:
+  match bytes prefix:
+    case Nil{} _:
+      None{}
+    case b <> rest Nil{}:
+      Some{b}
+    case b <> rest p <> ps:
+      next_byte_after(rest, ps)
+
+# `subpart` cannot be extended by `next`, the byte after it, if any.
+
+def maximal_subpart.longest(subpart: List<&2, U32>, next: Maybe<&2, U32>) -> Type:
+  match next:
+    case None{}:
+      Unit
+    case Some{b}:
+      {UTF8.begins_valid_sequence(List.append(&2, U32, subpart, [b])) == False{} : Bool}
+
+# The maximal subpart when the first byte begins a valid sequence:
+# `subpart` is the longest prefix of `b1 <> more` that begins a valid
+# sequence.  (Unicode's "initial subsequence of a well-formed code unit
+# sequence".)
+#
+# It suffices that adding the next byte does not begin a valid sequence:
+# by `utf8_begins_valid_sequence`, every prefix of a sequence that begins
+# a valid sequence also begins one, so no longer prefix can either.
+#
+# `first` makes `subpart` non-empty: `[b1]` begins a valid sequence, so
+# `[]` is never the longest.
+
+def maximal_subpart.sequence_prefix(+b1: U32, +more: List<&2, U32>,
+  -first: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
+  +subpart: List<&2, U32>) -> Type:
+  is_prefix(subpart, b1 <> more) &
+  {UTF8.begins_valid_sequence(subpart) == True{} : Bool} &
+  maximal_subpart.longest(subpart, next_byte_after(b1 <> more, subpart))
+
+# The maximal subpart when the first byte begins no valid sequence:
+# `subpart` is that byte alone.  (Unicode's "subsequence of length one".)
+# By `utf8_begins_valid_sequence`, no longer prefix begins a valid
+# sequence either.
+
+def maximal_subpart.single_byte(+b1: U32, +more: List<&2, U32>,
+  -first: {UTF8.begins_valid_sequence([b1]) == False{} : Bool},
+  +subpart: List<&2, U32>) -> Type:
+  {subpart == [b1] : List<&2, U32>}
+
+def maximal_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
+  -checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
+  +subpart: List<&2, U32>) -> Type:
+  match begins:
+    case True{}:
+      maximal_subpart.sequence_prefix(b1, more, checked, subpart)
+    case False{}:
+      maximal_subpart.single_byte(b1, more, checked, subpart)
+
+# `subpart` is the maximal subpart at the front of the non-empty bytes
+# `b1 <> more`, as the Unicode Standard defines it (§3.9): the longest
+# prefix that begins a valid sequence, or else the first byte alone.
+# Meant for bytes that do not begin with a valid sequence.
+
+def maximal_subpart(+b1: U32, +more: List<&2, U32>,
+  +subpart: List<&2, U32>) -> Type:
+  maximal_subpart.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, subpart)
+
+# Decoding the first code point of a complete buffer
+# --------------------------------------------------
+#
+# The buffer is complete: nothing more will follow it, so a sequence
+# left unfinished at its end is not valid and is replaced.
+
+# The bytes do not begin with a valid sequence: decoding gives U+FFFD
+# and the bytes after the maximal subpart.
+
+def decodes_first.replaced(+b1: U32, +more: List<&2, U32>,
+  result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
+  Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
+    maximal_subpart(b1, more, subpart) &
+    {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
+    {result == Some{(replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>}))
+
+# `found` is the scalar of a valid sequence at the front of the bytes,
+# and the bytes after it, if they begin with one.
+
+def decodes_first.found(+b1: U32, +more: List<&2, U32>,
+  found: Maybe<&1, U32 & List<&2, U32>>,
+  result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
+  match found:
+    case Some{scalar_rest}:
+      {result == Some{scalar_rest} : Maybe<&1, U32 & List<&2, U32>>}
+    case None{}:
+      decodes_first.replaced(b1, more, result)
+
+# Decoding the first code point of the complete buffer `bytes` gives
+# `result`: None if `bytes` is empty, otherwise the code point and the
+# bytes that follow it.
+
+def decodes_first(bytes: List<&2, U32>,
+  result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
+  match bytes:
+    case Nil{}:
+      {result == None{} : Maybe<&1, U32 & List<&2, U32>>}
+    case +b1 <> +more:
+      decodes_first.found(b1, more, next_scalar(b1 <> more), result)
+
+# `bytes` with its maximal subpart removed from the front.  The maximal
+# subpart is the longest non-empty prefix of `bytes` that begins a valid
+# sequence, or the first byte if there is no such prefix.  Meant for a
+# non-empty `bytes` that does not begin with a valid sequence.
+
+# `seq` is the prefix scanned so far and `rest` what follows it;
+# `after` is what follows the longest qualifying prefix found so far.
+
+def drop_maximal_subpart.pick(begins: Bool, rest: List<&2, U32>,
+  after: List<&2, U32>) -> List<&2, U32>:
+  match begins:
+    case False{}:
+      after
+    case True{}:
+      rest
+
+def drop_maximal_subpart.go(rest: List<&2, U32>, seq: List<&2, U32>,
+  after: List<&2, U32>) -> List<&2, U32>:
+  match rest:
+    case Nil{}:
+      after
+    case +b <> +more:
+      +longer = List.append(&2, U32, seq, [b])
+      drop_maximal_subpart.go(more, longer,
+        drop_maximal_subpart.pick(UTF8.begins_valid_sequence(longer), more, after))
+
+def drop_maximal_subpart(bytes: List<&2, U32>) -> List<&2, U32>:
+  match bytes:
+    case Nil{}:
+      Nil{}
+    case +b1 <> +rest:
+      drop_maximal_subpart.go(rest, {[b1] : List<&2, U32>}, rest)
 
 # The reference decoder
 # ---------------------
