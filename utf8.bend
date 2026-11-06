@@ -235,17 +235,3 @@ def decode_done(state: DecodeState()) -> String:
       ""
     case p <> ps:
       replacement_char_string()
-
-# An eleven-bit payload covers exactly the two-byte encoding capacity.
-def codepoint11(bits: Word(11n)) -> U32:
-  match bits:
-    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}:
-      U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, Word.zero(21n)}}}}}}}}}}}}
-
-def first(pair: U32 & U32) -> U32:
-  (a, b) = pair
-  a
-
-def second(pair: U32 & U32) -> U32:
-  (a, b) = pair
-  b
