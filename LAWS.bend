@@ -429,6 +429,15 @@ def maximal_subpart(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
   maximal_subpart.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, subpart)
 
+# A non-empty buffer that does not begin with a valid sequence has a
+# maximal subpart.
+
+law maximal_subpart_exists:
+  for +b1: U32
+  for +more: List<&2, U32>
+  for invalid: {next_scalar(b1 <> more) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+  Exists(List<&2, U32>, subpart => maximal_subpart(b1, more, subpart))
+
 # A buffer has only one maximal subpart.
 
 law maximal_subpart_unique:

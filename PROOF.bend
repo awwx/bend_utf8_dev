@@ -3504,6 +3504,97 @@ def Laws.maximal_subpart_unique(b1, more, s1, s2, p1, p2):
   utf8_proof.maximal_subpart_unique.if(b1, more, UTF8.begins_valid_sequence([b1]), {==},
     s1, s2, p1, p2)
 
+# Existence: scan forward from `[b1]`, extending the prefix while it
+# still begins a valid sequence.
+
+# What `maximal_subpart.sequence_prefix` asks for, for any bytes.
+def utf8_proof.Longest(+bytes: List<&2, U32>) -> Type:
+  Exists(List<&2, U32>, sub =>
+    Laws.is_prefix(sub, bytes) &
+    {UTF8.begins_valid_sequence(sub) == True{} : Bool} &
+    Laws.maximal_subpart.longest(sub, Laws.next_byte_after(bytes, sub)))
+
+def utf8_proof.next_after_append(+s: List<&2, U32>, +r: List<&2, U32>) ->
+  {Laws.next_byte_after(List.append(&2, U32, s, r), s) == List.head(&2, U32, r) : Maybe<&2, U32>}:
+  match s:
+    case Nil{}:
+      match r:
+        case Nil{}: {==}
+        case x <> xs: {==}
+    case +h <> +t:
+      utf8_proof.next_after_append(t, r)
+
+def utf8_proof.next_after(+s: List<&2, U32>, +r: List<&2, U32>, +bytes: List<&2, U32>,
+  e: {List.append(&2, U32, s, r) == bytes : List<&2, U32>}) ->
+  {Laws.next_byte_after(bytes, s) == List.head(&2, U32, r) : Maybe<&2, U32>}:
+  %e : {Laws.next_byte_after(_, s) == List.head(&2, U32, r) : Maybe<&2, U32>}
+  utf8_proof.next_after_append(s, r)
+
+def utf8_proof.longest_from_next(+s: List<&2, U32>, +bytes: List<&2, U32>,
+  -next: Maybe<&2, U32>, same: {next == Laws.next_byte_after(bytes, s) : Maybe<&2, U32>},
+  longest: Laws.maximal_subpart.longest(s, next)) ->
+  Laws.maximal_subpart.longest(s, Laws.next_byte_after(bytes, s)):
+  %same : Laws.maximal_subpart.longest(s, _)
+  longest
+
+# `s` begins a valid sequence and `s` followed by `c` does not.
+def utf8_proof.longest_stop(+s: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
+  +r: List<&2, U32>, +e: {List.append(&2, U32, s, c <> r) == bytes : List<&2, U32>},
+  begins_s: {UTF8.begins_valid_sequence(s) == True{} : Bool},
+  not_more: {UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])) == False{} : Bool}) ->
+  utf8_proof.Longest(bytes):
+  (s, ((c <> r, e), (begins_s,
+    utf8_proof.longest_from_next(s, bytes, Some{c},
+      Equal.sym(Maybe<&2, U32>, Laws.next_byte_after(bytes, s), Some{c},
+        utf8_proof.next_after(s, c <> r, bytes, e)),
+      not_more))))
+
+def utf8_proof.regroup_prefix(+s: List<&2, U32>, +c: U32, +r: List<&2, U32>,
+  +bytes: List<&2, U32>, e: {List.append(&2, U32, s, c <> r) == bytes : List<&2, U32>}) ->
+  {List.append(&2, U32, List.append(&2, U32, s, [c]), r) == bytes : List<&2, U32>}:
+  Equal.trans(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, s, [c]), r),
+    List.append(&2, U32, s, c <> r), bytes, utf8_proof.append_assoc(s, [c], r), e)
+
+def utf8_proof.longest_step(+s: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
+  +r: List<&2, U32>, +e: {List.append(&2, U32, s, c <> r) == bytes : List<&2, U32>},
+  begins_s: {UTF8.begins_valid_sequence(s) == True{} : Bool}, more: Bool,
+  checked: {UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])) == more : Bool},
+  longer: {UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])) == True{} : Bool} ->
+    utf8_proof.Longest(bytes)) ->
+  utf8_proof.Longest(bytes):
+  match more:
+    case False{}: utf8_proof.longest_stop(s, bytes, c, r, e, begins_s, checked)
+    case True{}: longer(checked)
+
+# `s` is a prefix of `bytes` that begins a valid sequence and `r` is the
+# rest; some prefix at least as long is the longest.
+def utf8_proof.longest_from(+r: List<&2, U32>, +s: List<&2, U32>, +bytes: List<&2, U32>,
+  +e: {List.append(&2, U32, s, r) == bytes : List<&2, U32>},
+  begins_s: {UTF8.begins_valid_sequence(s) == True{} : Bool}) ->
+  utf8_proof.Longest(bytes):
+  match r:
+    case Nil{}:
+      (s, ((Nil{}, e), (begins_s,
+        utf8_proof.longest_from_next(s, bytes, None{},
+          Equal.sym(Maybe<&2, U32>, Laws.next_byte_after(bytes, s), None{},
+            utf8_proof.next_after(s, Nil{}, bytes, e)),
+          Unit{}))))
+    case +c <> +rest:
+      utf8_proof.longest_step(s, bytes, c, rest, e, begins_s,
+        UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])), {==},
+        t => utf8_proof.longest_from(rest, List.append(&2, U32, s, [c]), bytes,
+          utf8_proof.regroup_prefix(s, c, rest, bytes, e), t))
+
+def utf8_proof.maximal_subpart_exists.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
+  checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool}) ->
+  Exists(List<&2, U32>, s => Laws.maximal_subpart.if(b1, more, begins, checked, s)):
+  match begins:
+    case True{}: utf8_proof.longest_from(more, [b1], b1 <> more, {==}, checked)
+    case False{}: ([b1], {==})
+
+def Laws.maximal_subpart_exists(b1, more, invalid):
+  utf8_proof.maximal_subpart_exists.if(b1, more, UTF8.begins_valid_sequence([b1]), {==})
+
 def utf8_proof.append_cancel(+s: List<&2, U32>, +x: List<&2, U32>, +y: List<&2, U32>,
   +e: {List.append(&2, U32, s, x) == List.append(&2, U32, s, y) : List<&2, U32>}) ->
   {x == y : List<&2, U32>}:
