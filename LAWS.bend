@@ -469,6 +469,27 @@ def decodes_first(bytes: List<&2, U32>,
     case +b1 <> +more:
       decodes_first.found(b1, more, next_scalar(b1 <> more), result)
 
+# A buffer has only one maximal subpart.
+
+law maximal_subpart_unique:
+  for +b1: U32
+  for +more: List<&2, U32>
+  for +s1: List<&2, U32>
+  for +s2: List<&2, U32>
+  for p1: maximal_subpart(b1, more, s1)
+  for p2: maximal_subpart(b1, more, s2)
+  {s1 == s2 : List<&2, U32>}
+
+# Decoding the first code point of a buffer has only one result.
+
+law decodes_first_unique:
+  for +bytes: List<&2, U32>
+  for r1: Maybe<&1, U32 & List<&2, U32>>
+  for r2: Maybe<&1, U32 & List<&2, U32>>
+  for d1: decodes_first(bytes, r1)
+  for d2: decodes_first(bytes, r2)
+  {r1 == r2 : Maybe<&1, U32 & List<&2, U32>>}
+
 # `bytes` with its maximal subpart removed from the front.  The maximal
 # subpart is the longest non-empty prefix of `bytes` that begins a valid
 # sequence, or the first byte if there is no such prefix.  Meant for a

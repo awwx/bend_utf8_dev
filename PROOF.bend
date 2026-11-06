@@ -3297,3 +3297,272 @@ def Laws.utf8_decode_done(buffers):
         Laws.reference_final(List.concat(&2, U32, buffers))) : Maybe<&2, String>}
   utf8_proof.done_text(Laws.all_bytes(List.concat(&2, U32, buffers)),
     Laws.reference.go(List.concat(&2, U32, buffers), Nil{}))
+
+# Uniqueness of maximal subparts and of decoding the first code point
+# --------------------------------------------------------------------
+
+def utf8_proof.head_or(d: U32, xs: List<&2, U32>) -> U32:
+  match xs:
+    case Nil{}: d
+    case x <> rest: x
+
+def utf8_proof.is_cons(xs: List<&2, U32>) -> Bool:
+  match xs:
+    case Nil{}: False{}
+    case x <> rest: True{}
+
+def utf8_proof.cons_head(+h1: U32, +h2: U32, +t1: List<&2, U32>, +t2: List<&2, U32>,
+  +e: {h1 <> t1 == h2 <> t2 : List<&2, U32>}) -> {h1 == h2 : U32}:
+  Equal.cong(List<&2, U32>, U32, xs => utf8_proof.head_or(h1, xs), h1 <> t1, h2 <> t2, e)
+
+def utf8_proof.cons_tail(+h1: U32, +h2: U32, +t1: List<&2, U32>, +t2: List<&2, U32>,
+  +e: {h1 <> t1 == h2 <> t2 : List<&2, U32>}) -> {t1 == t2 : List<&2, U32>}:
+  Equal.cong(List<&2, U32>, List<&2, U32>, xs => List.tail(&2, U32, xs), h1 <> t1, h2 <> t2, e)
+
+def utf8_proof.cons_nil(+h: U32, +t: List<&2, U32>, e: {h <> t == Nil{} : List<&2, U32>}) -> Empty:
+  utf8_proof.true_false(Equal.cong(List<&2, U32>, Bool, utf8_proof.is_cons, h <> t, Nil{}, e))
+
+def utf8_proof.cons_eq(+h1: U32, +h2: U32, +t1: List<&2, U32>, +t2: List<&2, U32>,
+  eh: {h1 == h2 : U32}, et: {t1 == t2 : List<&2, U32>}) -> {h1 <> t1 == h2 <> t2 : List<&2, U32>}:
+  %eh : {h1 <> t1 == _ <> t2 : List<&2, U32>}
+  %et : {h1 <> t1 == h1 <> _ : List<&2, U32>}
+  {==}
+
+def utf8_proof.append_assoc(+x: List<&2, U32>, +y: List<&2, U32>, +z: List<&2, U32>) ->
+  {List.append(&2, U32, List.append(&2, U32, x, y), z) ==
+    List.append(&2, U32, x, List.append(&2, U32, y, z)) : List<&2, U32>}:
+  match x:
+    case Nil{}: {==}
+    case +h <> +t:
+      %utf8_proof.append_assoc(t, y, z) :
+        {h <> List.append(&2, U32, List.append(&2, U32, t, y), z) == h <> _ : List<&2, U32>}
+      {==}
+
+# Every prefix of bytes that begin a valid sequence begins one too, by
+# `utf8_begins_valid_sequence`.
+def utf8_proof.valid_regroup(+x: List<&2, U32>, +y: List<&2, U32>, +z: List<&2, U32>,
+  valid: {Laws.is_valid_sequence(List.append(&2, U32, List.append(&2, U32, x, y), z)) == True{} : Bool}) ->
+  {Laws.is_valid_sequence(List.append(&2, U32, x, List.append(&2, U32, y, z))) == True{} : Bool}:
+  %utf8_proof.append_assoc(x, y, z) : {Laws.is_valid_sequence(_) == True{} : Bool}
+  valid
+
+def utf8_proof.begins_prefix.completion(+x: List<&2, U32>, +y: List<&2, U32>,
+  completion: BeginsCompletion(List.append(&2, U32, x, y))) ->
+  {UTF8.begins_valid_sequence(x) == True{} : Bool}:
+  (+rest, valid) = completion
+  utf8_proof.begins_from_completion(x,
+    (List.append(&2, U32, y, rest), utf8_proof.valid_regroup(x, y, rest, valid)))
+
+def utf8_proof.begins_prefix(+x: List<&2, U32>, +y: List<&2, U32>,
+  begins: {UTF8.begins_valid_sequence(List.append(&2, U32, x, y)) == True{} : Bool}) ->
+  {UTF8.begins_valid_sequence(x) == True{} : Bool}:
+  utf8_proof.begins_prefix.completion(x, y,
+    utf8_proof.begins_completion(List.append(&2, U32, x, y), begins))
+
+# `a` is shorter than `b`, both prefixes of `bytes`: `b` is `a` followed
+# by `c` and more, and `c` is the byte after `a`.
+def utf8_proof.Shorter(+a: List<&2, U32>, +b: List<&2, U32>, +bytes: List<&2, U32>) -> Type:
+  Exists(U32, c => Exists(List<&2, U32>, extra =>
+    {b == List.append(&2, U32, a, c <> extra) : List<&2, U32>} &
+    {Laws.next_byte_after(bytes, a) == Some{c} : Maybe<&2, U32>}))
+
+# Two prefixes of the same bytes are equal or one is shorter.
+def utf8_proof.Compared(+s1: List<&2, U32>, +s2: List<&2, U32>, +bytes: List<&2, U32>) -> Type:
+  Or({s1 == s2 : List<&2, U32>},
+    Or(utf8_proof.Shorter(s1, s2, bytes), utf8_proof.Shorter(s2, s1, bytes)))
+
+def utf8_proof.next_after_nil(+h: U32, +rest: List<&2, U32>, +bytes: List<&2, U32>,
+  e: {h <> rest == bytes : List<&2, U32>}) ->
+  {Laws.next_byte_after(bytes, Nil{}) == Some{h} : Maybe<&2, U32>}:
+  %e : {Laws.next_byte_after(_, Nil{}) == Some{h} : Maybe<&2, U32>}
+  {==}
+
+def utf8_proof.shorter_cons(+h1: U32, +h2: U32, +t1: List<&2, U32>, +t2: List<&2, U32>,
+  +b: U32, +bs: List<&2, U32>, eh: {h2 == h1 : U32},
+  shorter: utf8_proof.Shorter(t1, t2, bs)) ->
+  utf8_proof.Shorter(h1 <> t1, h2 <> t2, b <> bs):
+  (+c, more) = shorter
+  (+extra, facts) = more
+  (eq, next) = facts
+  (c, (extra, (utf8_proof.cons_eq(h2, h1, t2, List.append(&2, U32, t1, c <> extra), eh, eq), next)))
+
+def utf8_proof.compared_cons(+h1: U32, +h2: U32, +t1: List<&2, U32>, +t2: List<&2, U32>,
+  +b: U32, +bs: List<&2, U32>, +eh1: {h1 == b : U32}, +eh2: {h2 == b : U32},
+  compared: utf8_proof.Compared(t1, t2, bs)) ->
+  utf8_proof.Compared(h1 <> t1, h2 <> t2, b <> bs):
+  match compared:
+    case Inl{same}:
+      Inl{utf8_proof.cons_eq(h1, h2, t1, t2,
+        Equal.trans(U32, h1, b, h2, eh1, Equal.sym(U32, h2, b, eh2)), same)}
+    case Inr{Inl{shorter}}:
+      Inr{Inl{utf8_proof.shorter_cons(h1, h2, t1, t2, b, bs,
+        Equal.trans(U32, h2, b, h1, eh2, Equal.sym(U32, h1, b, eh1)), shorter)}}
+    case Inr{Inr{shorter}}:
+      Inr{Inr{utf8_proof.shorter_cons(h2, h1, t2, t1, b, bs,
+        Equal.trans(U32, h1, b, h2, eh1, Equal.sym(U32, h2, b, eh2)), shorter)}}
+
+def utf8_proof.compare(+s1: List<&2, U32>, +s2: List<&2, U32>, +bytes: List<&2, U32>,
+  +r1: List<&2, U32>, +r2: List<&2, U32>,
+  +e1: {List.append(&2, U32, s1, r1) == bytes : List<&2, U32>},
+  +e2: {List.append(&2, U32, s2, r2) == bytes : List<&2, U32>}) ->
+  utf8_proof.Compared(s1, s2, bytes):
+  match s1 s2:
+    case Nil{} Nil{}:
+      Inl{{==}}
+    case Nil{} +h <> +t:
+      Inr{Inl{(h, (t, ({==}, utf8_proof.next_after_nil(h, List.append(&2, U32, t, r2), bytes, e2))))}}
+    case +h <> +t Nil{}:
+      Inr{Inr{(h, (t, ({==}, utf8_proof.next_after_nil(h, List.append(&2, U32, t, r1), bytes, e1))))}}
+    case +h1 <> +t1 +h2 <> +t2:
+      match bytes:
+        case Nil{}:
+          Empty.absurd(utf8_proof.Compared(h1 <> t1, h2 <> t2, Nil{}),
+            utf8_proof.cons_nil(h1, List.append(&2, U32, t1, r1), e1))
+        case +b <> +bs:
+          utf8_proof.compared_cons(h1, h2, t1, t2, b, bs,
+            utf8_proof.cons_head(h1, b, List.append(&2, U32, t1, r1), bs, e1),
+            utf8_proof.cons_head(h2, b, List.append(&2, U32, t2, r2), bs, e2),
+            utf8_proof.compare(t1, t2, bs, r1, r2,
+              utf8_proof.cons_tail(h1, b, List.append(&2, U32, t1, r1), bs, e1),
+              utf8_proof.cons_tail(h2, b, List.append(&2, U32, t2, r2), bs, e2)))
+
+def utf8_proof.longest_next(+a: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
+  next: {Laws.next_byte_after(bytes, a) == Some{c} : Maybe<&2, U32>},
+  longest: Laws.maximal_subpart.longest(a, Laws.next_byte_after(bytes, a))) ->
+  Laws.maximal_subpart.longest(a, Some{c}):
+  %next : Laws.maximal_subpart.longest(a, _)
+  longest
+
+def utf8_proof.begins_regroup(+a: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
+  +b: List<&2, U32>, eq: {b == List.append(&2, U32, a, c <> extra) : List<&2, U32>},
+  begins: {UTF8.begins_valid_sequence(b) == True{} : Bool}) ->
+  {UTF8.begins_valid_sequence(List.append(&2, U32, List.append(&2, U32, a, [c]), extra)) == True{} : Bool}:
+  %Equal.sym(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, a, [c]), extra),
+      List.append(&2, U32, a, List.append(&2, U32, [c], extra)), utf8_proof.append_assoc(a, [c], extra)) :
+    {UTF8.begins_valid_sequence(_) == True{} : Bool}
+  %eq : {UTF8.begins_valid_sequence(_) == True{} : Bool}
+  begins
+
+# A prefix that begins a valid sequence and is longer than `a`
+# contradicts `a` being the longest.
+def utf8_proof.longer_not_begins(+a: List<&2, U32>, +b: List<&2, U32>, +bytes: List<&2, U32>,
+  begins_b: {UTF8.begins_valid_sequence(b) == True{} : Bool},
+  longest_a: Laws.maximal_subpart.longest(a, Laws.next_byte_after(bytes, a)),
+  shorter: utf8_proof.Shorter(a, b, bytes)) -> Empty:
+  (+c, more) = shorter
+  (+extra, facts) = more
+  (eq, next) = facts
+  +ac = List.append(&2, U32, a, [c])
+  not_begins = utf8_proof.longest_next(a, bytes, c, next, longest_a)
+  begins_ac = utf8_proof.begins_prefix(ac, extra, utf8_proof.begins_regroup(a, c, extra, b, eq, begins_b))
+  utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence(ac), False{},
+    Equal.sym(Bool, UTF8.begins_valid_sequence(ac), True{}, begins_ac), not_begins))
+
+def utf8_proof.sequence_prefix_unique.compared(+s1: List<&2, U32>, +s2: List<&2, U32>,
+  +bytes: List<&2, U32>,
+  begins1: {UTF8.begins_valid_sequence(s1) == True{} : Bool},
+  begins2: {UTF8.begins_valid_sequence(s2) == True{} : Bool},
+  longest1: Laws.maximal_subpart.longest(s1, Laws.next_byte_after(bytes, s1)),
+  longest2: Laws.maximal_subpart.longest(s2, Laws.next_byte_after(bytes, s2)),
+  compared: utf8_proof.Compared(s1, s2, bytes)) -> {s1 == s2 : List<&2, U32>}:
+  match compared:
+    case Inl{same}:
+      same
+    case Inr{Inl{shorter}}:
+      Empty.absurd({s1 == s2 : List<&2, U32>},
+        utf8_proof.longer_not_begins(s1, s2, bytes, begins2, longest1, shorter))
+    case Inr{Inr{shorter}}:
+      Empty.absurd({s1 == s2 : List<&2, U32>},
+        utf8_proof.longer_not_begins(s2, s1, bytes, begins1, longest2, shorter))
+
+def utf8_proof.sequence_prefix_unique(+b1: U32, +more: List<&2, U32>,
+  -first: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
+  +s1: List<&2, U32>, +s2: List<&2, U32>,
+  p1: Laws.maximal_subpart.sequence_prefix(b1, more, first, s1),
+  p2: Laws.maximal_subpart.sequence_prefix(b1, more, first, s2)) -> {s1 == s2 : List<&2, U32>}:
+  (prefix1, facts1) = p1
+  (+r1, e1) = prefix1
+  (begins1, longest1) = facts1
+  (prefix2, facts2) = p2
+  (+r2, e2) = prefix2
+  (begins2, longest2) = facts2
+  utf8_proof.sequence_prefix_unique.compared(s1, s2, b1 <> more, begins1, begins2, longest1, longest2,
+    utf8_proof.compare(s1, s2, b1 <> more, r1, r2, e1, e2))
+
+def utf8_proof.maximal_subpart_unique.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
+  -checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
+  +s1: List<&2, U32>, +s2: List<&2, U32>,
+  p1: Laws.maximal_subpart.if(b1, more, begins, checked, s1),
+  p2: Laws.maximal_subpart.if(b1, more, begins, checked, s2)) -> {s1 == s2 : List<&2, U32>}:
+  match begins:
+    case True{}:
+      utf8_proof.sequence_prefix_unique(b1, more, checked, s1, s2, p1, p2)
+    case False{}:
+      Equal.trans(List<&2, U32>, s1, [b1], s2, p1, Equal.sym(List<&2, U32>, s2, [b1], p2))
+
+def Laws.maximal_subpart_unique(b1, more, s1, s2, p1, p2):
+  utf8_proof.maximal_subpart_unique.if(b1, more, UTF8.begins_valid_sequence([b1]), {==},
+    s1, s2, p1, p2)
+
+def utf8_proof.append_cancel(+s: List<&2, U32>, +x: List<&2, U32>, +y: List<&2, U32>,
+  +e: {List.append(&2, U32, s, x) == List.append(&2, U32, s, y) : List<&2, U32>}) ->
+  {x == y : List<&2, U32>}:
+  match s:
+    case Nil{}: e
+    case +h <> +t:
+      utf8_proof.append_cancel(t, x, y,
+        utf8_proof.cons_tail(h, h, List.append(&2, U32, t, x), List.append(&2, U32, t, y), e))
+
+def utf8_proof.append_same_left(+s1: List<&2, U32>, +s2: List<&2, U32>, +rest: List<&2, U32>,
+  +bytes: List<&2, U32>, same: {s1 == s2 : List<&2, U32>},
+  e: {List.append(&2, U32, s2, rest) == bytes : List<&2, U32>}) ->
+  {List.append(&2, U32, s1, rest) == bytes : List<&2, U32>}:
+  %Equal.sym(List<&2, U32>, s1, s2, same) : {List.append(&2, U32, _, rest) == bytes : List<&2, U32>}
+  e
+
+def utf8_proof.replaced_unique(+b1: U32, +more: List<&2, U32>,
+  r1: Maybe<&1, U32 & List<&2, U32>>, r2: Maybe<&1, U32 & List<&2, U32>>,
+  d1: Laws.decodes_first.replaced(b1, more, r1),
+  d2: Laws.decodes_first.replaced(b1, more, r2)) ->
+  {r1 == r2 : Maybe<&1, U32 & List<&2, U32>>}:
+  (+sp1, d1a) = d1
+  (+rest1, d1b) = d1a
+  (m1, d1c) = d1b
+  (a1, res1) = d1c
+  (+sp2, d2a) = d2
+  (+rest2, d2b) = d2a
+  (m2, d2c) = d2b
+  (a2, res2) = d2c
+  +same_sp = Laws.maximal_subpart_unique(b1, more, sp1, sp2, m1, m2)
+  +a2_sp1 = utf8_proof.append_same_left(sp1, sp2, rest2, b1 <> more, same_sp, a2)
+  +same_rest = utf8_proof.append_cancel(sp1, rest1, rest2,
+    Equal.trans(List<&2, U32>, List.append(&2, U32, sp1, rest1), b1 <> more,
+      List.append(&2, U32, sp1, rest2), a1,
+      Equal.sym(List<&2, U32>, List.append(&2, U32, sp1, rest2), b1 <> more, a2_sp1)))
+  Equal.trans(Maybe<&1, U32 & List<&2, U32>>, r1, Some{(Laws.replacement_char(), rest1)}, r2, res1,
+    Equal.trans(Maybe<&1, U32 & List<&2, U32>>, Some{(Laws.replacement_char(), rest1)},
+      Some{(Laws.replacement_char(), rest2)}, r2,
+      Equal.cong(List<&2, U32>, Maybe<&1, U32 & List<&2, U32>>,
+        x => Some{(Laws.replacement_char(), x)}, rest1, rest2, same_rest),
+      Equal.sym(Maybe<&1, U32 & List<&2, U32>>, r2, Some{(Laws.replacement_char(), rest2)}, res2)))
+
+def utf8_proof.found_unique(+b1: U32, +more: List<&2, U32>,
+  found: Maybe<&1, U32 & List<&2, U32>>,
+  r1: Maybe<&1, U32 & List<&2, U32>>, r2: Maybe<&1, U32 & List<&2, U32>>,
+  d1: Laws.decodes_first.found(b1, more, found, r1),
+  d2: Laws.decodes_first.found(b1, more, found, r2)) ->
+  {r1 == r2 : Maybe<&1, U32 & List<&2, U32>>}:
+  match found:
+    case Some{x}:
+      Equal.trans(Maybe<&1, U32 & List<&2, U32>>, r1, Some{x}, r2, d1,
+        Equal.sym(Maybe<&1, U32 & List<&2, U32>>, r2, Some{x}, d2))
+    case None{}:
+      utf8_proof.replaced_unique(b1, more, r1, r2, d1, d2)
+
+def Laws.decodes_first_unique(bytes, r1, r2, d1, d2):
+  match bytes:
+    case Nil{}:
+      Equal.trans(Maybe<&1, U32 & List<&2, U32>>, r1, None{}, r2, d1,
+        Equal.sym(Maybe<&1, U32 & List<&2, U32>>, r2, None{}, d2))
+    case +b1 <> +more:
+      utf8_proof.found_unique(b1, more, Laws.next_scalar(b1 <> more), r1, r2, d1, d2)
