@@ -2664,3 +2664,34 @@ def BinaryLaws.strbyte_injective(s1, s2, valid1, valid2, equal):
       Equal.cong(U32, String, value => strbyte_injective.render(value),
         B.strbyte(s1, v1), B.strbyte(s2, v2), equal),
       strbyte_injective.inverse(s2, v2)))
+
+# A valid one-byte sequence has the one-byte shape: when the shape test
+# fails, `valid_one_byte` is False, contradicting `valid`.
+def utf8_proof.valid_one_byte_has_shape(+byte: U32, shape: Bool,
+  checked: {UTF8.has_one_byte_shape(byte) == shape : Bool},
+  valid: {Laws.valid_one_byte.if(byte, shape, checked) == True{} : Bool}) ->
+  {UTF8.has_one_byte_shape(byte) == True{} : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({UTF8.has_one_byte_shape(byte) == True{} : Bool},
+        H.hex_u32.false_true(valid))
+    case True{}:
+      checked
+
+def Laws.valid_one_byte_has_shape(byte, valid):
+  utf8_proof.valid_one_byte_has_shape(byte, UTF8.has_one_byte_shape(byte), {==}, valid)
+
+# A valid two-byte sequence has the two-byte shape, in the same way.
+def utf8_proof.valid_two_bytes_has_shape(+b1: U32, +b2: U32, shape: Bool,
+  checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
+  valid: {Laws.valid_two_bytes.if(b1, b2, shape, checked) == True{} : Bool}) ->
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+        H.hex_u32.false_true(valid))
+    case True{}:
+      checked
+
+def Laws.valid_two_bytes_has_shape(b1, b2, valid):
+  utf8_proof.valid_two_bytes_has_shape(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, valid)

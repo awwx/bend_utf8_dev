@@ -448,6 +448,32 @@ pass that proof to a function.
 A law may build a proof that its statement needs, such as the proof
 argument of a function it calls, from other laws inside its own statement.
 
+A reference definition in a laws file may do the same, but only in an
+erased position, such as a function's `-` proof argument. Bend rejects a
+law used in live code ("an unfilled law is a dead claim: live code cannot
+use it"), which also rules out circular reasoning. Either way, the check
+passes only once `PROOF.bend` proves every law that is used, so the proof
+stays out of the laws file. *Example:* a law states the fact that decoding
+needs, and the reference definition passes that law as the decoder's proof
+argument:
+
+```bend
+# A valid two-byte sequence has the two-byte shape.
+law valid_two_bytes_has_shape:
+  for +b1: U32
+  for +b2: U32
+  for valid: {valid_two_bytes(b1, b2) == True{} : Bool}
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
+
+def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
+  -checked: {valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{UTF8.decode_two_bytes(b1, b2, valid_two_bytes_has_shape(b1, b2, checked))}
+```
+
 In `PROOF.bend`, laws are likewise reused as lemmas by calling
 `Laws.name(...)`. *Example:* given `produced`, a proof that the reference
 table maps `cp` to `Some{(b1, b2)}`, a proof obtains evidence that `cp` is
@@ -608,6 +634,22 @@ single induction instead of a case split.
   *Example:* `can_encode_as_two_bytes`, `encode_as_two_bytes`,
   `decode_two_bytes`, and `has_two_byte_shape` (the implementation's
   predicate) vs `two_byte_shape` (the reference definition).
+- **Be precise first, then brief.** Spec names deserve more care than
+  ordinary code names, because the spec is read in order to be checked
+  (§1.3). Choose a name that says exactly what the thing is. Among precise
+  names, prefer the shortest.
+  - Drop words that the context already supplies, such as the subject of the
+    file, and connecting words that carry no meaning.
+  - Keep every word that carries meaning.
+  - Put exact details, such as a code point's value, in a comment rather
+    than in the name.
+
+  *Example:* `unicode_replacement_char_as_string` shortens to
+  `replacement_char_string`. "Unicode" is implied by the subject, and "as"
+  adds nothing. "Char" stays, because the value really is a Bend `Char`
+  inside a `String`. A one-line comment gives the value, U+FFFD. In the
+  other direction, `scalar_text` was short but imprecise, since it didn't
+  say that it takes a code point. `code_point_to_string` says so.
 - **Helpers belonging to a function** are named `fn.helper`
   (`hex_u32.combine`, `two_byte_shape.bits`, `str_bit8.if`).
 - **Proof argument names say what they prove** (`valid`, `valid_shape`,

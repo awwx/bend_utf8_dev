@@ -54,6 +54,26 @@ def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
 def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
   valid_two_bytes.if(b1, b2, has_two_byte_shape(b1, b2), {==})
 
+# Streaming decoder (not yet implemented).  These placeholders only give
+# the laws in LAWS.bend something to name; the state type is the
+# implementation's choice.
+
+def DecodeState() -> Type:
+  Unit
+
+def begins_valid_sequence(seq: List<&2, U32>) -> Bool:
+  False{}
+
+def decode_start() -> DecodeState():
+  Unit{}
+
+def decode_buffer(state: DecodeState(), buffer: List<&2, U32>) ->
+  Maybe<&1, DecodeState() & String>:
+  None{}
+
+def decode_done(state: DecodeState()) -> String:
+  ""
+
 # An eleven-bit payload covers exactly the two-byte encoding capacity.
 def codepoint11(bits: Word(11n)) -> U32:
   match bits:
