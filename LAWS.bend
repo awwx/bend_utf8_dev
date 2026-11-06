@@ -489,29 +489,20 @@ def decodes_first(bytes: List<&2, U32>,
     case +b1 <> +more:
       decodes_first.found(b1, more, next_scalar(b1 <> more), result)
 
-# Decoding the first code point of an empty buffer gives None.
+# Now we add some checks for our definition.
 
-law decodes_first_empty:
-  for result: Maybe<&1, U32 & List<&2, U32>>
-  for decoded: decodes_first([], result)
-  {result == None{} : Maybe<&1, U32 & List<&2, U32>>}
-
-# Decoding the first code point of a non-empty buffer gives Some.
-
-law decodes_first_nonempty:
-  for +b1: U32
-  for +more: List<&2, U32>
-  for result: Maybe<&1, U32 & List<&2, U32>>
-  for decoded: decodes_first(b1 <> more, result)
-  {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}
-
-# Decoding the first code point of any buffer has a result.
+# Now we check that for any buffer, decodes_first implies that a
+# result exists. (That is, we haven't created a definition for which
+# there is some buffer that no `result` value at all satisfies the
+# definition.)  The result itself can be None or Some, we just require
+# that there is one.
 
 law decodes_first_exists:
   for +bytes: List<&2, U32>
   Exists(Maybe<&1, U32 & List<&2, U32>>, result => decodes_first(bytes, result))
 
-# Decoding the first code point of a buffer has only one result.
+# Check for uniqueness: for any buffer, there is only one `result`
+# value which satisfies our definition.
 
 law decodes_first_unique:
   for +bytes: List<&2, U32>
@@ -520,6 +511,26 @@ law decodes_first_unique:
   for d1: decodes_first(bytes, r1)
   for d2: decodes_first(bytes, r2)
   {r1 == r2 : Maybe<&1, U32 & List<&2, U32>>}
+
+# Check that decoding the first code point of an empty buffer gives
+# None.  This is trivial given our decodes_first def above, but we
+# include for completeness.
+
+law decodes_first_empty:
+  for result: Maybe<&1, U32 & List<&2, U32>>
+  for decoded: decodes_first([], result)
+  {result == None{} : Maybe<&1, U32 & List<&2, U32>>}
+
+# Check that decoding the first code point of any non-empty buffer
+# always gives Some.
+
+law decodes_first_nonempty:
+  for +b1: U32
+  for +more: List<&2, U32>
+  for result: Maybe<&1, U32 & List<&2, U32>>
+  for decoded: decodes_first(b1 <> more, result)
+  {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}
+
 
 # `bytes` with its maximal subpart removed from the front.  The maximal
 # subpart is the longest non-empty prefix of `bytes` that begins a valid
