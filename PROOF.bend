@@ -578,7 +578,7 @@ def utf8_proof.one_shape_witness(+byte: U32,
 def utf8_proof.one_model_byte_accepted(+cp: U32, +byte: U32,
   +produced: {Laws.one_byte_shape(cp) == Some{byte} : Maybe<&2, U32>}) ->
   {UTF8.has_one_byte_shape(byte) == True{} : Bool}:
-  +accepted = Equal.trans(Bool, UTF8.can_encode_as_one_byte(cp), Laws.can_encode_as_one_byte(cp), True{},
+  +accepted = Equal.trans(Bool, UTF8.can_encode_as_one_byte(cp), Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), True{},
     Laws.utf8_can_encode_as_one_byte(cp),
     Equal.cong(Maybe<&2, U32>, Bool, shape => Maybe.is_some(&2, U32, shape),
       Laws.one_byte_shape(cp), Some{byte}, produced))
