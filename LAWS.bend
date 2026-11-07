@@ -161,12 +161,28 @@ law utf8_two_byte_inverse:
     cp => valid => UTF8.encode_as_two_bytes(cp, valid),
     p => valid => UTF8.decode_two_bytes(B.first(p), B.second(p), valid))
 
+## Overlong encodings
 
+# In UTF-8, an "overlong" encoding is an encoding which is the correct
+# shape for encoding the code point, but a shorter enconding also
+# encodes the code point.  These are invalid in UTF-8.
 
 # No one-byte encoding is overlong.
 
 def overlong_one_byte(b1: U32) -> Bool:
   False{}
+
+# A two-byte encoding is overlong if the code point it encodes could
+# be encoded as a one byte encoding.
+
+law utf8_overlong_two_bytes:
+  for +b1: U32
+  for +b2: U32
+  for -valid_shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
+  {UTF8.overlong_two_bytes(b1, b2, valid_shape) ==
+    UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid_shape)) : Bool}
+
+
 
 # A valid one-byte encoding has the one-byte shape, and if it does
 # have the one-byte shape, it is not overlong and decodes to a Unicode
@@ -191,19 +207,7 @@ law utf8_valid_one_byte:
   {UTF8.valid_one_byte(byte) == valid_one_byte(byte) : Bool}
 
 
-
-# Given a code point and a proof that the code point can be encoded in
-# a UTF-8 two-byte shape (as specified by two_byte_shape above),
-# `UTF8.encode_as_two_bytes` returns the two bytes of the shape
-# directly as U32 values without needing to use a Maybe.
-
 # Overlong means that the decoded code point fits in one byte.
-law utf8_overlong_two_bytes:
-  for +b1: U32
-  for +b2: U32
-  for -valid_shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
-  {UTF8.overlong_two_bytes(b1, b2, valid_shape) ==
-    UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid_shape)) : Bool}
 
 # A valid two-byte encoding has the two-byte shape, and, if it does
 # have the two-byte shape, it is not overlong and decodes to a Unicode
