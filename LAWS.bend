@@ -89,7 +89,7 @@ def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
 
 ## Can encode
 
-# A code point can be encoded as one byte iff iff one_byte_shape
+# A code point can be encoded as a sequence of bytes iff the shape
 # matches.
 
 def can_encode_as_one_byte(cp: U32) -> Bool:
@@ -97,7 +97,7 @@ def can_encode_as_one_byte(cp: U32) -> Bool:
 
 law utf8_can_encode_as_one_byte:
   for +cp: U32
-  {UTF8.can_encode_as_one_byte(cp) == can_encode_as_one_byte(cp) : Bool}
+  {UTF8.can_encode_as_one_byte(cp) == Maybe.is_some(&2, U32, one_byte_shape(cp)) : Bool}
 
 law utf8_can_encode_as_two_bytes:
   for +cp: U32
