@@ -287,6 +287,40 @@ def is_valid_sequence(seq: List<&2, U32>) -> Bool:
       False{}
 
 
+## Decode the first sequence from a buffer.
+
+# If the buffer starts with a valid sequence, returns the scalar that
+# the sequence encodes and the remaining buffer after that sequence.
+#
+# Returns None if the buffer doesn't start with a valid sequence.
+
+def next_scalar.found(scalar: Maybe<&2, U32>, rest: List<&2, U32>,
+  otherwise: List<&2, U32> -> Maybe<&1, U32 & List<&2, U32>>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match scalar:
+    case Some{cp}:
+      Some{(cp, rest)}
+    case None{}:
+      otherwise(rest)
+
+def next_scalar.two(+b1: U32, rest: List<&2, U32>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match rest:
+    case Nil{}:
+      None{}
+    case +b2 <> after:
+      next_scalar.found(two_byte_scalar(b1, b2), after, r => None{})
+
+def next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
+  match bytes:
+    case Nil{}:
+      None{}
+    case +b1 <> rest:
+      next_scalar.found(one_byte_scalar(b1), rest,
+        r => next_scalar.two(b1, r))
+
+
+
 # Streaming decoding
 # ==================
 #
@@ -322,37 +356,6 @@ def replacement_char_string() -> String:
 
 
 
-# `seq` is exactly one valid sequence.
-
-
-# The scalar that a valid sequence at the front of `bytes` encodes,
-# and the bytes after that sequence; or None if `bytes` does not begin
-# with a valid sequence.  `bytes` holds values 0..255.
-
-def next_scalar.found(scalar: Maybe<&2, U32>, rest: List<&2, U32>,
-  otherwise: List<&2, U32> -> Maybe<&1, U32 & List<&2, U32>>) ->
-  Maybe<&1, U32 & List<&2, U32>>:
-  match scalar:
-    case Some{cp}:
-      Some{(cp, rest)}
-    case None{}:
-      otherwise(rest)
-
-def next_scalar.two(+b1: U32, rest: List<&2, U32>) ->
-  Maybe<&1, U32 & List<&2, U32>>:
-  match rest:
-    case Nil{}:
-      None{}
-    case +b2 <> after:
-      next_scalar.found(two_byte_scalar(b1, b2), after, r => None{})
-
-def next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
-  match bytes:
-    case Nil{}:
-      None{}
-    case +b1 <> rest:
-      next_scalar.found(one_byte_scalar(b1), rest,
-        r => next_scalar.two(b1, r))
 
 # `UTF8.begins_valid_sequence(seq)` returns True iff `seq` begins a
 # valid sequence: there exists zero or more bytes which when added to
