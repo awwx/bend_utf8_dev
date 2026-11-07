@@ -62,6 +62,33 @@ def one_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&2, U32>:
 def one_byte_shape(cp: U32) -> Maybe<&2, U32>:
   one_byte_shape.bits(B.u32_byte4(cp))
 
+# UTF-8 two-byte shape
+#
+# 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz
+#
+# Returns two U32 representing the two bytes if the shape matches, or
+# None if the shape doesn't match.
+#
+# Capacity includes overlong encodings of 0..127; shortest-form
+# validity is separate.
+
+def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
+  match bits:
+    case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (False{}, False{}, False{}, False{}, False{}, x1, x2, x3),
+          (y1, y2, y3, y4, z1, z2, z3, z4)):
+      Some{(B.bit8_value((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
+            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+    case _:
+      None{}
+
+def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
+  two_byte_shape.bits(B.u32_byte4(cp))
+
+
+## Can encode
+
 # A code point can be encoded as one byte iff iff one_byte_shape
 # matches.
 
@@ -71,6 +98,12 @@ def can_encode_as_one_byte(cp: U32) -> Bool:
 law utf8_can_encode_as_one_byte:
   for +cp: U32
   {UTF8.can_encode_as_one_byte(cp) == can_encode_as_one_byte(cp) : Bool}
+
+law utf8_can_encode_as_two_bytes:
+  for +cp: U32
+  {UTF8.can_encode_as_two_bytes(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
+
+
 
 law utf8_encode_as_one_byte:
   for +cp: U32
@@ -123,36 +156,7 @@ law utf8_valid_one_byte:
   for +byte: U32
   {UTF8.valid_one_byte(byte) == valid_one_byte(byte) : Bool}
 
-# UTF-8 two-byte shape
-#
-# 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz
-#
-# Returns two U32 representing the two bytes if the shape matches, or
-# None if the shape doesn't match.
-#
-# Capacity includes overlong encodings of 0..127; shortest-form
-# validity is separate.
 
-def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
-  match bits:
-    case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
-          (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
-          (False{}, False{}, False{}, False{}, False{}, x1, x2, x3),
-          (y1, y2, y3, y4, z1, z2, z3, z4)):
-      Some{(B.bit8_value((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
-            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
-    case _:
-      None{}
-
-def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
-  two_byte_shape.bits(B.u32_byte4(cp))
-
-# Specification for UTF8.can_encode_as_two_bytes: it returns True iff
-# two_byte_shape matches.
-
-law utf8_can_encode_as_two_bytes:
-  for +cp: U32
-  {UTF8.can_encode_as_two_bytes(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
 
 # Given a code point and a proof that the code point can be encoded in
 # a UTF-8 two-byte shape (as specified by two_byte_shape above),
