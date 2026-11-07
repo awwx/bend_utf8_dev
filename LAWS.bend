@@ -223,6 +223,27 @@ law utf8_valid_two_bytes:
   {UTF8.valid_two_bytes(b1, b2) == valid_two_bytes.if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}) : Bool}
 
 
+## Valid sequences have their correct byte shape.
+
+# Since our definition of a valid sequence includes that a sequence is
+# only valid when it has the correct byte shape, if we have a valid
+# sequence we know that it has a correct byte shape.
+#
+# We use this law below when we have a valid sequence and we need
+# a proof that it has a correct byte shape.
+
+law valid_one_byte_has_shape:
+  for +byte: U32
+  for valid: {UTF8.valid_one_byte(byte) == True{} : Bool}
+  {UTF8.has_one_byte_shape(byte) == True{} : Bool}
+
+law valid_two_bytes_has_shape:
+  for +b1: U32
+  for +b2: U32
+  for valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
+
+
 # Streaming decoding
 # ==================
 #
@@ -254,12 +275,6 @@ def replacement_char_string() -> String:
 # Valid sequences
 # ---------------
 
-# A valid one-byte sequence has the one-byte shape.
-
-law valid_one_byte_has_shape:
-  for +byte: U32
-  for valid: {UTF8.valid_one_byte(byte) == True{} : Bool}
-  {UTF8.has_one_byte_shape(byte) == True{} : Bool}
 
 # The scalar that a valid one-byte sequence encodes, or None.
 
@@ -273,19 +288,6 @@ def one_byte_scalar.if(+byte: U32, valid: Bool,
 
 def one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
   one_byte_scalar.if(byte, UTF8.valid_one_byte(byte), {==})
-
-# Since one of the conditions for a byte sequence to be valid is that
-# it has the right shape, if two bytes are a valid two-byte sequence,
-# this implies that the two bytes also have the two-byte shape.
-#
-# We use this law when we have a valid two-byte sequence and we need
-# a proof that it has the two-byte shape.
-
-law valid_two_bytes_has_shape:
-  for +b1: U32
-  for +b2: U32
-  for valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}
-  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
 
 # Given any two bytes, return the scalar that the two-byte sequence
 # encodes if it is a valid sequence, otherwise return None.
