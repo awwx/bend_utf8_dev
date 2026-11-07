@@ -272,18 +272,6 @@ def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
 def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
   two_byte_scalar.if(b1, b2, UTF8.valid_two_bytes(b1, b2), {==})
 
-# The scalar that `seq` encodes when `seq` is exactly one valid
-# sequence, otherwise None.
-
-def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
-  match seq:
-    case +b1 <> Nil{}:
-      one_byte_scalar(b1)
-    case +b1 <> +b2 <> Nil{}:
-      two_byte_scalar(b1, b2)
-    case _:
-      None{}
-
 
 # Streaming decoding
 # ==================
@@ -323,7 +311,13 @@ def replacement_char_string() -> String:
 # `seq` is exactly one valid sequence.
 
 def is_valid_sequence(seq: List<&2, U32>) -> Bool:
-  Maybe.is_some(&2, U32, sequence_scalar(seq))
+  match seq:
+    case +b1 <> Nil{}:
+      UTF8.valid_one_byte(b1)
+    case +b1 <> +b2 <> Nil{}:
+      UTF8.valid_two_bytes(b1, b2)
+    case _:
+      False{}
 
 # The scalar that a valid sequence at the front of `bytes` encodes,
 # and the bytes after that sequence; or None if `bytes` does not begin
