@@ -208,16 +208,6 @@ law utf8_valid_one_byte:
   for +byte: U32
   {UTF8.valid_one_byte(byte) == valid_one_byte.if(byte, UTF8.has_one_byte_shape(byte), {==}) : Bool}
 
-
-
-
-# A valid two-byte encoding has the two-byte shape, and, if it does
-# have the two-byte shape, it is not overlong and decodes to a Unicode
-# scalar.
-#
-# Testing the shape first supplies the proof that the overlong check
-# and decoding need.
-
 def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
   -checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool}) -> Bool:
   match shape:
@@ -234,6 +224,7 @@ law utf8_valid_two_bytes:
   for +b1: U32
   for +b2: U32
   {UTF8.valid_two_bytes(b1, b2) == valid_two_bytes(b1, b2) : Bool}
+
 
 # Streaming decoding
 # ==================
