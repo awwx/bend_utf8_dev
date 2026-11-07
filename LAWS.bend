@@ -139,6 +139,7 @@ law utf8_has_two_byte_shape:
   ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
+
 ## Encoding is bijective
 
 # Each encode_as_N_byte is bijective, and decode_N_byte is exactly its
@@ -160,6 +161,7 @@ law utf8_two_byte_inverse:
     p => UTF8.has_two_byte_shape(B.first(p), B.second(p)),
     cp => valid => UTF8.encode_as_two_bytes(cp, valid),
     p => valid => UTF8.decode_two_bytes(B.first(p), B.second(p), valid))
+
 
 ## Overlong encodings
 
