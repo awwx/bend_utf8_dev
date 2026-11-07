@@ -2666,7 +2666,7 @@ def BinaryLaws.strbyte_injective(s1, s2, valid1, valid2, equal):
       strbyte_injective.inverse(s2, v2)))
 
 # A valid one-byte sequence has the one-byte shape: when the shape test
-# fails, `valid_one_byte` is False, contradicting `valid`.
+# fails, `valid_one_byte.if` is False, contradicting `valid`.
 def utf8_proof.valid_one_byte_has_shape(+byte: U32, shape: Bool,
   checked: {UTF8.has_one_byte_shape(byte) == shape : Bool},
   valid: {Laws.valid_one_byte.if(byte, shape, checked) == True{} : Bool}) ->
@@ -2679,7 +2679,12 @@ def utf8_proof.valid_one_byte_has_shape(+byte: U32, shape: Bool,
       checked
 
 def Laws.valid_one_byte_has_shape(byte, valid):
-  utf8_proof.valid_one_byte_has_shape(byte, UTF8.has_one_byte_shape(byte), {==}, valid)
+  +shape = UTF8.has_one_byte_shape(byte)
+  utf8_proof.valid_one_byte_has_shape(byte, shape, {==},
+    Equal.trans(Bool, Laws.valid_one_byte.if(byte, shape, {==}), UTF8.valid_one_byte(byte), True{},
+      Equal.sym(Bool, UTF8.valid_one_byte(byte), Laws.valid_one_byte.if(byte, shape, {==}),
+        Laws.utf8_valid_one_byte(byte)),
+      valid))
 
 # A valid two-byte sequence has the two-byte shape, in the same way.
 def utf8_proof.valid_two_bytes_has_shape(+b1: U32, +b2: U32, shape: Bool,
@@ -2839,7 +2844,7 @@ def bool_or_true(+a: Bool) -> {Bool.or(a, True{}) == True{} : Bool}:
 # A reference scalar is Some exactly when the reference validity test is
 # True.
 def utf8_proof.one_scalar_some(+byte: U32, valid: Bool,
-  -checked: {Laws.valid_one_byte(byte) == valid : Bool},
+  -checked: {UTF8.valid_one_byte(byte) == valid : Bool},
   is_true: {valid == True{} : Bool}) ->
   {Maybe.is_some(&2, U32, Laws.one_byte_scalar.if(byte, valid, checked)) == True{} : Bool}:
   match valid:
@@ -2847,7 +2852,7 @@ def utf8_proof.one_scalar_some(+byte: U32, valid: Bool,
     case True{}: {==}
 
 def utf8_proof.one_scalar_valid(+byte: U32, valid: Bool,
-  -checked: {Laws.valid_one_byte(byte) == valid : Bool},
+  -checked: {UTF8.valid_one_byte(byte) == valid : Bool},
   some: {Maybe.is_some(&2, U32, Laws.one_byte_scalar.if(byte, valid, checked)) == True{} : Bool}) ->
   {valid == True{} : Bool}:
   match valid:
@@ -2875,10 +2880,7 @@ def utf8_proof.two_scalar_valid(+b1: U32, +b2: U32, valid: Bool,
 def utf8_proof.one_valid_sequence(+b1: U32,
   valid: {UTF8.valid_one_byte(b1) == True{} : Bool}) ->
   {Laws.is_valid_sequence([b1]) == True{} : Bool}:
-  utf8_proof.one_scalar_some(b1, Laws.valid_one_byte(b1), {==},
-    Equal.trans(Bool, Laws.valid_one_byte(b1), UTF8.valid_one_byte(b1), True{},
-      Equal.sym(Bool, UTF8.valid_one_byte(b1), Laws.valid_one_byte(b1), Laws.utf8_valid_one_byte(b1)),
-      valid))
+  utf8_proof.one_scalar_some(b1, UTF8.valid_one_byte(b1), {==}, valid)
 
 def utf8_proof.two_valid_sequence(+b1: U32, +b2: U32,
   valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}) ->
@@ -2891,9 +2893,7 @@ def utf8_proof.two_valid_sequence(+b1: U32, +b2: U32,
 def utf8_proof.one_valid_from_sequence(+b1: U32,
   valid: {Laws.is_valid_sequence([b1]) == True{} : Bool}) ->
   {UTF8.valid_one_byte(b1) == True{} : Bool}:
-  Equal.trans(Bool, UTF8.valid_one_byte(b1), Laws.valid_one_byte(b1), True{},
-    Laws.utf8_valid_one_byte(b1),
-    utf8_proof.one_scalar_valid(b1, Laws.valid_one_byte(b1), {==}, valid))
+  utf8_proof.one_scalar_valid(b1, UTF8.valid_one_byte(b1), {==}, valid)
 
 def utf8_proof.two_valid_from_sequence(+b1: U32, +b2: U32,
   valid: {Laws.is_valid_sequence([b1, b2]) == True{} : Bool}) ->
@@ -2971,7 +2971,7 @@ def utf8_proof.true_false(e: {True{} == False{} : Bool}) -> Empty:
 # make equal, and decoding does not depend on its proof argument.
 def utf8_proof.one_scalar_agrees(+byte: U32, impl: Bool,
   -impl_checked: {UTF8.valid_one_byte(byte) == impl : Bool}, spec: Bool,
-  -spec_checked: {Laws.valid_one_byte(byte) == spec : Bool},
+  -spec_checked: {UTF8.valid_one_byte(byte) == spec : Bool},
   same: {impl == spec : Bool}) ->
   {UTF8.one_byte_scalar.if(byte, impl, impl_checked) ==
     Laws.one_byte_scalar.if(byte, spec, spec_checked) : Maybe<&2, U32>}:
@@ -3007,7 +3007,7 @@ def utf8_proof.scalar_agrees(+seq: List<&2, U32>) ->
     case Nil{}: {==}
     case +b1 <> Nil{}:
       utf8_proof.one_scalar_agrees(b1, UTF8.valid_one_byte(b1), {==},
-        Laws.valid_one_byte(b1), {==}, Laws.utf8_valid_one_byte(b1))
+        UTF8.valid_one_byte(b1), {==}, {==})
     case +b1 <> +b2 <> Nil{}:
       utf8_proof.two_scalar_agrees(b1, b2, UTF8.valid_two_bytes(b1, b2), {==},
         Laws.valid_two_bytes(b1, b2), {==}, Laws.utf8_valid_two_bytes(b1, b2))

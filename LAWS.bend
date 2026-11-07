@@ -204,12 +204,9 @@ def valid_one_byte.if(+byte: U32, shape: Bool,
       Bool.not(overlong_one_byte(byte)) &&
       is_unicode_scalar(UTF8.decode_one_byte(byte, checked))
 
-def valid_one_byte(+byte: U32) -> Bool:
-  valid_one_byte.if(byte, UTF8.has_one_byte_shape(byte), {==})
-
 law utf8_valid_one_byte:
   for +byte: U32
-  {UTF8.valid_one_byte(byte) == valid_one_byte(byte) : Bool}
+  {UTF8.valid_one_byte(byte) == valid_one_byte.if(byte, UTF8.has_one_byte_shape(byte), {==}) : Bool}
 
 
 
@@ -273,13 +270,13 @@ def replacement_char_string() -> String:
 
 law valid_one_byte_has_shape:
   for +byte: U32
-  for valid: {valid_one_byte(byte) == True{} : Bool}
+  for valid: {UTF8.valid_one_byte(byte) == True{} : Bool}
   {UTF8.has_one_byte_shape(byte) == True{} : Bool}
 
 # The scalar that a valid one-byte sequence encodes, or None.
 
 def one_byte_scalar.if(+byte: U32, valid: Bool,
-  -checked: {valid_one_byte(byte) == valid : Bool}) -> Maybe<&2, U32>:
+  -checked: {UTF8.valid_one_byte(byte) == valid : Bool}) -> Maybe<&2, U32>:
   match valid:
     case False{}:
       None{}
@@ -287,7 +284,7 @@ def one_byte_scalar.if(+byte: U32, valid: Bool,
       Some{UTF8.decode_one_byte(byte, valid_one_byte_has_shape(byte, checked))}
 
 def one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
-  one_byte_scalar.if(byte, valid_one_byte(byte), {==})
+  one_byte_scalar.if(byte, UTF8.valid_one_byte(byte), {==})
 
 # Since one of the conditions for a byte sequence to be valid is that
 # it has the right shape, if two bytes are a valid two-byte sequence,
