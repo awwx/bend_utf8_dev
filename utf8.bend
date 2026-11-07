@@ -136,13 +136,14 @@ def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
     case _:
       None{}
 
-# Whether some bytes, possibly none, can follow `seq` to make a valid
-# sequence.  Whether a lead byte can begin a two-byte sequence does not
-# depend on which continuation byte follows, so 0x80 stands for them all.
-def begins_valid_sequence(seq: List<&2, U32>) -> Bool:
+# Whether `seq` is a valid sequence prefix: one or more bytes that
+# some bytes, possibly none, can follow to make a valid sequence.
+# Whether a lead byte can begin a two-byte sequence does not depend on
+# which continuation byte follows, so 0x80 stands for them all.
+def is_valid_sequence_prefix(seq: List<&2, U32>) -> Bool:
   match seq:
     case Nil{}:
-      True{}
+      False{}
     case +b1 <> Nil{}:
       valid_one_byte(b1) || valid_two_bytes(b1, 128)
     case +b1 <> +b2 <> Nil{}:
@@ -176,14 +177,14 @@ def decode_buffer.advance(seq: List<&2, U32>, scalar: Maybe<&2, U32>,
 # start of one, or replaced.
 def decode_buffer.start(+b: U32) -> decode_buffer.Step():
   +seq = {[b] : List<&2, U32>}
-  decode_buffer.advance(seq, sequence_scalar(seq), begins_valid_sequence(seq),
+  decode_buffer.advance(seq, sequence_scalar(seq), is_valid_sequence_prefix(seq),
     u => (replacement_char_string(), Nil{}))
 
 # A byte after pending bytes.  If it cannot continue them, the pending
 # bytes are replaced and the byte starts afresh.
 def decode_buffer.extend(pending: List<&2, U32>, +b: U32) -> decode_buffer.Step():
   +seq = List.append(&2, U32, pending, [b])
-  decode_buffer.advance(seq, sequence_scalar(seq), begins_valid_sequence(seq),
+  decode_buffer.advance(seq, sequence_scalar(seq), is_valid_sequence_prefix(seq),
     u => decode_buffer.prepend(replacement_char_string(), decode_buffer.start(b)))
 
 def decode_buffer.step(pending: List<&2, U32>, +b: U32) -> decode_buffer.Step():

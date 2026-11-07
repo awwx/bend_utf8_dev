@@ -2846,64 +2846,66 @@ def bool_or_true(+a: Bool) -> {Bool.or(a, True{}) == True{} : Bool}:
     case False{}: {==}
     case True{}: {==}
 
-def BeginsCompletion(+seq: List<&2, U32>) -> Type:
+def PrefixCompletion(+seq: List<&2, U32>) -> Type:
   Exists(List<&2, U32>, rest =>
     {Laws.is_valid_sequence(List.append(&2, U32, seq, rest)) == True{} : Bool})
 
-# A single byte that begins a sequence is either valid by itself, or
-# completed by 0x80.
-def utf8_proof.begins_one(+b1: U32, one: Bool,
+# A single byte that is a valid sequence prefix is either valid by
+# itself, or completed by 0x80.
+def utf8_proof.prefix_one(+b1: U32, one: Bool,
   checked: {UTF8.valid_one_byte(b1) == one : Bool},
   begins: {Bool.or(one, UTF8.valid_two_bytes(b1, 128)) == True{} : Bool}) ->
-  BeginsCompletion([b1]):
+  PrefixCompletion([b1]):
   match one:
     case True{}: (Nil{}, checked)
     case False{}: ([128], begins)
 
-def utf8_proof.begins_completion(+seq: List<&2, U32>,
-  begins: {UTF8.begins_valid_sequence(seq) == True{} : Bool}) -> BeginsCompletion(seq):
+def utf8_proof.prefix_completion(+seq: List<&2, U32>,
+  begins: {UTF8.is_valid_sequence_prefix(seq) == True{} : Bool}) -> PrefixCompletion(seq):
   match seq:
     case Nil{}:
-      ([0], {==})
+      Empty.absurd(PrefixCompletion(Nil{}), H.hex_u32.false_true(begins))
     case +b1 <> Nil{}:
-      utf8_proof.begins_one(b1, UTF8.valid_one_byte(b1), {==}, begins)
+      utf8_proof.prefix_one(b1, UTF8.valid_one_byte(b1), {==}, begins)
     case +b1 <> +b2 <> Nil{}:
       (Nil{}, begins)
     case b1 <> b2 <> b3 <> rest:
-      Empty.absurd(BeginsCompletion(b1 <> b2 <> b3 <> rest), H.hex_u32.false_true(begins))
+      Empty.absurd(PrefixCompletion(b1 <> b2 <> b3 <> rest), H.hex_u32.false_true(begins))
 
-def utf8_proof.begins_from(+seq: List<&2, U32>, +rest: List<&2, U32>,
-  valid: {Laws.is_valid_sequence(List.append(&2, U32, seq, rest)) == True{} : Bool}) ->
-  {UTF8.begins_valid_sequence(seq) == True{} : Bool}:
-  match seq rest:
-    case Nil{} _:
-      {==}
-    case +b1 <> Nil{} Nil{}:
+def utf8_proof.prefix_from_valid(+b1: U32, +more: List<&2, U32>, +rest: List<&2, U32>,
+  valid: {Laws.is_valid_sequence(List.append(&2, U32, b1 <> more, rest)) == True{} : Bool}) ->
+  {UTF8.is_valid_sequence_prefix(b1 <> more) == True{} : Bool}:
+  match more rest:
+    case Nil{} Nil{}:
       %Equal.sym(Bool, UTF8.valid_one_byte(b1), True{}, valid) :
         {Bool.or(_, UTF8.valid_two_bytes(b1, 128)) == True{} : Bool}
       {==}
-    case +b1 <> Nil{} +b2 <> Nil{}:
+    case Nil{} +b2 <> Nil{}:
       +lead = utf8_proof.any_continuation(b1, b2, valid)
       %Equal.sym(Bool, UTF8.valid_two_bytes(b1, 128), True{}, lead) :
         {Bool.or(UTF8.valid_one_byte(b1), _) == True{} : Bool}
       bool_or_true(UTF8.valid_one_byte(b1))
-    case b1 <> Nil{} b2 <> b3 <> more:
-      Empty.absurd({UTF8.begins_valid_sequence([b1]) == True{} : Bool}, H.hex_u32.false_true(valid))
-    case +b1 <> +b2 <> Nil{} Nil{}:
+    case Nil{} b2 <> b3 <> after:
+      Empty.absurd({UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool}, H.hex_u32.false_true(valid))
+    case +b2 <> Nil{} Nil{}:
       valid
-    case b1 <> b2 <> Nil{} b3 <> more:
-      Empty.absurd({UTF8.begins_valid_sequence([b1, b2]) == True{} : Bool}, H.hex_u32.false_true(valid))
-    case b1 <> b2 <> b3 <> more _:
-      Empty.absurd({UTF8.begins_valid_sequence(b1 <> b2 <> b3 <> more) == True{} : Bool}, H.hex_u32.false_true(valid))
+    case b2 <> Nil{} b3 <> after:
+      Empty.absurd({UTF8.is_valid_sequence_prefix([b1, b2]) == True{} : Bool}, H.hex_u32.false_true(valid))
+    case b2 <> b3 <> after _:
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> b2 <> b3 <> after) == True{} : Bool}, H.hex_u32.false_true(valid))
 
-def utf8_proof.begins_from_completion(+seq: List<&2, U32>, completion: BeginsCompletion(seq)) ->
-  {UTF8.begins_valid_sequence(seq) == True{} : Bool}:
+def utf8_proof.prefix_from_completion(+b1: U32, +more: List<&2, U32>,
+  completion: PrefixCompletion(b1 <> more)) ->
+  {UTF8.is_valid_sequence_prefix(b1 <> more) == True{} : Bool}:
   (+rest, valid) = completion
-  utf8_proof.begins_from(seq, rest, valid)
+  utf8_proof.prefix_from_valid(b1, more, rest, valid)
 
-def Laws.utf8_begins_valid_sequence(seq):
-  (begins => utf8_proof.begins_completion(seq, begins),
-   completion => utf8_proof.begins_from_completion(seq, completion))
+def Laws.utf8_is_valid_sequence_prefix(b1, more):
+  (begins => utf8_proof.prefix_completion(b1 <> more, begins),
+   completion => utf8_proof.prefix_from_completion(b1, more, completion))
+
+def Laws.utf8_empty_not_valid_sequence_prefix():
+  {==}
 
 # The implementation's scalar functions agree with the specification's
 # --------------------------------------------------------------------
@@ -3141,26 +3143,36 @@ def utf8_proof.append_assoc(+x: List<&2, U32>, +y: List<&2, U32>, +z: List<&2, U
         {h <> List.append(&2, U32, List.append(&2, U32, t, y), z) == h <> _ : List<&2, U32>}
       {==}
 
-# Every prefix of bytes that begin a valid sequence begins one too, by
-# `utf8_begins_valid_sequence`.
+# Every non-empty prefix of a valid sequence prefix is one too, by
+# `utf8_is_valid_sequence_prefix`.
 def utf8_proof.valid_regroup(+x: List<&2, U32>, +y: List<&2, U32>, +z: List<&2, U32>,
   valid: {Laws.is_valid_sequence(List.append(&2, U32, List.append(&2, U32, x, y), z)) == True{} : Bool}) ->
   {Laws.is_valid_sequence(List.append(&2, U32, x, List.append(&2, U32, y, z))) == True{} : Bool}:
   %utf8_proof.append_assoc(x, y, z) : {Laws.is_valid_sequence(_) == True{} : Bool}
   valid
 
-def utf8_proof.begins_prefix.completion(+x: List<&2, U32>, +y: List<&2, U32>,
-  completion: BeginsCompletion(List.append(&2, U32, x, y))) ->
-  {UTF8.begins_valid_sequence(x) == True{} : Bool}:
+def utf8_proof.prefix_closed.completion(+x1: U32, +xs: List<&2, U32>, +y: List<&2, U32>,
+  completion: PrefixCompletion(List.append(&2, U32, x1 <> xs, y))) ->
+  {UTF8.is_valid_sequence_prefix(x1 <> xs) == True{} : Bool}:
   (+rest, valid) = completion
-  utf8_proof.begins_from_completion(x,
-    (List.append(&2, U32, y, rest), utf8_proof.valid_regroup(x, y, rest, valid)))
+  utf8_proof.prefix_from_completion(x1, xs,
+    (List.append(&2, U32, y, rest), utf8_proof.valid_regroup(x1 <> xs, y, rest, valid)))
 
-def utf8_proof.begins_prefix(+x: List<&2, U32>, +y: List<&2, U32>,
-  begins: {UTF8.begins_valid_sequence(List.append(&2, U32, x, y)) == True{} : Bool}) ->
-  {UTF8.begins_valid_sequence(x) == True{} : Bool}:
-  utf8_proof.begins_prefix.completion(x, y,
-    utf8_proof.begins_completion(List.append(&2, U32, x, y), begins))
+def utf8_proof.prefix_closed(+x1: U32, +xs: List<&2, U32>, +y: List<&2, U32>,
+  begins: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, x1 <> xs, y)) == True{} : Bool}) ->
+  {UTF8.is_valid_sequence_prefix(x1 <> xs) == True{} : Bool}:
+  utf8_proof.prefix_closed.completion(x1, xs, y,
+    utf8_proof.prefix_completion(List.append(&2, U32, x1 <> xs, y), begins))
+
+# `a` followed by `c` is non-empty, so prefix closure applies to it.
+def utf8_proof.prefix_closed_snoc(+a: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
+  begins: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, List.append(&2, U32, a, [c]), extra)) == True{} : Bool}) ->
+  {UTF8.is_valid_sequence_prefix(List.append(&2, U32, a, [c])) == True{} : Bool}:
+  match a:
+    case Nil{}:
+      utf8_proof.prefix_closed(c, Nil{}, extra, begins)
+    case +h <> +t:
+      utf8_proof.prefix_closed(h, List.append(&2, U32, t, [c]), extra, begins)
 
 # `a` is shorter than `b`, both prefixes of `bytes`: `b` is `a` followed
 # by `c` and more, and `c` is the byte after `a`.
@@ -3236,20 +3248,20 @@ def utf8_proof.longest_next(+a: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
   %next : Laws.maximal_subpart.not_extended_by(a, _)
   not_extended
 
-def utf8_proof.begins_regroup(+a: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
+def utf8_proof.prefix_regroup(+a: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
   +b: List<&2, U32>, eq: {b == List.append(&2, U32, a, c <> extra) : List<&2, U32>},
-  begins: {UTF8.begins_valid_sequence(b) == True{} : Bool}) ->
-  {UTF8.begins_valid_sequence(List.append(&2, U32, List.append(&2, U32, a, [c]), extra)) == True{} : Bool}:
+  begins: {UTF8.is_valid_sequence_prefix(b) == True{} : Bool}) ->
+  {UTF8.is_valid_sequence_prefix(List.append(&2, U32, List.append(&2, U32, a, [c]), extra)) == True{} : Bool}:
   %Equal.sym(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, a, [c]), extra),
       List.append(&2, U32, a, List.append(&2, U32, [c], extra)), utf8_proof.append_assoc(a, [c], extra)) :
-    {UTF8.begins_valid_sequence(_) == True{} : Bool}
-  %eq : {UTF8.begins_valid_sequence(_) == True{} : Bool}
+    {UTF8.is_valid_sequence_prefix(_) == True{} : Bool}
+  %eq : {UTF8.is_valid_sequence_prefix(_) == True{} : Bool}
   begins
 
-# A prefix that begins a valid sequence and is longer than `a`
-# contradicts `a` being the longest.
-def utf8_proof.longer_not_begins(+a: List<&2, U32>, +b: List<&2, U32>, +bytes: List<&2, U32>,
-  begins_b: {UTF8.begins_valid_sequence(b) == True{} : Bool},
+# A valid sequence prefix of `bytes` longer than `a` contradicts `a`
+# not being extended by the byte after it.
+def utf8_proof.longer_not_prefix(+a: List<&2, U32>, +b: List<&2, U32>, +bytes: List<&2, U32>,
+  begins_b: {UTF8.is_valid_sequence_prefix(b) == True{} : Bool},
   not_extended_a: Laws.maximal_subpart.not_extended_by(a, Laws.next_byte_after(bytes, a)),
   shorter: utf8_proof.Shorter(a, b, bytes)) -> Empty:
   (+c, more) = shorter
@@ -3257,14 +3269,14 @@ def utf8_proof.longer_not_begins(+a: List<&2, U32>, +b: List<&2, U32>, +bytes: L
   (eq, next) = facts
   +ac = List.append(&2, U32, a, [c])
   not_begins = utf8_proof.longest_next(a, bytes, c, next, not_extended_a)
-  begins_ac = utf8_proof.begins_prefix(ac, extra, utf8_proof.begins_regroup(a, c, extra, b, eq, begins_b))
-  utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence(ac), False{},
-    Equal.sym(Bool, UTF8.begins_valid_sequence(ac), True{}, begins_ac), not_begins))
+  begins_ac = utf8_proof.prefix_closed_snoc(a, c, extra, utf8_proof.prefix_regroup(a, c, extra, b, eq, begins_b))
+  utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.is_valid_sequence_prefix(ac), False{},
+    Equal.sym(Bool, UTF8.is_valid_sequence_prefix(ac), True{}, begins_ac), not_begins))
 
 def utf8_proof.sequence_prefix_unique.compared(+s1: List<&2, U32>, +s2: List<&2, U32>,
   +bytes: List<&2, U32>,
-  begins1: {UTF8.begins_valid_sequence(s1) == True{} : Bool},
-  begins2: {UTF8.begins_valid_sequence(s2) == True{} : Bool},
+  begins1: {UTF8.is_valid_sequence_prefix(s1) == True{} : Bool},
+  begins2: {UTF8.is_valid_sequence_prefix(s2) == True{} : Bool},
   not_extended1: Laws.maximal_subpart.not_extended_by(s1, Laws.next_byte_after(bytes, s1)),
   not_extended2: Laws.maximal_subpart.not_extended_by(s2, Laws.next_byte_after(bytes, s2)),
   compared: utf8_proof.Compared(s1, s2, bytes)) -> {s1 == s2 : List<&2, U32>}:
@@ -3273,13 +3285,13 @@ def utf8_proof.sequence_prefix_unique.compared(+s1: List<&2, U32>, +s2: List<&2,
       same
     case Inr{Inl{shorter}}:
       Empty.absurd({s1 == s2 : List<&2, U32>},
-        utf8_proof.longer_not_begins(s1, s2, bytes, begins2, not_extended1, shorter))
+        utf8_proof.longer_not_prefix(s1, s2, bytes, begins2, not_extended1, shorter))
     case Inr{Inr{shorter}}:
       Empty.absurd({s1 == s2 : List<&2, U32>},
-        utf8_proof.longer_not_begins(s2, s1, bytes, begins1, not_extended2, shorter))
+        utf8_proof.longer_not_prefix(s2, s1, bytes, begins1, not_extended2, shorter))
 
 def utf8_proof.sequence_prefix_unique(+b1: U32, +more: List<&2, U32>,
-  -first: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
+  -first: {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool},
   +s1: List<&2, U32>, +s2: List<&2, U32>,
   p1: Laws.maximal_subpart.sequence_prefix(b1, more, first, s1),
   p2: Laws.maximal_subpart.sequence_prefix(b1, more, first, s2)) -> {s1 == s2 : List<&2, U32>}:
@@ -3293,7 +3305,7 @@ def utf8_proof.sequence_prefix_unique(+b1: U32, +more: List<&2, U32>,
     utf8_proof.compare(s1, s2, b1 <> more, r1, r2, e1, e2))
 
 def utf8_proof.maximal_subpart_unique.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
-  -checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
+  -checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
   +s1: List<&2, U32>, +s2: List<&2, U32>,
   p1: Laws.maximal_subpart.if(b1, more, begins, checked, s1),
   p2: Laws.maximal_subpart.if(b1, more, begins, checked, s2)) -> {s1 == s2 : List<&2, U32>}:
@@ -3304,17 +3316,17 @@ def utf8_proof.maximal_subpart_unique.if(+b1: U32, +more: List<&2, U32>, begins:
       Equal.trans(List<&2, U32>, s1, [b1], s2, p1, Equal.sym(List<&2, U32>, s2, [b1], p2))
 
 def Laws.maximal_subpart_unique(b1, more, s1, s2, p1, p2):
-  utf8_proof.maximal_subpart_unique.if(b1, more, UTF8.begins_valid_sequence([b1]), {==},
+  utf8_proof.maximal_subpart_unique.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==},
     s1, s2, p1, p2)
 
 # Existence: scan forward from `[b1]`, extending the prefix while it
-# still begins a valid sequence.
+# is still a valid sequence prefix.
 
 # What `maximal_subpart.sequence_prefix` asks for, for any bytes.
 def utf8_proof.Longest(+bytes: List<&2, U32>) -> Type:
   Exists(List<&2, U32>, sub =>
     Laws.is_prefix(sub, bytes) &
-    {UTF8.begins_valid_sequence(sub) == True{} : Bool} &
+    {UTF8.is_valid_sequence_prefix(sub) == True{} : Bool} &
     Laws.maximal_subpart.not_extended_by(sub, Laws.next_byte_after(bytes, sub)))
 
 def utf8_proof.next_after_append(+s: List<&2, U32>, +r: List<&2, U32>) ->
@@ -3340,11 +3352,11 @@ def utf8_proof.longest_from_next(+s: List<&2, U32>, +bytes: List<&2, U32>,
   %same : Laws.maximal_subpart.not_extended_by(s, _)
   not_extended
 
-# `s` begins a valid sequence and `s` followed by `c` does not.
+# `s` is a valid sequence prefix and `s` followed by `c` is not.
 def utf8_proof.longest_stop(+s: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
   +r: List<&2, U32>, +e: {List.append(&2, U32, s, c <> r) == bytes : List<&2, U32>},
-  begins_s: {UTF8.begins_valid_sequence(s) == True{} : Bool},
-  not_more: {UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])) == False{} : Bool}) ->
+  begins_s: {UTF8.is_valid_sequence_prefix(s) == True{} : Bool},
+  not_more: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, s, [c])) == False{} : Bool}) ->
   utf8_proof.Longest(bytes):
   (s, ((c <> r, e), (begins_s,
     utf8_proof.longest_from_next(s, bytes, Some{c},
@@ -3360,20 +3372,20 @@ def utf8_proof.regroup_prefix(+s: List<&2, U32>, +c: U32, +r: List<&2, U32>,
 
 def utf8_proof.longest_step(+s: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
   +r: List<&2, U32>, +e: {List.append(&2, U32, s, c <> r) == bytes : List<&2, U32>},
-  begins_s: {UTF8.begins_valid_sequence(s) == True{} : Bool}, more: Bool,
-  checked: {UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])) == more : Bool},
-  longer: {UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])) == True{} : Bool} ->
+  begins_s: {UTF8.is_valid_sequence_prefix(s) == True{} : Bool}, more: Bool,
+  checked: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, s, [c])) == more : Bool},
+  longer: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, s, [c])) == True{} : Bool} ->
     utf8_proof.Longest(bytes)) ->
   utf8_proof.Longest(bytes):
   match more:
     case False{}: utf8_proof.longest_stop(s, bytes, c, r, e, begins_s, checked)
     case True{}: longer(checked)
 
-# `s` is a prefix of `bytes` that begins a valid sequence and `r` is the
+# `s` is a valid sequence prefix at the front of `bytes` and `r` is the
 # rest; some prefix at least as long is the longest.
 def utf8_proof.longest_from(+r: List<&2, U32>, +s: List<&2, U32>, +bytes: List<&2, U32>,
   +e: {List.append(&2, U32, s, r) == bytes : List<&2, U32>},
-  begins_s: {UTF8.begins_valid_sequence(s) == True{} : Bool}) ->
+  begins_s: {UTF8.is_valid_sequence_prefix(s) == True{} : Bool}) ->
   utf8_proof.Longest(bytes):
   match r:
     case Nil{}:
@@ -3384,19 +3396,19 @@ def utf8_proof.longest_from(+r: List<&2, U32>, +s: List<&2, U32>, +bytes: List<&
           Unit{}))))
     case +c <> +rest:
       utf8_proof.longest_step(s, bytes, c, rest, e, begins_s,
-        UTF8.begins_valid_sequence(List.append(&2, U32, s, [c])), {==},
+        UTF8.is_valid_sequence_prefix(List.append(&2, U32, s, [c])), {==},
         t => utf8_proof.longest_from(rest, List.append(&2, U32, s, [c]), bytes,
           utf8_proof.regroup_prefix(s, c, rest, bytes, e), t))
 
 def utf8_proof.maximal_subpart_exists.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
-  checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool}) ->
+  checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool}) ->
   Exists(List<&2, U32>, s => Laws.maximal_subpart.if(b1, more, begins, checked, s)):
   match begins:
     case True{}: utf8_proof.longest_from(more, [b1], b1 <> more, {==}, checked)
     case False{}: ([b1], {==})
 
 def Laws.maximal_subpart_exists(b1, more, invalid):
-  utf8_proof.maximal_subpart_exists.if(b1, more, UTF8.begins_valid_sequence([b1]), {==})
+  utf8_proof.maximal_subpart_exists.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==})
 
 def utf8_proof.append_cancel(+s: List<&2, U32>, +x: List<&2, U32>, +y: List<&2, U32>,
   +e: {List.append(&2, U32, s, x) == List.append(&2, U32, s, y) : List<&2, U32>}) ->
@@ -3468,13 +3480,13 @@ def utf8_proof.next_progress_at(+b1: U32, +more: List<&2, U32>,
 
 # The replaced result, given the maximal subpart: U+FFFD and the bytes
 # after the subpart, which its `is_prefix` clause supplies.  The subpart
-# is not empty, since `[b1]` begins a valid sequence and so `[]` is not
-# the longest; so the bytes after it are a suffix of `more`.
+# is not empty, since `[]` is not a valid sequence prefix; so the bytes
+# after it are a suffix of `more`.
 def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
-  checked: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
+  checked: {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool},
   +sub: List<&2, U32>, +rest: List<&2, U32>,
   +split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>},
-  facts: {UTF8.begins_valid_sequence(sub) == True{} : Bool} &
+  facts: {UTF8.is_valid_sequence_prefix(sub) == True{} : Bool} &
     Laws.maximal_subpart.not_extended_by(sub, Laws.next_byte_after(b1 <> more, sub))) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
@@ -3491,15 +3503,16 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
             {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
             {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
           utf8_proof.Progress(more, result)),
-        utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence([b1]), False{},
-          Equal.sym(Bool, UTF8.begins_valid_sequence([b1]), True{}, checked), not_extended)))
+        utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.is_valid_sequence_prefix(Nil{}), False{},
+          Equal.sym(Bool, UTF8.is_valid_sequence_prefix(Nil{}), True{}, begins_sub),
+          Laws.utf8_empty_not_valid_sequence_prefix())))
     case +s <> +ss:
       (Some{(Laws.replacement_char(), rest)},
         ((s <> ss, (rest, (((rest, split), facts), (split, {==})))),
          (ss, utf8_proof.cons_tail(s, b1, List.append(&2, U32, ss, rest), more, split))))
 
 def utf8_proof.replaced_from.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
-  checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
+  checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
   +sub: List<&2, U32>, maximal: Laws.maximal_subpart.if(b1, more, begins, checked, sub)) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
@@ -3521,7 +3534,7 @@ def utf8_proof.replaced_from(+b1: U32, +more: List<&2, U32>,
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Laws.decodes_first.replaced(b1, more, result) & utf8_proof.Progress(more, result)):
   (+sub, maximal) = found
-  utf8_proof.replaced_from.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, sub, maximal)
+  utf8_proof.replaced_from.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==}, sub, maximal)
 
 def utf8_proof.found_exists(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>,
@@ -3851,8 +3864,8 @@ def Laws.decodes_examples():
 # ---------------------------------------
 #
 # The decoder's byte loop, `UTF8.decode_buffer.bytes`, keeps pending
-# either nothing or one byte that begins a valid sequence without being
-# one.  Each step turns a decoding of what follows into a decoding of
+# either nothing or one byte that is a valid sequence prefix without
+# being a whole valid sequence.  Each step turns a decoding of what follows into a decoding of
 # the whole input; at the end, a pending byte is replaced.
 
 def utf8_proof.Pending(pending: List<&2, U32>) -> Type:
@@ -3860,7 +3873,7 @@ def utf8_proof.Pending(pending: List<&2, U32>) -> Type:
     case Nil{}:
       Unit
     case +p <> Nil{}:
-      {UTF8.begins_valid_sequence([p]) == True{} : Bool} &
+      {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool} &
       {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}
     case _:
       Empty
@@ -3896,11 +3909,11 @@ def utf8_proof.two_scalar_is(+b1: U32, +b2: U32, -m: Maybe<&2, U32>,
       utf8_proof.two_scalar_agrees(b1, b2, UTF8.valid_two_bytes(b1, b2), {==},
         UTF8.valid_two_bytes(b1, b2), {==}, {==})), e)
 
-def utf8_proof.begins_contra(+b: U32,
-  begins: {UTF8.begins_valid_sequence([b]) == True{} : Bool},
-  not_begins: {UTF8.begins_valid_sequence([b]) == False{} : Bool}) -> Empty:
-  utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence([b]), False{},
-    Equal.sym(Bool, UTF8.begins_valid_sequence([b]), True{}, begins), not_begins))
+def utf8_proof.prefix_contra(+b: U32,
+  begins: {UTF8.is_valid_sequence_prefix([b]) == True{} : Bool},
+  not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) -> Empty:
+  utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.is_valid_sequence_prefix([b]), False{},
+    Equal.sym(Bool, UTF8.is_valid_sequence_prefix([b]), True{}, begins), not_begins))
 
 # A reference scalar is None when its validity test cannot be True.
 def utf8_proof.one_scalar_none(+byte: U32, valid: Bool,
@@ -3919,18 +3932,18 @@ def utf8_proof.two_scalar_none(+b1: U32, +b2: U32, valid: Bool,
     case False{}: {==}
     case True{}: Empty.absurd({Laws.two_byte_scalar.if(b1, b2, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
 
-# A byte that begins no valid sequence is not one, nor the start of a
-# two-byte one.
-def utf8_proof.not_one(+b: U32, +not_begins: {UTF8.begins_valid_sequence([b]) == False{} : Bool}) ->
+# A byte that is not a valid sequence prefix is not a valid sequence,
+# nor the start of a two-byte one.
+def utf8_proof.not_one(+b: U32, +not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) ->
   {Laws.one_byte_scalar(b) == None{} : Maybe<&2, U32>}:
   utf8_proof.one_scalar_none(b, UTF8.valid_one_byte(b), {==},
-    valid => utf8_proof.begins_contra(b, utf8_proof.begins_from([b], Nil{}, valid), not_begins))
+    valid => utf8_proof.prefix_contra(b, utf8_proof.prefix_from_valid(b, Nil{}, Nil{}, valid), not_begins))
 
 def utf8_proof.not_two(+b: U32, +b2: U32,
-  +not_begins: {UTF8.begins_valid_sequence([b]) == False{} : Bool}) ->
+  +not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) ->
   {Laws.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}:
   utf8_proof.two_scalar_none(b, b2, UTF8.valid_two_bytes(b, b2), {==},
-    valid => utf8_proof.begins_contra(b, utf8_proof.begins_from([b], [b2], valid), not_begins))
+    valid => utf8_proof.prefix_contra(b, utf8_proof.prefix_from_valid(b, Nil{}, [b2], valid), not_begins))
 
 def utf8_proof.two_none_all(+b: U32, +rest: List<&2, U32>,
   none: @b2: U32 -> {Laws.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}) ->
@@ -3974,40 +3987,40 @@ def utf8_proof.next_two(+p: U32, +b: U32, +rest: List<&2, U32>, +cp: U32,
     {Laws.next_scalar.found(_, rest, r => None{}) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
   {==}
 
-# A byte that begins no valid sequence is its own maximal subpart.
+# A byte that is not a valid sequence prefix is its own maximal subpart.
 def utf8_proof.single_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
-  checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
-  not_begins: {UTF8.begins_valid_sequence([b1]) == False{} : Bool}) ->
+  checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
+  not_begins: {UTF8.is_valid_sequence_prefix([b1]) == False{} : Bool}) ->
   Laws.maximal_subpart.if(b1, more, begins, checked, [b1]):
   match begins:
     case False{}: {==}
     case True{}:
       Empty.absurd(Laws.maximal_subpart.sequence_prefix(b1, more, checked, [b1]),
-        utf8_proof.begins_contra(b1, checked, not_begins))
+        utf8_proof.prefix_contra(b1, checked, not_begins))
 
 def utf8_proof.single_subpart(+b1: U32, +more: List<&2, U32>,
-  not_begins: {UTF8.begins_valid_sequence([b1]) == False{} : Bool}) ->
+  not_begins: {UTF8.is_valid_sequence_prefix([b1]) == False{} : Bool}) ->
   Laws.maximal_subpart(b1, more, [b1]):
-  utf8_proof.single_subpart.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, not_begins)
+  utf8_proof.single_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==}, not_begins)
 
-# A byte that begins a valid sequence, which the next byte (if any)
+# A byte that is a valid sequence prefix, which the next byte (if any)
 # cannot continue, is its own maximal subpart.
 def utf8_proof.lead_subpart.if(+p: U32, +more: List<&2, U32>, begins: Bool,
-  checked: {UTF8.begins_valid_sequence([p]) == begins : Bool},
-  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  checked: {UTF8.is_valid_sequence_prefix([p]) == begins : Bool},
+  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
   not_extended: Laws.maximal_subpart.not_extended_by([p], Laws.next_byte_after(p <> more, [p]))) ->
   Laws.maximal_subpart.if(p, more, begins, checked, [p]):
   match begins:
     case True{}: ((more, {==}), (lead, not_extended))
     case False{}:
       Empty.absurd(Laws.maximal_subpart.single_byte(p, more, checked, [p]),
-        utf8_proof.begins_contra(p, lead, checked))
+        utf8_proof.prefix_contra(p, lead, checked))
 
 def utf8_proof.lead_subpart(+p: U32, +more: List<&2, U32>,
-  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
   not_extended: Laws.maximal_subpart.not_extended_by([p], Laws.next_byte_after(p <> more, [p]))) ->
   Laws.maximal_subpart(p, more, [p]):
-  utf8_proof.lead_subpart.if(p, more, UTF8.begins_valid_sequence([p]), {==}, lead, not_extended)
+  utf8_proof.lead_subpart.if(p, more, UTF8.is_valid_sequence_prefix([p]), {==}, lead, not_extended)
 
 def utf8_proof.first_found(+b1: U32, +more: List<&2, U32>, -x: U32 & List<&2, U32>,
   e: {Laws.next_scalar(b1 <> more) == Some{x} : Maybe<&1, U32 & List<&2, U32>>}) ->
@@ -4029,7 +4042,7 @@ def utf8_proof.first_replaced(+b1: U32, +more: List<&2, U32>, +sub: List<&2, U32
 # A step with nothing pending.
 def utf8_proof.start_ok.if(+b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
   scalar_is: {UTF8.sequence_scalar([b]) == scalar : Maybe<&2, U32>}, begins: Bool,
-  +begins_is: {UTF8.begins_valid_sequence([b]) == begins : Bool}) ->
+  +begins_is: {UTF8.is_valid_sequence_prefix([b]) == begins : Bool}) ->
   utf8_proof.StepOK(Nil{}, b, rest, UTF8.decode_buffer.advance([b], scalar, begins,
     u => (UTF8.replacement_char_string(), Nil{}))):
   match scalar begins:
@@ -4049,15 +4062,15 @@ def utf8_proof.start_ok.if(+b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>
 def utf8_proof.start_ok(+b: U32, +rest: List<&2, U32>) ->
   utf8_proof.StepOK(Nil{}, b, rest, UTF8.decode_buffer.start(b)):
   utf8_proof.start_ok.if(b, rest, UTF8.sequence_scalar([b]), {==},
-    UTF8.begins_valid_sequence([b]), {==})
+    UTF8.is_valid_sequence_prefix([b]), {==})
 
 # The pending byte cannot be continued: it is replaced, and the new byte
 # starts afresh.
 def utf8_proof.extend_fail(+p: U32, +b: U32, +rest: List<&2, U32>,
   s: UTF8.decode_buffer.Step(), started: utf8_proof.StepOK(Nil{}, b, rest, s),
-  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
   one: {Laws.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
-  not_begins: {UTF8.begins_valid_sequence([p, b]) == False{} : Bool},
+  not_begins: {UTF8.is_valid_sequence_prefix([p, b]) == False{} : Bool},
   two: {Laws.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
   utf8_proof.StepOK([p], b, rest,
     UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), s)):
@@ -4082,7 +4095,7 @@ def utf8_proof.two_valid_some(+p: U32, +b: U32, valid: Bool,
 # A step with one byte pending.
 def utf8_proof.extend_ok.if(+p: U32, +b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
   scalar_is: {UTF8.sequence_scalar([p, b]) == scalar : Maybe<&2, U32>}, begins: Bool,
-  begins_is: {UTF8.begins_valid_sequence([p, b]) == begins : Bool},
+  begins_is: {UTF8.is_valid_sequence_prefix([p, b]) == begins : Bool},
   pending: utf8_proof.Pending([p])) ->
   utf8_proof.StepOK([p], b, rest, UTF8.decode_buffer.advance([p, b], scalar, begins,
     u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(b)))):
@@ -4110,7 +4123,7 @@ def utf8_proof.step_ok(+pending: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
       utf8_proof.start_ok(b, rest)
     case +p <> Nil{}:
       utf8_proof.extend_ok.if(p, b, rest, UTF8.sequence_scalar([p, b]), {==},
-        UTF8.begins_valid_sequence([p, b]), {==}, invariant)
+        UTF8.is_valid_sequence_prefix([p, b]), {==}, invariant)
     case p <> q <> more:
       Empty.absurd(utf8_proof.StepOK(p <> q <> more, b, rest, UTF8.decode_buffer.step(p <> q <> more, b)),
         invariant)
@@ -4396,7 +4409,7 @@ def utf8_proof.lead_two.if(+p: U32, one: Bool, -checked: {UTF8.valid_one_byte(p)
           UTF8.one_byte_scalar.if(p, True{}, checked), None{}, alone)))
 
 def utf8_proof.lead_two(+p: U32,
-  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
   alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}) ->
   {UTF8.valid_two_bytes(p, 128) == True{} : Bool}:
   utf8_proof.lead_two.if(p, UTF8.valid_one_byte(p), {==}, lead, alone)
@@ -4429,7 +4442,7 @@ def utf8_proof.two_after.if(+p: U32, valid: Bool, +checked: {UTF8.valid_two_byte
 # With `p` pending, the continuation 0x80 gives one character, at most
 # 2047.
 def utf8_proof.two_after(+p: U32,
-  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
   alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}) ->
   Exists(U32, cp =>
     {utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])) == SCon{Chr{cp}, SNil{}} : String} &
@@ -4465,7 +4478,7 @@ def utf8_proof.prompt.large(+bytes: List<&2, U32>, +text: String, +c: U32, +t: S
 
 def utf8_proof.prompt.lead(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32,
   +same: {t == text : String},
-  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
   alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>},
   split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
     t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, [p]))),
