@@ -139,11 +139,13 @@ law utf8_has_two_byte_shape:
   ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
+## Encoding is bijective
 
-
-# We require that `encode_as_one_byte` be bijective between accepted
-# code points and bytes satisfying `has_one_byte_shape`, and we specify
-# that `decode_one_byte` is exactly its inverse.
+# Each encode_as_N_byte is bijective, and decode_N_byte is exactly its
+# inverse.
+#
+# For a code point which *can be* encoded as the specified number of
+# bytes, we can roundtrip `decode(encode(cp)) == cp` and vice versa.
 
 law utf8_one_byte_inverse:
   Func.Bijection(U32, U32,
@@ -151,6 +153,15 @@ law utf8_one_byte_inverse:
     byte => UTF8.has_one_byte_shape(byte),
     cp => valid => UTF8.encode_as_one_byte(cp, valid),
     byte => valid => UTF8.decode_one_byte(byte, valid))
+
+law utf8_two_byte_inverse:
+  Func.Bijection(U32, U32 & U32,
+    cp => UTF8.can_encode_as_two_bytes(cp),
+    p => UTF8.has_two_byte_shape(B.first(p), B.second(p)),
+    cp => valid => UTF8.encode_as_two_bytes(cp, valid),
+    p => valid => UTF8.decode_two_bytes(B.first(p), B.second(p), valid))
+
+
 
 # No one-byte encoding is overlong.
 
@@ -185,18 +196,6 @@ law utf8_valid_one_byte:
 # a UTF-8 two-byte shape (as specified by two_byte_shape above),
 # `UTF8.encode_as_two_bytes` returns the two bytes of the shape
 # directly as U32 values without needing to use a Maybe.
-
-# We require that `encode_as_two_bytes` be bijective between accepted
-# code points and byte pairs satisfying `has_two_byte_shape`, and we
-# specify that `decode_two_bytes` is exactly its inverse.  A pair `p`
-# stands for its bytes `B.first(p)` and `B.second(p)`.
-
-law utf8_two_byte_inverse:
-  Func.Bijection(U32, U32 & U32,
-    cp => UTF8.can_encode_as_two_bytes(cp),
-    p => UTF8.has_two_byte_shape(B.first(p), B.second(p)),
-    cp => valid => UTF8.encode_as_two_bytes(cp, valid),
-    p => valid => UTF8.decode_two_bytes(B.first(p), B.second(p), valid))
 
 # Overlong means that the decoded code point fits in one byte.
 law utf8_overlong_two_bytes:
