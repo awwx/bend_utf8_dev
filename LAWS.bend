@@ -381,47 +381,16 @@ def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
 # In the second case the prefix stops short of a whole sequence:
 # either the input ends after it, or the next byte cannot extend it.
 
-
-# Streaming decoding
-# ==================
+# A relation saying that `subpart` cannot be extended by `next`, the
+# single byte after it in the input, if any: either there is no next
+# byte, or `subpart` followed by `next` is not a valid sequence
+# prefix.
 #
-# `UTF8.decode_start()` is the decoder state before any input.
-# `UTF8.decode_buffer(state, buffer)` takes the next buffer of bytes and
-# returns the new state and the text that is now fully resolved.
-# `UTF8.decode_done(state)` returns the text that ends the input.  The
-# state type, `UTF8.DecodeState()`, is the implementation's choice: the
-# laws below only describe the text that comes out.
-#
-# Ill-formed input is replaced as the Unicode Standard recommends (§3.9,
-# "U+FFFD Substitution of Maximal Subparts"): each maximal subpart, the
-# longest run of bytes that begins some valid sequence or else a single
-# byte, becomes one U+FFFD.
+# By itself this doesn't say that a valid sequence prefix couldn't be
+# formed by adding *more* bytes from the input; that will be covered
+# next.
 
-def code_point_to_string(cp: U32) -> String:
-  SCon{Chr{cp}, SNil{}}
-
-# U+FFFD REPLACEMENT CHARACTER.
-
-def replacement_char() -> U32:
-  H.hex_u32("FFFD", {==})
-
-# U+FFFD REPLACEMENT CHARACTER, as a one-character string.
-
-def replacement_char_string() -> String:
-  code_point_to_string(replacement_char())
-
-# Valid sequences
-# ---------------
-
-
-
-
-
-
-
-# `subpart` cannot be extended by `next`, the byte after it, if any.
-
-def maximal_subpart.longest(subpart: List<&2, U32>, next: Maybe<&2, U32>) -> Type:
+def maximal_subpart.not_extended_by(subpart: List<&2, U32>, next: Maybe<&2, U32>) -> Type:
   match next:
     case None{}:
       Unit
@@ -445,7 +414,7 @@ def maximal_subpart.sequence_prefix(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
   is_prefix(subpart, b1 <> more) &
   {UTF8.begins_valid_sequence(subpart) == True{} : Bool} &
-  maximal_subpart.longest(subpart, next_byte_after(b1 <> more, subpart))
+  maximal_subpart.not_extended_by(subpart, next_byte_after(b1 <> more, subpart))
 
 # The maximal subpart when the first byte begins no valid sequence:
 # `subpart` is that byte alone.  (Unicode's "subsequence of length one".)
@@ -494,6 +463,43 @@ law maximal_subpart_unique:
   for p1: maximal_subpart(b1, more, s1)
   for p2: maximal_subpart(b1, more, s2)
   {s1 == s2 : List<&2, U32>}
+
+
+
+
+
+# Streaming decoding
+# ==================
+#
+# `UTF8.decode_start()` is the decoder state before any input.
+# `UTF8.decode_buffer(state, buffer)` takes the next buffer of bytes and
+# returns the new state and the text that is now fully resolved.
+# `UTF8.decode_done(state)` returns the text that ends the input.  The
+# state type, `UTF8.DecodeState()`, is the implementation's choice: the
+# laws below only describe the text that comes out.
+#
+# Ill-formed input is replaced as the Unicode Standard recommends (§3.9,
+# "U+FFFD Substitution of Maximal Subparts"): each maximal subpart, the
+# longest run of bytes that begins some valid sequence or else a single
+# byte, becomes one U+FFFD.
+
+def code_point_to_string(cp: U32) -> String:
+  SCon{Chr{cp}, SNil{}}
+
+# U+FFFD REPLACEMENT CHARACTER.
+
+def replacement_char() -> U32:
+  H.hex_u32("FFFD", {==})
+
+# U+FFFD REPLACEMENT CHARACTER, as a one-character string.
+
+def replacement_char_string() -> String:
+  code_point_to_string(replacement_char())
+
+
+
+
+
 
 # Decoding the first code point of a complete buffer
 # --------------------------------------------------

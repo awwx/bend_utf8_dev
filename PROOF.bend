@@ -3231,10 +3231,10 @@ def utf8_proof.compare(+s1: List<&2, U32>, +s2: List<&2, U32>, +bytes: List<&2, 
 
 def utf8_proof.longest_next(+a: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
   next: {Laws.next_byte_after(bytes, a) == Some{c} : Maybe<&2, U32>},
-  longest: Laws.maximal_subpart.longest(a, Laws.next_byte_after(bytes, a))) ->
-  Laws.maximal_subpart.longest(a, Some{c}):
-  %next : Laws.maximal_subpart.longest(a, _)
-  longest
+  not_extended: Laws.maximal_subpart.not_extended_by(a, Laws.next_byte_after(bytes, a))) ->
+  Laws.maximal_subpart.not_extended_by(a, Some{c}):
+  %next : Laws.maximal_subpart.not_extended_by(a, _)
+  not_extended
 
 def utf8_proof.begins_regroup(+a: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
   +b: List<&2, U32>, eq: {b == List.append(&2, U32, a, c <> extra) : List<&2, U32>},
@@ -3250,13 +3250,13 @@ def utf8_proof.begins_regroup(+a: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
 # contradicts `a` being the longest.
 def utf8_proof.longer_not_begins(+a: List<&2, U32>, +b: List<&2, U32>, +bytes: List<&2, U32>,
   begins_b: {UTF8.begins_valid_sequence(b) == True{} : Bool},
-  longest_a: Laws.maximal_subpart.longest(a, Laws.next_byte_after(bytes, a)),
+  not_extended_a: Laws.maximal_subpart.not_extended_by(a, Laws.next_byte_after(bytes, a)),
   shorter: utf8_proof.Shorter(a, b, bytes)) -> Empty:
   (+c, more) = shorter
   (+extra, facts) = more
   (eq, next) = facts
   +ac = List.append(&2, U32, a, [c])
-  not_begins = utf8_proof.longest_next(a, bytes, c, next, longest_a)
+  not_begins = utf8_proof.longest_next(a, bytes, c, next, not_extended_a)
   begins_ac = utf8_proof.begins_prefix(ac, extra, utf8_proof.begins_regroup(a, c, extra, b, eq, begins_b))
   utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence(ac), False{},
     Equal.sym(Bool, UTF8.begins_valid_sequence(ac), True{}, begins_ac), not_begins))
@@ -3265,18 +3265,18 @@ def utf8_proof.sequence_prefix_unique.compared(+s1: List<&2, U32>, +s2: List<&2,
   +bytes: List<&2, U32>,
   begins1: {UTF8.begins_valid_sequence(s1) == True{} : Bool},
   begins2: {UTF8.begins_valid_sequence(s2) == True{} : Bool},
-  longest1: Laws.maximal_subpart.longest(s1, Laws.next_byte_after(bytes, s1)),
-  longest2: Laws.maximal_subpart.longest(s2, Laws.next_byte_after(bytes, s2)),
+  not_extended1: Laws.maximal_subpart.not_extended_by(s1, Laws.next_byte_after(bytes, s1)),
+  not_extended2: Laws.maximal_subpart.not_extended_by(s2, Laws.next_byte_after(bytes, s2)),
   compared: utf8_proof.Compared(s1, s2, bytes)) -> {s1 == s2 : List<&2, U32>}:
   match compared:
     case Inl{same}:
       same
     case Inr{Inl{shorter}}:
       Empty.absurd({s1 == s2 : List<&2, U32>},
-        utf8_proof.longer_not_begins(s1, s2, bytes, begins2, longest1, shorter))
+        utf8_proof.longer_not_begins(s1, s2, bytes, begins2, not_extended1, shorter))
     case Inr{Inr{shorter}}:
       Empty.absurd({s1 == s2 : List<&2, U32>},
-        utf8_proof.longer_not_begins(s2, s1, bytes, begins1, longest2, shorter))
+        utf8_proof.longer_not_begins(s2, s1, bytes, begins1, not_extended2, shorter))
 
 def utf8_proof.sequence_prefix_unique(+b1: U32, +more: List<&2, U32>,
   -first: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
@@ -3285,11 +3285,11 @@ def utf8_proof.sequence_prefix_unique(+b1: U32, +more: List<&2, U32>,
   p2: Laws.maximal_subpart.sequence_prefix(b1, more, first, s2)) -> {s1 == s2 : List<&2, U32>}:
   (prefix1, facts1) = p1
   (+r1, e1) = prefix1
-  (begins1, longest1) = facts1
+  (begins1, not_extended1) = facts1
   (prefix2, facts2) = p2
   (+r2, e2) = prefix2
-  (begins2, longest2) = facts2
-  utf8_proof.sequence_prefix_unique.compared(s1, s2, b1 <> more, begins1, begins2, longest1, longest2,
+  (begins2, not_extended2) = facts2
+  utf8_proof.sequence_prefix_unique.compared(s1, s2, b1 <> more, begins1, begins2, not_extended1, not_extended2,
     utf8_proof.compare(s1, s2, b1 <> more, r1, r2, e1, e2))
 
 def utf8_proof.maximal_subpart_unique.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
@@ -3315,7 +3315,7 @@ def utf8_proof.Longest(+bytes: List<&2, U32>) -> Type:
   Exists(List<&2, U32>, sub =>
     Laws.is_prefix(sub, bytes) &
     {UTF8.begins_valid_sequence(sub) == True{} : Bool} &
-    Laws.maximal_subpart.longest(sub, Laws.next_byte_after(bytes, sub)))
+    Laws.maximal_subpart.not_extended_by(sub, Laws.next_byte_after(bytes, sub)))
 
 def utf8_proof.next_after_append(+s: List<&2, U32>, +r: List<&2, U32>) ->
   {Laws.next_byte_after(List.append(&2, U32, s, r), s) == List.head(&2, U32, r) : Maybe<&2, U32>}:
@@ -3335,10 +3335,10 @@ def utf8_proof.next_after(+s: List<&2, U32>, +r: List<&2, U32>, +bytes: List<&2,
 
 def utf8_proof.longest_from_next(+s: List<&2, U32>, +bytes: List<&2, U32>,
   -next: Maybe<&2, U32>, same: {next == Laws.next_byte_after(bytes, s) : Maybe<&2, U32>},
-  longest: Laws.maximal_subpart.longest(s, next)) ->
-  Laws.maximal_subpart.longest(s, Laws.next_byte_after(bytes, s)):
-  %same : Laws.maximal_subpart.longest(s, _)
-  longest
+  not_extended: Laws.maximal_subpart.not_extended_by(s, next)) ->
+  Laws.maximal_subpart.not_extended_by(s, Laws.next_byte_after(bytes, s)):
+  %same : Laws.maximal_subpart.not_extended_by(s, _)
+  not_extended
 
 # `s` begins a valid sequence and `s` followed by `c` does not.
 def utf8_proof.longest_stop(+s: List<&2, U32>, +bytes: List<&2, U32>, +c: U32,
@@ -3475,7 +3475,7 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
   +sub: List<&2, U32>, +rest: List<&2, U32>,
   +split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>},
   facts: {UTF8.begins_valid_sequence(sub) == True{} : Bool} &
-    Laws.maximal_subpart.longest(sub, Laws.next_byte_after(b1 <> more, sub))) ->
+    Laws.maximal_subpart.not_extended_by(sub, Laws.next_byte_after(b1 <> more, sub))) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
       Laws.maximal_subpart.sequence_prefix(b1, more, checked, subpart) &
@@ -3484,7 +3484,7 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
     utf8_proof.Progress(more, result)):
   match sub:
     case Nil{}:
-      (begins_sub, longest) = facts
+      (begins_sub, not_extended) = facts
       Empty.absurd(Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
           Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
             Laws.maximal_subpart.sequence_prefix(b1, more, checked, subpart) &
@@ -3492,7 +3492,7 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
             {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
           utf8_proof.Progress(more, result)),
         utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence([b1]), False{},
-          Equal.sym(Bool, UTF8.begins_valid_sequence([b1]), True{}, checked), longest)))
+          Equal.sym(Bool, UTF8.begins_valid_sequence([b1]), True{}, checked), not_extended)))
     case +s <> +ss:
       (Some{(Laws.replacement_char(), rest)},
         ((s <> ss, (rest, (((rest, split), facts), (split, {==})))),
@@ -3995,19 +3995,19 @@ def utf8_proof.single_subpart(+b1: U32, +more: List<&2, U32>,
 def utf8_proof.lead_subpart.if(+p: U32, +more: List<&2, U32>, begins: Bool,
   checked: {UTF8.begins_valid_sequence([p]) == begins : Bool},
   lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
-  longest: Laws.maximal_subpart.longest([p], Laws.next_byte_after(p <> more, [p]))) ->
+  not_extended: Laws.maximal_subpart.not_extended_by([p], Laws.next_byte_after(p <> more, [p]))) ->
   Laws.maximal_subpart.if(p, more, begins, checked, [p]):
   match begins:
-    case True{}: ((more, {==}), (lead, longest))
+    case True{}: ((more, {==}), (lead, not_extended))
     case False{}:
       Empty.absurd(Laws.maximal_subpart.single_byte(p, more, checked, [p]),
         utf8_proof.begins_contra(p, lead, checked))
 
 def utf8_proof.lead_subpart(+p: U32, +more: List<&2, U32>,
   lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
-  longest: Laws.maximal_subpart.longest([p], Laws.next_byte_after(p <> more, [p]))) ->
+  not_extended: Laws.maximal_subpart.not_extended_by([p], Laws.next_byte_after(p <> more, [p]))) ->
   Laws.maximal_subpart(p, more, [p]):
-  utf8_proof.lead_subpart.if(p, more, UTF8.begins_valid_sequence([p]), {==}, lead, longest)
+  utf8_proof.lead_subpart.if(p, more, UTF8.begins_valid_sequence([p]), {==}, lead, not_extended)
 
 def utf8_proof.first_found(+b1: U32, +more: List<&2, U32>, -x: U32 & List<&2, U32>,
   e: {Laws.next_scalar(b1 <> more) == Some{x} : Maybe<&1, U32 & List<&2, U32>>}) ->
