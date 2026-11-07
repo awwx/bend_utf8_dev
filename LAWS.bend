@@ -367,6 +367,20 @@ def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
       next_byte_after(rest, ps)
 
 
+## Maximal subparts
+
+# Where the bytes being decoded do not begin with a valid sequence,
+# the "maximal subpart" at their front is the run of bytes replaced by
+# one U+FFFD (Unicode §3.9).  It is either:
+#
+# * the first byte alone, when it cannot begin any valid sequence; or,
+#
+# * the longest prefix that *could* begin a valid sequence, when the
+#   first byte can begin one.
+#
+# In the second case the prefix stops short of a whole sequence:
+# either the input ends after it, or the next byte cannot extend it.
+
 
 # Streaming decoding
 # ==================
@@ -404,8 +418,6 @@ def replacement_char_string() -> String:
 
 
 
-# Maximal subparts
-# ----------------
 
 # `subpart` cannot be extended by `next`, the byte after it, if any.
 
