@@ -6,6 +6,9 @@ import ./binary_LAWS.bend as BinaryLaws
 import ./hexdigits.bend as H
 import ./func_LAWS.bend as Func
 
+
+## Surrogate code points
+
 # Surrogate code points are U+D800..U+DFFF.
 
 def is_surrogate_code_point(+cp: U32) -> Bool:
@@ -20,6 +23,9 @@ law is_surrogate_code_point_examples:
   {is_surrogate_code_point(H.hex_u32("DFFF", {==})) == True{} : Bool} &
   {is_surrogate_code_point(H.hex_u32("E000", {==})) == False{} : Bool}
 
+
+## Unicode scalars
+
 # A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
 # surrogate code points.
 
@@ -27,6 +33,9 @@ def is_unicode_scalar(+cp: U32) -> Bool:
   U32.is_ge(cp, H.hex_u32("000000", {==})) &&
   U32.is_le(cp, H.hex_u32("10FFFF", {==})) &&
   Bool.not(is_surrogate_code_point(cp))
+
+
+## Byte shapes
 
 # By a "byte shape" we mean a series of bytes that has the correct bit
 # pattern for a UTF-8 encoding.  This includes invalid UTF-8 encodings
