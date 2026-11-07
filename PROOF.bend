@@ -3889,18 +3889,18 @@ def utf8_proof.suffix_trans(+xs: List<&2, U32>, +ys: List<&2, U32>, +zs: List<&2
 # for what follows it.
 def utf8_proof.decodes_cons(+bytes: List<&2, U32>, +cp: U32, +rest: List<&2, U32>,
   decoded: Laws.decodes_first(bytes, Some{(cp, rest)}),
-  tail: Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
-  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, bytes)):
-  (+cps, decoded_rest) = tail
-  (cp <> cps, (rest, (decoded, decoded_rest)))
+  tail: Exists(String, text => Laws.decodes.go(text, rest))) ->
+  Exists(String, text => Laws.decodes.go(text, bytes)):
+  (+more, decoded_rest) = tail
+  (SCon{Chr{cp}, more}, (rest, (decoded, decoded_rest)))
 
 def utf8_proof.decodes_exists.pair(+fs: List<&2, U32>, +b1: U32, +more: List<&2, U32>,
   more_fs: utf8_proof.Suffix(more, fs), p: U32 & List<&2, U32>,
   decoded: Laws.decodes_first(b1 <> more, Some{p}),
   progress: utf8_proof.Progress.pair(more, p),
   recurse: @rest: List<&2, U32> -> utf8_proof.Suffix(rest, fs) ->
-    Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
-  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)):
+    Exists(String, text => Laws.decodes.go(text, rest))) ->
+  Exists(String, text => Laws.decodes.go(text, b1 <> more)):
   (+cp, +rest) = p
   utf8_proof.decodes_cons(b1 <> more, cp, rest, decoded,
     recurse(rest, utf8_proof.suffix_trans(rest, more, fs, progress, more_fs)))
@@ -3910,11 +3910,11 @@ def utf8_proof.decodes_exists.result(+fs: List<&2, U32>, +b1: U32, +more: List<&
   decoded: Laws.decodes_first(b1 <> more, result),
   progress: utf8_proof.Progress(more, result),
   recurse: @rest: List<&2, U32> -> utf8_proof.Suffix(rest, fs) ->
-    Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
-  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)):
+    Exists(String, text => Laws.decodes.go(text, rest))) ->
+  Exists(String, text => Laws.decodes.go(text, b1 <> more)):
   match result:
     case None{}:
-      (Nil{}, decoded)
+      (SNil{}, decoded)
     case Some{p}:
       utf8_proof.decodes_exists.pair(fs, b1, more, more_fs, p, decoded, progress, recurse)
 
@@ -3923,20 +3923,20 @@ def utf8_proof.decodes_exists.step(+fs: List<&2, U32>, +b1: U32, +more: List<&2,
   first: Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Laws.decodes_first(b1 <> more, result) & utf8_proof.Progress(more, result)),
   recurse: @rest: List<&2, U32> -> utf8_proof.Suffix(rest, fs) ->
-    Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
-  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)):
+    Exists(String, text => Laws.decodes.go(text, rest))) ->
+  Exists(String, text => Laws.decodes.go(text, b1 <> more)):
   (result, both) = first
   (decoded, progress) = both
   utf8_proof.decodes_exists.result(fs, b1, more, more_fs, result, decoded, progress, recurse)
 
 def utf8_proof.decodes_exists.go(+fuel: List<&2, U32>, +bytes: List<&2, U32>,
   suffix: utf8_proof.Suffix(bytes, fuel)) ->
-  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, bytes)):
+  Exists(String, text => Laws.decodes.go(text, bytes)):
   match fuel bytes:
     case _ Nil{}:
-      (Nil{}, {==})
+      (SNil{}, {==})
     case Nil{} +b1 <> +more:
-      Empty.absurd(Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)),
+      Empty.absurd(Exists(String, text => Laws.decodes.go(text, b1 <> more)),
         utf8_proof.suffix_nil_absurd(b1, more, suffix))
     case +f <> +fs +b1 <> +more:
       utf8_proof.decodes_exists.step(fs, b1, more,
@@ -3975,50 +3975,57 @@ def utf8_proof.none_some(+c: U32, +r: List<&2, U32>,
   H.hex_u32.false_true(Equal.cong(Maybe<&1, U32 & List<&2, U32>>, Bool,
     m => Maybe.is_some(&1, U32 & List<&2, U32>, m), None{}, Some{(c, r)}, e))
 
-def utf8_proof.decodes_at(+scalars: List<&2, U32>, +from: List<&2, U32>, +to: List<&2, U32>,
-  same: {from == to : List<&2, U32>}, decoded: Laws.decodes.go(scalars, from)) ->
-  Laws.decodes.go(scalars, to):
-  %same : Laws.decodes.go(scalars, _)
+def utf8_proof.decodes_at(+text: String, +from: List<&2, U32>, +to: List<&2, U32>,
+  same: {from == to : List<&2, U32>}, decoded: Laws.decodes.go(text, from)) ->
+  Laws.decodes.go(text, to):
+  %same : Laws.decodes.go(text, _)
   decoded
 
-def utf8_proof.decodes_unique.cons(+c1: U32, +c2: U32, +t1: List<&2, U32>, +t2: List<&2, U32>,
+def utf8_proof.scon_eq(+c1: U32, +c2: U32, +t1: String, +t2: String,
+  ec: {c1 == c2 : U32}, et: {t1 == t2 : String}) ->
+  {SCon{Chr{c1}, t1} == SCon{Chr{c2}, t2} : String}:
+  %ec : {SCon{Chr{c1}, t1} == SCon{Chr{_}, t2} : String}
+  %et : {SCon{Chr{c1}, t1} == SCon{Chr{c1}, _} : String}
+  {==}
+
+def utf8_proof.decodes_unique.cons(+c1: U32, +c2: U32, +t1: String, +t2: String,
   +r1: List<&2, U32>, +r2: List<&2, U32>,
   +e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>},
   g2: Laws.decodes.go(t2, r2),
-  tails: Laws.decodes.go(t2, r1) -> {t1 == t2 : List<&2, U32>}) ->
-  {c1 <> t1 == c2 <> t2 : List<&2, U32>}:
-  utf8_proof.cons_eq(c1, c2, t1, t2, utf8_proof.some_first(c1, c2, r1, r2, e),
+  tails: Laws.decodes.go(t2, r1) -> {t1 == t2 : String}) ->
+  {SCon{Chr{c1}, t1} == SCon{Chr{c2}, t2} : String}:
+  utf8_proof.scon_eq(c1, c2, t1, t2, utf8_proof.some_first(c1, c2, r1, r2, e),
     tails(utf8_proof.decodes_at(t2, r2, r1,
       Equal.sym(List<&2, U32>, r1, r2, utf8_proof.some_rest(c1, c2, r1, r2, e)), g2)))
 
-def utf8_proof.decodes_unique.go(+s1: List<&2, U32>, +s2: List<&2, U32>, +bytes: List<&2, U32>,
-  d1: Laws.decodes.go(s1, bytes), d2: Laws.decodes.go(s2, bytes)) -> {s1 == s2 : List<&2, U32>}:
-  match s1 s2:
-    case Nil{} Nil{}:
+def utf8_proof.decodes_unique.go(+t1: String, +t2: String, +bytes: List<&2, U32>,
+  d1: Laws.decodes.go(t1, bytes), d2: Laws.decodes.go(t2, bytes)) -> {t1 == t2 : String}:
+  match t1 t2:
+    case SNil{} SNil{}:
       {==}
-    case Nil{} +c <> +cs:
+    case SNil{} SCon{Chr{+c}, +cs}:
       (+rest, facts) = d2
       (first, others) = facts
-      Empty.absurd({Nil{} == c <> cs : List<&2, U32>},
+      Empty.absurd({SNil{} == SCon{Chr{c}, cs} : String},
         utf8_proof.none_some(c, rest,
           Laws.decodes_first_unique(bytes, None{}, Some{(c, rest)}, d1, first)))
-    case +c <> +cs Nil{}:
+    case SCon{Chr{+c}, +cs} SNil{}:
       (+rest, facts) = d1
       (first, others) = facts
-      Empty.absurd({c <> cs == Nil{} : List<&2, U32>},
+      Empty.absurd({SCon{Chr{c}, cs} == SNil{} : String},
         utf8_proof.none_some(c, rest,
           Laws.decodes_first_unique(bytes, None{}, Some{(c, rest)}, d2, first)))
-    case +c1 <> +t1 +c2 <> +t2:
+    case SCon{Chr{+c1}, +m1} SCon{Chr{+c2}, +m2}:
       (+r1, facts1) = d1
       (first1, g1) = facts1
       (+r2, facts2) = d2
       (first2, g2) = facts2
-      utf8_proof.decodes_unique.cons(c1, c2, t1, t2, r1, r2,
+      utf8_proof.decodes_unique.cons(c1, c2, m1, m2, r1, r2,
         Laws.decodes_first_unique(bytes, Some{(c1, r1)}, Some{(c2, r2)}, first1, first2), g2,
-        g => utf8_proof.decodes_unique.go(t1, t2, r1, g1, g))
+        g => utf8_proof.decodes_unique.go(m1, m2, r1, g1, g))
 
-def Laws.decodes_unique(bytes, s1, s2, d1, d2):
-  utf8_proof.decodes_unique.go(s1, s2, bytes, d1, d2)
+def Laws.decodes_unique(bytes, t1, t2, d1, d2):
+  utf8_proof.decodes_unique.go(t1, t2, bytes, d1, d2)
 
 # Each example gives, for each scalar, the bytes left after it; for a
 # replaced scalar, also the maximal subpart and its proof.
@@ -4036,3 +4043,321 @@ def Laws.decodes_examples():
   ([194, 169, 255], ({==},
     ([255], ({==},
       ([], (([255], ([], ({==}, ({==}, {==})))), {==})))))))))))))
+
+# Running the decoder satisfies `decodes`
+# ---------------------------------------
+#
+# The decoder's byte loop, `UTF8.decode_buffer.bytes`, keeps pending
+# either nothing or one byte that begins a valid sequence without being
+# one.  Each step turns a decoding of what follows into a decoding of
+# the whole input; at the end, a pending byte is replaced.
+
+def utf8_proof.Pending(pending: List<&2, U32>) -> Type:
+  match pending:
+    case Nil{}:
+      Unit
+    case +p <> Nil{}:
+      {UTF8.begins_valid_sequence([p]) == True{} : Bool} &
+      {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}
+    case _:
+      Empty
+
+# After a step from `pending` on byte `b`, with `rest` still to come:
+# the new pending bytes keep the invariant, and the step's text followed
+# by any decoding of what remains is a decoding of everything.
+def utf8_proof.StepOK(+pending: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
+  stepped: UTF8.decode_buffer.Step()) -> Type:
+  (text, +next) = stepped
+  utf8_proof.Pending(next) &
+  (@after: String -> Laws.decodes(List.append(&2, U32, next, rest), after) ->
+    Laws.decodes(List.append(&2, U32, pending, b <> rest), text ++ after))
+
+def utf8_proof.final_text(step: UTF8.decode_buffer.Step()) -> String:
+  (text, pending) = step
+  text ++ UTF8.decode_done(pending)
+
+# The implementation's scalar is the reference definition's.
+def utf8_proof.scalar_is(+seq: List<&2, U32>, -m: Maybe<&2, U32>,
+  e: {UTF8.sequence_scalar(seq) == m : Maybe<&2, U32>}) ->
+  {Laws.sequence_scalar(seq) == m : Maybe<&2, U32>}:
+  Equal.trans(Maybe<&2, U32>, Laws.sequence_scalar(seq), UTF8.sequence_scalar(seq), m,
+    Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar(seq), Laws.sequence_scalar(seq),
+      utf8_proof.scalar_agrees(seq)), e)
+
+def utf8_proof.none_from(m: Maybe<&2, U32>,
+  some: {Maybe.is_some(&2, U32, m) == True{} : Bool} -> Empty) -> {m == None{} : Maybe<&2, U32>}:
+  match m:
+    case None{}: {==}
+    case Some{x}: Empty.absurd({Some{x} == None{} : Maybe<&2, U32>}, some({==}))
+
+def utf8_proof.begins_contra(+b: U32,
+  begins: {UTF8.begins_valid_sequence([b]) == True{} : Bool},
+  not_begins: {UTF8.begins_valid_sequence([b]) == False{} : Bool}) -> Empty:
+  utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence([b]), False{},
+    Equal.sym(Bool, UTF8.begins_valid_sequence([b]), True{}, begins), not_begins))
+
+# A byte that begins no valid sequence is not one, nor the start of a
+# two-byte one.
+def utf8_proof.not_one(+b: U32, +not_begins: {UTF8.begins_valid_sequence([b]) == False{} : Bool}) ->
+  {Laws.one_byte_scalar(b) == None{} : Maybe<&2, U32>}:
+  utf8_proof.none_from(Laws.one_byte_scalar(b),
+    valid => utf8_proof.begins_contra(b, utf8_proof.begins_from([b], Nil{}, valid), not_begins))
+
+def utf8_proof.not_two(+b: U32, +b2: U32,
+  +not_begins: {UTF8.begins_valid_sequence([b]) == False{} : Bool}) ->
+  {Laws.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}:
+  utf8_proof.none_from(Laws.two_byte_scalar(b, b2),
+    valid => utf8_proof.begins_contra(b, utf8_proof.begins_from([b], [b2], valid), not_begins))
+
+def utf8_proof.two_none_all(+b: U32, +rest: List<&2, U32>,
+  none: @b2: U32 -> {Laws.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}) ->
+  {Laws.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  match rest:
+    case Nil{}: {==}
+    case +b2 <> +after:
+      %Equal.sym(Maybe<&2, U32>, Laws.two_byte_scalar(b, b2), None{}, none(b2)) :
+        {Laws.next_scalar.found(_, after, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+      {==}
+
+def utf8_proof.two_none_at(+p: U32, +b: U32, +rest: List<&2, U32>,
+  none: {Laws.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
+  {Laws.next_scalar.two(p, b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, Laws.two_byte_scalar(p, b), None{}, none) :
+    {Laws.next_scalar.found(_, rest, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+  {==}
+
+def utf8_proof.next_none(+b: U32, +rest: List<&2, U32>,
+  one: {Laws.one_byte_scalar(b) == None{} : Maybe<&2, U32>},
+  two: {Laws.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}) ->
+  {Laws.next_scalar(b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_scalar(b), None{}, one) :
+    {Laws.next_scalar.found(_, rest, r => Laws.next_scalar.two(b, r)) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+  two
+
+def utf8_proof.next_one(+b: U32, +rest: List<&2, U32>, +cp: U32,
+  one: {Laws.one_byte_scalar(b) == Some{cp} : Maybe<&2, U32>}) ->
+  {Laws.next_scalar(b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_scalar(b), Some{cp}, one) :
+    {Laws.next_scalar.found(_, rest, r => Laws.next_scalar.two(b, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  {==}
+
+def utf8_proof.next_two(+p: U32, +b: U32, +rest: List<&2, U32>, +cp: U32,
+  one: {Laws.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
+  two: {Laws.two_byte_scalar(p, b) == Some{cp} : Maybe<&2, U32>}) ->
+  {Laws.next_scalar(p <> b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_scalar(p), None{}, one) :
+    {Laws.next_scalar.found(_, b <> rest, r => Laws.next_scalar.two(p, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  %Equal.sym(Maybe<&2, U32>, Laws.two_byte_scalar(p, b), Some{cp}, two) :
+    {Laws.next_scalar.found(_, rest, r => None{}) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  {==}
+
+# A byte that begins no valid sequence is its own maximal subpart.
+def utf8_proof.single_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
+  checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
+  not_begins: {UTF8.begins_valid_sequence([b1]) == False{} : Bool}) ->
+  Laws.maximal_subpart.if(b1, more, begins, checked, [b1]):
+  match begins:
+    case False{}: {==}
+    case True{}:
+      Empty.absurd(Laws.maximal_subpart.sequence_prefix(b1, more, checked, [b1]),
+        utf8_proof.begins_contra(b1, checked, not_begins))
+
+def utf8_proof.single_subpart(+b1: U32, +more: List<&2, U32>,
+  not_begins: {UTF8.begins_valid_sequence([b1]) == False{} : Bool}) ->
+  Laws.maximal_subpart(b1, more, [b1]):
+  utf8_proof.single_subpart.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, not_begins)
+
+# A byte that begins a valid sequence, which the next byte (if any)
+# cannot continue, is its own maximal subpart.
+def utf8_proof.lead_subpart.if(+p: U32, +more: List<&2, U32>, begins: Bool,
+  checked: {UTF8.begins_valid_sequence([p]) == begins : Bool},
+  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  longest: Laws.maximal_subpart.longest([p], Laws.next_byte_after(p <> more, [p]))) ->
+  Laws.maximal_subpart.if(p, more, begins, checked, [p]):
+  match begins:
+    case True{}: ((more, {==}), (lead, longest))
+    case False{}:
+      Empty.absurd(Laws.maximal_subpart.single_byte(p, more, checked, [p]),
+        utf8_proof.begins_contra(p, lead, checked))
+
+def utf8_proof.lead_subpart(+p: U32, +more: List<&2, U32>,
+  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  longest: Laws.maximal_subpart.longest([p], Laws.next_byte_after(p <> more, [p]))) ->
+  Laws.maximal_subpart(p, more, [p]):
+  utf8_proof.lead_subpart.if(p, more, UTF8.begins_valid_sequence([p]), {==}, lead, longest)
+
+def utf8_proof.first_found(+b1: U32, +more: List<&2, U32>, -x: U32 & List<&2, U32>,
+  e: {Laws.next_scalar(b1 <> more) == Some{x} : Maybe<&1, U32 & List<&2, U32>>}) ->
+  Laws.decodes_first(b1 <> more, Some{x}):
+  %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, Laws.next_scalar(b1 <> more), Some{x}, e) :
+    Laws.decodes_first.found(b1, more, _, Some{x})
+  {==}
+
+def utf8_proof.first_replaced(+b1: U32, +more: List<&2, U32>, +sub: List<&2, U32>,
+  +rest: List<&2, U32>,
+  e: {Laws.next_scalar(b1 <> more) == None{} : Maybe<&1, U32 & List<&2, U32>>},
+  maximal: Laws.maximal_subpart(b1, more, sub),
+  split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>}) ->
+  Laws.decodes_first(b1 <> more, Some{(Laws.replacement_char(), rest)}):
+  %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, Laws.next_scalar(b1 <> more), None{}, e) :
+    Laws.decodes_first.found(b1, more, _, Some{(Laws.replacement_char(), rest)})
+  (sub, (rest, (maximal, (split, {==}))))
+
+# A step with nothing pending.
+def utf8_proof.start_ok.if(+b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
+  scalar_is: {UTF8.sequence_scalar([b]) == scalar : Maybe<&2, U32>}, begins: Bool,
+  +begins_is: {UTF8.begins_valid_sequence([b]) == begins : Bool}) ->
+  utf8_proof.StepOK(Nil{}, b, rest, UTF8.decode_buffer.advance([b], scalar, begins,
+    u => (UTF8.replacement_char_string(), Nil{}))):
+  match scalar begins:
+    case Some{+cp} _:
+      (Unit{}, after => d =>
+        (rest, (utf8_proof.first_found(b, rest, (cp, rest),
+          utf8_proof.next_one(b, rest, cp, utf8_proof.scalar_is([b], Some{cp}, scalar_is))), d)))
+    case None{} True{}:
+      ((begins_is, scalar_is), after => d => d)
+    case None{} False{}:
+      (Unit{}, after => d =>
+        (rest, (utf8_proof.first_replaced(b, rest, [b], rest,
+          utf8_proof.next_none(b, rest, utf8_proof.not_one(b, begins_is),
+            utf8_proof.two_none_all(b, rest, b2 => utf8_proof.not_two(b, b2, begins_is))),
+          utf8_proof.single_subpart(b, rest, begins_is), {==}), d)))
+
+def utf8_proof.start_ok(+b: U32, +rest: List<&2, U32>) ->
+  utf8_proof.StepOK(Nil{}, b, rest, UTF8.decode_buffer.start(b)):
+  utf8_proof.start_ok.if(b, rest, UTF8.sequence_scalar([b]), {==},
+    UTF8.begins_valid_sequence([b]), {==})
+
+# The pending byte cannot be continued: it is replaced, and the new byte
+# starts afresh.
+def utf8_proof.extend_fail(+p: U32, +b: U32, +rest: List<&2, U32>,
+  s: UTF8.decode_buffer.Step(), started: utf8_proof.StepOK(Nil{}, b, rest, s),
+  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  one: {Laws.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
+  not_begins: {UTF8.begins_valid_sequence([p, b]) == False{} : Bool},
+  two: {Laws.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
+  utf8_proof.StepOK([p], b, rest,
+    UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), s)):
+  (+t, +q) = s
+  (pending_q, continue) = started
+  (pending_q, after => d =>
+    (b <> rest, (utf8_proof.first_replaced(p, b <> rest, [p], b <> rest,
+      utf8_proof.next_none(p, b <> rest, one, utf8_proof.two_none_at(p, b, rest, two)),
+      utf8_proof.lead_subpart(p, b <> rest, lead, not_begins), {==}),
+      continue(after, d))))
+
+def utf8_proof.two_valid_some(+p: U32, +b: U32, valid: Bool,
+  -checked: {UTF8.valid_two_bytes(p, b) == valid : Bool},
+  none: {UTF8.two_byte_scalar.if(p, b, valid, checked) == None{} : Maybe<&2, U32>},
+  is_true: {valid == True{} : Bool}) -> Empty:
+  match valid:
+    case False{}: H.hex_u32.false_true(is_true)
+    case True{}:
+      utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+        UTF8.two_byte_scalar.if(p, b, True{}, checked), None{}, none))
+
+# A step with one byte pending.
+def utf8_proof.extend_ok.if(+p: U32, +b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
+  scalar_is: {UTF8.sequence_scalar([p, b]) == scalar : Maybe<&2, U32>}, begins: Bool,
+  begins_is: {UTF8.begins_valid_sequence([p, b]) == begins : Bool},
+  pending: utf8_proof.Pending([p])) ->
+  utf8_proof.StepOK([p], b, rest, UTF8.decode_buffer.advance([p, b], scalar, begins,
+    u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(b)))):
+  match scalar begins:
+    case Some{+cp} _:
+      (lead, alone) = pending
+      (Unit{}, after => d =>
+        (rest, (utf8_proof.first_found(p, b <> rest, (cp, rest),
+          utf8_proof.next_two(p, b, rest, cp, utf8_proof.scalar_is([p], None{}, alone),
+            utf8_proof.scalar_is([p, b], Some{cp}, scalar_is))), d)))
+    case None{} True{}:
+      Empty.absurd(utf8_proof.StepOK([p], b, rest, ("", [p, b])),
+        utf8_proof.two_valid_some(p, b, UTF8.valid_two_bytes(p, b), {==}, scalar_is, begins_is))
+    case None{} False{}:
+      (lead, alone) = pending
+      utf8_proof.extend_fail(p, b, rest, UTF8.decode_buffer.start(b), utf8_proof.start_ok(b, rest),
+        lead, utf8_proof.scalar_is([p], None{}, alone), begins_is,
+        utf8_proof.scalar_is([p, b], None{}, scalar_is))
+
+def utf8_proof.step_ok(+pending: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
+  invariant: utf8_proof.Pending(pending)) ->
+  utf8_proof.StepOK(pending, b, rest, UTF8.decode_buffer.step(pending, b)):
+  match pending:
+    case Nil{}:
+      utf8_proof.start_ok(b, rest)
+    case +p <> Nil{}:
+      utf8_proof.extend_ok.if(p, b, rest, UTF8.sequence_scalar([p, b]), {==},
+        UTF8.begins_valid_sequence([p, b]), {==}, invariant)
+    case p <> q <> more:
+      Empty.absurd(utf8_proof.StepOK(p <> q <> more, b, rest, UTF8.decode_buffer.step(p <> q <> more, b)),
+        invariant)
+
+# At the end of the input, a pending byte is replaced.
+def utf8_proof.done_ok(+pending: List<&2, U32>, invariant: utf8_proof.Pending(pending)) ->
+  Laws.decodes(List.append(&2, U32, pending, Nil{}), UTF8.decode_done(pending)):
+  match pending:
+    case Nil{}:
+      {==}
+    case +p <> Nil{}:
+      (lead, alone) = invariant
+      (Nil{}, (utf8_proof.first_replaced(p, Nil{}, [p], Nil{},
+        utf8_proof.next_none(p, Nil{}, utf8_proof.scalar_is([p], None{}, alone), {==}),
+        utf8_proof.lead_subpart(p, Nil{}, lead, Unit{}), {==}), {==}))
+    case p <> q <> more:
+      Empty.absurd(Laws.decodes(List.append(&2, U32, p <> q <> more, Nil{}), UTF8.decode_done(p <> q <> more)),
+        invariant)
+
+def utf8_proof.final_prepend(+t: String, s: UTF8.decode_buffer.Step()) ->
+  {utf8_proof.final_text(UTF8.decode_buffer.prepend(t, s)) == t ++ utf8_proof.final_text(s) : String}:
+  (+more, +q) = s
+  utf8_proof.string_assoc(t, more, UTF8.decode_done(q))
+
+def utf8_proof.bytes_ok.then(+pending: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
+  stepped: UTF8.decode_buffer.Step(), ok: utf8_proof.StepOK(pending, b, rest, stepped),
+  recurse: @q: List<&2, U32> -> utf8_proof.Pending(q) ->
+    Laws.decodes(List.append(&2, U32, q, rest), utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, q)))) ->
+  Laws.decodes(List.append(&2, U32, pending, b <> rest),
+    utf8_proof.final_text(UTF8.decode_buffer.then(stepped, q => UTF8.decode_buffer.bytes(rest, q)))):
+  (+t, +q) = stepped
+  (pending_q, continue) = ok
+  %Equal.sym(String, utf8_proof.final_text(UTF8.decode_buffer.prepend(t, UTF8.decode_buffer.bytes(rest, q))),
+      t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, q)),
+      utf8_proof.final_prepend(t, UTF8.decode_buffer.bytes(rest, q))) :
+    Laws.decodes(List.append(&2, U32, pending, b <> rest), _)
+  continue(utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, q)), recurse(q, pending_q))
+
+# Decoding `bytes` from `pending`, then finishing, decodes `pending`
+# followed by `bytes`.
+def utf8_proof.bytes_ok(+bytes: List<&2, U32>, +pending: List<&2, U32>,
+  invariant: utf8_proof.Pending(pending)) ->
+  Laws.decodes(List.append(&2, U32, pending, bytes),
+    utf8_proof.final_text(UTF8.decode_buffer.bytes(bytes, pending))):
+  match bytes:
+    case Nil{}:
+      utf8_proof.done_ok(pending, invariant)
+    case +b <> +rest:
+      utf8_proof.bytes_ok.then(pending, b, rest, UTF8.decode_buffer.step(pending, b),
+        utf8_proof.step_ok(pending, b, rest, invariant),
+        q => q_ok => utf8_proof.bytes_ok(rest, q, q_ok))
+
+def utf8_proof.decodes_result(ok: Bool, +bytes: List<&2, U32>, step: UTF8.decode_buffer.Step(),
+  decoded: Laws.decodes(bytes, utf8_proof.final_text(step))) ->
+  Laws.decodes_result.if(ok, bytes, Laws.decoded.text(utf8_proof.expected_fed(ok, step))):
+  match ok:
+    case False{}:
+      {==}
+    case True{}:
+      (+text, +pending) = step
+      (text ++ UTF8.decode_done(pending), ({==}, decoded))
+
+def Laws.utf8_decodes(buffers):
+  +bytes = List.concat(&2, U32, buffers)
+  %Equal.sym(Laws.Fed(), Laws.feed(buffers, Nil{}),
+      utf8_proof.expected_fed(Laws.all_bytes(bytes), Laws.reference.go(bytes, Nil{})),
+      utf8_proof.feed_agrees(buffers, Nil{})) :
+    Laws.decodes_result.if(Laws.all_bytes(bytes), bytes, Laws.decoded.text(_))
+  %utf8_proof.bytes_agrees(bytes, Nil{}) :
+    Laws.decodes_result.if(Laws.all_bytes(bytes), bytes,
+      Laws.decoded.text(utf8_proof.expected_fed(Laws.all_bytes(bytes), _)))
+  utf8_proof.decodes_result(Laws.all_bytes(bytes), bytes, UTF8.decode_buffer.bytes(bytes, Nil{}),
+    utf8_proof.bytes_ok(bytes, Nil{}, Unit{}))

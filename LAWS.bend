@@ -534,63 +534,157 @@ law decodes_first_nonempty:
 # Decoding a complete buffer
 # --------------------------
 
-# Decoding the complete buffer `bytes` gives the scalars `scalars`: an
-# empty list if there is nothing to decode, otherwise the scalar that
-# `decodes_first` gives followed by the scalars from decoding the bytes
+# Decoding the complete buffer `bytes` gives the string `text`: empty if
+# there is nothing to decode, otherwise the code point that
+# `decodes_first` gives followed by the text from decoding the bytes
 # after it.
 #
-# The recursion is on `scalars`, which shrinks at each step, so
-# `scalars` comes first in `decodes.go`.
+# The recursion is on `text`, which shrinks at each step, so `text`
+# comes first in `decodes.go`.
 
-def decodes.go(scalars: List<&2, U32>, bytes: List<&2, U32>) -> Type:
-  match scalars:
-    case Nil{}:
+def decodes.go(text: String, bytes: List<&2, U32>) -> Type:
+  match text:
+    case SNil{}:
       decodes_first(bytes, None{})
-    case +cp <> +cps:
+    case SCon{Chr{cp}, more}:
       Exists(List<&2, U32>, rest =>
-        decodes_first(bytes, Some{(cp, rest)}) & decodes.go(cps, rest))
+        decodes_first(bytes, Some{(cp, rest)}) & decodes.go(more, rest))
 
-def decodes(bytes: List<&2, U32>, scalars: List<&2, U32>) -> Type:
-  decodes.go(scalars, bytes)
+def decodes(bytes: List<&2, U32>, text: String) -> Type:
+  decodes.go(text, bytes)
 
-# Every buffer decodes to some list of scalars.
+# Every buffer decodes to some text.
 
 law decodes_exists:
   for +bytes: List<&2, U32>
-  Exists(List<&2, U32>, scalars => decodes(bytes, scalars))
+  Exists(String, text => decodes(bytes, text))
 
-# A buffer decodes to only one list of scalars.
+# A buffer decodes to only one text.
 
 law decodes_unique:
   for +bytes: List<&2, U32>
-  for +s1: List<&2, U32>
-  for +s2: List<&2, U32>
-  for d1: decodes(bytes, s1)
-  for d2: decodes(bytes, s2)
-  {s1 == s2 : List<&2, U32>}
+  for +t1: String
+  for +t2: String
+  for d1: decodes(bytes, t1)
+  for d2: decodes(bytes, t2)
+  {t1 == t2 : String}
 
 # Bytes in hex: 65 = 0x41 "A", 66 = 0x42 "B", 72 = 0x48 "H",
 # 128 = 0x80, 169 = 0xA9, 192 = 0xC0, 194 = 0xC2, 255 = 0xFF.
 
 law decodes_examples:
   # Nothing to decode.
-  decodes([], []) &
+  decodes([], "") &
   # One-byte sequences.
-  decodes([65, 66], [65, 66]) &
+  decodes([65, 66], "AB") &
   # A two-byte sequence: C2 A9 is U+00A9.
-  decodes([194, 169], [169]) &
+  decodes([194, 169], code_point_to_string(169)) &
   # A lead byte followed by a byte that cannot continue it: the lead
   # byte is replaced, and "A" decodes afresh.
-  decodes([194, 65], [replacement_char(), 65]) &
+  decodes([194, 65], replacement_char_string() ++ "A") &
   # C0 begins no valid sequence (it would be overlong), and neither does
   # a lone continuation byte: each is replaced separately.
-  decodes([192, 128], [replacement_char(), replacement_char()]) &
+  decodes([192, 128], replacement_char_string() ++ replacement_char_string()) &
   # A sequence left unfinished at the end of the buffer is replaced.
-  decodes([194], [replacement_char()]) &
+  decodes([194], replacement_char_string()) &
   # The second C2 cannot continue the first; it then begins C2 A9.
-  decodes([194, 194, 169], [replacement_char(), 169]) &
+  decodes([194, 194, 169], replacement_char_string() ++ code_point_to_string(169)) &
   # Valid sequences around a byte that never appears in UTF-8.
-  decodes([72, 194, 169, 255], [72, 169, replacement_char()])
+  decodes([72, 194, 169, 255],
+    "H" ++ code_point_to_string(169) ++ replacement_char_string())
+
+# Running the decoder
+# -------------------
+
+# `Some{x}` when `cond` holds, otherwise None.
+def when(-A: Data, cond: Bool, x: A) -> Maybe<&2, A>:
+  match cond:
+    case False{}:
+      None{}
+    case True{}:
+      Some{x}
+
+# Every value in `bytes` is a byte, 0..255.
+
+def all_bytes(bytes: List<&2, U32>) -> Bool:
+  List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
+
+# The decoder state and the text so far, or None if `UTF8.decode_buffer`
+# returned None for some buffer (which it does when the buffer holds a
+# value above 255).  No buffers are given to the decoder after that.
+
+def Fed() -> Type:
+  Maybe<&1, UTF8.DecodeState() & String>
+
+def feed.prepend(text: String, result: Fed()) -> Fed():
+  match result:
+    case None{}:
+      None{}
+    case Some{(state, more)}:
+      Some{(state, text ++ more)}
+
+def feed.then(result: Fed(), rest: UTF8.DecodeState() -> Fed()) -> Fed():
+  match result:
+    case None{}:
+      None{}
+    case Some{(state, text)}:
+      feed.prepend(text, rest(state))
+
+# Give `buffers` to `UTF8.decode_buffer` in order, starting from `state`,
+# and join the text that the calls return.
+
+def feed(buffers: List<&2, List<&2, U32>>, state: UTF8.DecodeState()) -> Fed():
+  match buffers:
+    case Nil{}:
+      Some{(state, "")}
+    case buffer <> rest:
+      feed.then(UTF8.decode_buffer(state, buffer), s => feed(rest, s))
+
+# The text returned for `buffers`, without and with `UTF8.decode_done`.
+
+def decoded_so_far.text(result: Fed()) -> Maybe<&2, String>:
+  match result:
+    case None{}:
+      None{}
+    case Some{(state, text)}:
+      Some{text}
+
+def decoded_so_far(buffers: List<&2, List<&2, U32>>) -> Maybe<&2, String>:
+  decoded_so_far.text(feed(buffers, UTF8.decode_start()))
+
+def decoded.text(result: Fed()) -> Maybe<&2, String>:
+  match result:
+    case None{}:
+      None{}
+    case Some{(state, text)}:
+      Some{text ++ UTF8.decode_done(state)}
+
+def decoded(buffers: List<&2, List<&2, U32>>) -> Maybe<&2, String>:
+  decoded.text(feed(buffers, UTF8.decode_start()))
+
+# Running the decoder satisfies `decodes`
+# ---------------------------------------
+
+# What running the decoder on `bytes` should give: None if a value is
+# above 255, otherwise text that `bytes` decodes to.
+
+def decodes_result.if(ok: Bool, +bytes: List<&2, U32>, result: Maybe<&2, String>) -> Type:
+  match ok:
+    case False{}:
+      {result == None{} : Maybe<&2, String>}
+    case True{}:
+      Exists(String, text => {result == Some{text} : Maybe<&2, String>} & decodes(bytes, text))
+
+def decodes_result(+bytes: List<&2, U32>, result: Maybe<&2, String>) -> Type:
+  decodes_result.if(all_bytes(bytes), bytes, result)
+
+# However the input is split into buffers, giving them in order to
+# `UTF8.decode_buffer` and then calling `UTF8.decode_done` gives what
+# their concatenation decodes to.
+
+law utf8_decodes:
+  for +buffers: List<&2, List<&2, U32>>
+  decodes_result(List.concat(&2, U32, buffers), decoded(buffers))
 
 # `bytes` with its maximal subpart removed from the front.  The maximal
 # subpart is the longest non-empty prefix of `bytes` that begins a valid
@@ -720,73 +814,8 @@ def Step.final_text(step: Step()) -> String:
 def reference_final(bytes: List<&2, U32>) -> String:
   Step.final_text(reference.go(bytes, Nil{}))
 
-# Running the decoder
-# -------------------
-
-# `Some{x}` when `cond` holds, otherwise None.
-def when(-A: Data, cond: Bool, x: A) -> Maybe<&2, A>:
-  match cond:
-    case False{}:
-      None{}
-    case True{}:
-      Some{x}
-
-# Every value in `bytes` is a byte, 0..255.
-
-def all_bytes(bytes: List<&2, U32>) -> Bool:
-  List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
-
-# The decoder state and the text so far, or None once a buffer is
-# rejected.
-
-def Fed() -> Type:
-  Maybe<&1, UTF8.DecodeState() & String>
-
-def feed.prepend(text: String, result: Fed()) -> Fed():
-  match result:
-    case None{}:
-      None{}
-    case Some{(state, more)}:
-      Some{(state, text ++ more)}
-
-def feed.then(result: Fed(), rest: UTF8.DecodeState() -> Fed()) -> Fed():
-  match result:
-    case None{}:
-      None{}
-    case Some{(state, text)}:
-      feed.prepend(text, rest(state))
-
-# Give `buffers` to `UTF8.decode_buffer` in order, starting from `state`,
-# and join the text that the calls return.
-
-def feed(buffers: List<&2, List<&2, U32>>, state: UTF8.DecodeState()) -> Fed():
-  match buffers:
-    case Nil{}:
-      Some{(state, "")}
-    case buffer <> rest:
-      feed.then(UTF8.decode_buffer(state, buffer), s => feed(rest, s))
-
-# The text returned for `buffers`, without and with `UTF8.decode_done`.
-
-def decoded_so_far.text(result: Fed()) -> Maybe<&2, String>:
-  match result:
-    case None{}:
-      None{}
-    case Some{(state, text)}:
-      Some{text}
-
-def decoded_so_far(buffers: List<&2, List<&2, U32>>) -> Maybe<&2, String>:
-  decoded_so_far.text(feed(buffers, UTF8.decode_start()))
-
-def decoded.text(result: Fed()) -> Maybe<&2, String>:
-  match result:
-    case None{}:
-      None{}
-    case Some{(state, text)}:
-      Some{text ++ UTF8.decode_done(state)}
-
-def decoded(buffers: List<&2, List<&2, U32>>) -> Maybe<&2, String>:
-  decoded.text(feed(buffers, UTF8.decode_start()))
+# Agreement with the reference decoder
+# ------------------------------------
 
 # However the input is split into buffers, after each buffer the decoder
 # has returned exactly the text that the bytes so far fully determine:
