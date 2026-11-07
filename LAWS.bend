@@ -101,13 +101,25 @@ law utf8_can_encode_as_two_bytes:
   {UTF8.can_encode_as_two_bytes(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
 
 
+## Encode as
+
+# Require that given a supplied proof that a code point *can* be encoded
+# as a byte sequence, `encode_as_*` returns those bytes.
+# (Supplying a proof means that we don't have to return a Maybe.)
 
 law utf8_encode_as_one_byte:
   for +cp: U32
   for valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}
   {Some{UTF8.encode_as_one_byte(cp, valid)} == one_byte_shape(cp) : Maybe<&2, U32>}
 
-# True exactly when the byte is produced by the one-byte encoding table.
+law utf8_encode_as_two_bytes:
+  for +cp: U32
+  for valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
+  {Some{UTF8.encode_as_two_bytes(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
+
+
+
+
 law utf8_has_one_byte_shape:
   for +byte: U32
   representation = Exists(U32, cp =>
@@ -159,11 +171,6 @@ law utf8_valid_one_byte:
 # a UTF-8 two-byte shape (as specified by two_byte_shape above),
 # `UTF8.encode_as_two_bytes` returns the two bytes of the shape
 # directly as U32 values without needing to use a Maybe.
-
-law utf8_encode_as_two_bytes:
-  for +cp: U32
-  for valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
-  {Some{UTF8.encode_as_two_bytes(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 # `UTF8.has_two_byte_shape(b1, b2)` returns True iff `(b1, b2)` can be
 # returned by `two_byte_shape` for some code point.
