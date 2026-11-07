@@ -105,7 +105,7 @@ law utf8_can_encode_as_two_bytes:
 
 # Require that given a supplied proof that a code point *can* be encoded
 # as a byte sequence, `encode_as_*` returns those bytes.
-# (Supplying a proof means that we don't have to return a Maybe.)
+# (Supplying the proof means that we don't have to return a Maybe.)
 
 law utf8_encode_as_one_byte:
   for +cp: U32
@@ -118,7 +118,11 @@ law utf8_encode_as_two_bytes:
   {Some{UTF8.encode_as_two_bytes(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 
+## has_N_byte_shape(cp) -> Bool
 
+# Return True if the code point *can be* encoded as a sequence of the
+# specified number of bytes.  (At this point we're still ignoring
+# overlong encodings.)
 
 law utf8_has_one_byte_shape:
   for +byte: U32
@@ -126,6 +130,16 @@ law utf8_has_one_byte_shape:
     {one_byte_shape(cp) == Some{byte} : Maybe<&2, U32>})
   ({UTF8.has_one_byte_shape(byte) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_one_byte_shape(byte) == True{} : Bool})
+
+law utf8_has_two_byte_shape:
+  for +b1: U32
+  for +b2: U32
+  representation = Exists(U32, cp =>
+    {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>})
+  ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
+  (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
+
+
 
 # We require that `encode_as_one_byte` be bijective between accepted
 # code points and bytes satisfying `has_one_byte_shape`, and we specify
@@ -171,17 +185,6 @@ law utf8_valid_one_byte:
 # a UTF-8 two-byte shape (as specified by two_byte_shape above),
 # `UTF8.encode_as_two_bytes` returns the two bytes of the shape
 # directly as U32 values without needing to use a Maybe.
-
-# `UTF8.has_two_byte_shape(b1, b2)` returns True iff `(b1, b2)` can be
-# returned by `two_byte_shape` for some code point.
-
-law utf8_has_two_byte_shape:
-  for +b1: U32
-  for +b2: U32
-  representation = Exists(U32, cp =>
-    {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>})
-  ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
-  (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
 
 # We require that `encode_as_two_bytes` be bijective between accepted
 # code points and byte pairs satisfying `has_two_byte_shape`, and we
