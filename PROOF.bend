@@ -3611,10 +3611,64 @@ def utf8_proof.append_same_left(+s1: List<&2, U32>, +s2: List<&2, U32>, +rest: L
   %Equal.sym(List<&2, U32>, s1, s2, same) : {List.append(&2, U32, _, rest) == bytes : List<&2, U32>}
   e
 
+# Decoding the first code point makes progress
+# ---------------------------------------------
+#
+# Existence for `decodes` needs each step to consume at least one byte.
+# These proofs construct a `decodes_first` result together with that
+# fact; `decodes_first_exists` then drops it.
+
+# `xs` is a suffix of `ys`.
+def utf8_proof.Suffix(+xs: List<&2, U32>, +ys: List<&2, U32>) -> Type:
+  Exists(List<&2, U32>, p => {List.append(&2, U32, p, xs) == ys : List<&2, U32>})
+
+def utf8_proof.Progress.pair(+more: List<&2, U32>, p: U32 & List<&2, U32>) -> Type:
+  (cp, rest) = p
+  utf8_proof.Suffix(rest, more)
+
+# A result for `b1 <> more` leaves a suffix of `more`.
+def utf8_proof.Progress(+more: List<&2, U32>, result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
+  match result:
+    case None{}: Unit
+    case Some{p}: utf8_proof.Progress.pair(more, p)
+
+def utf8_proof.next_found_progress(scalar: Maybe<&2, U32>, +rest: List<&2, U32>,
+  -otherwise: List<&2, U32> -> Maybe<&1, U32 & List<&2, U32>>, +more: List<&2, U32>,
+  suffix: utf8_proof.Suffix(rest, more),
+  other: utf8_proof.Progress(more, otherwise(rest))) ->
+  utf8_proof.Progress(more, Laws.next_scalar.found(scalar, rest, otherwise)):
+  match scalar:
+    case Some{cp}: suffix
+    case None{}: other
+
+def utf8_proof.next_two_progress(+b1: U32, +more: List<&2, U32>) ->
+  utf8_proof.Progress(more, Laws.next_scalar.two(b1, more)):
+  match more:
+    case Nil{}:
+      Unit{}
+    case +b2 <> +after:
+      utf8_proof.next_found_progress(Laws.two_byte_scalar(b1, b2), after, r => None{},
+        b2 <> after, ([b2], {==}), Unit{})
+
+def utf8_proof.next_progress(+b1: U32, +more: List<&2, U32>) ->
+  utf8_proof.Progress(more, Laws.next_scalar(b1 <> more)):
+  utf8_proof.next_found_progress(Laws.one_byte_scalar(b1), more,
+    r => Laws.next_scalar.two(b1, r), more, (Nil{}, {==}),
+    utf8_proof.next_two_progress(b1, more))
+
+def utf8_proof.next_progress_at(+b1: U32, +more: List<&2, U32>,
+  -found: Maybe<&1, U32 & List<&2, U32>>,
+  checked: {Laws.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
+  utf8_proof.Progress(more, found):
+  %checked : utf8_proof.Progress(more, _)
+  utf8_proof.next_progress(b1, more)
+
 # The replaced result, given the maximal subpart: U+FFFD and the bytes
-# after the subpart, which its `is_prefix` clause supplies.
+# after the subpart, which its `is_prefix` clause supplies.  The subpart
+# is not empty, since `[b1]` begins a valid sequence and so `[]` is not
+# the longest; so the bytes after it are a suffix of `more`.
 def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
-  -checked: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
+  checked: {UTF8.begins_valid_sequence([b1]) == True{} : Bool},
   +sub: List<&2, U32>, +rest: List<&2, U32>,
   +split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>},
   facts: {UTF8.begins_valid_sequence(sub) == True{} : Bool} &
@@ -3623,47 +3677,81 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
     Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
       Laws.maximal_subpart.sequence_prefix(b1, more, checked, subpart) &
       {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
-      {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>}))):
-  (Some{(Laws.replacement_char(), rest)}, (sub, (rest, (((rest, split), facts), (split, {==})))))
+      {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
+    utf8_proof.Progress(more, result)):
+  match sub:
+    case Nil{}:
+      (begins_sub, longest) = facts
+      Empty.absurd(Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+          Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
+            Laws.maximal_subpart.sequence_prefix(b1, more, checked, subpart) &
+            {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
+            {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
+          utf8_proof.Progress(more, result)),
+        utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.begins_valid_sequence([b1]), False{},
+          Equal.sym(Bool, UTF8.begins_valid_sequence([b1]), True{}, checked), longest)))
+    case +s <> +ss:
+      (Some{(Laws.replacement_char(), rest)},
+        ((s <> ss, (rest, (((rest, split), facts), (split, {==})))),
+         (ss, utf8_proof.cons_tail(s, b1, List.append(&2, U32, ss, rest), more, split))))
 
 def utf8_proof.replaced_from.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
-  -checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
+  checked: {UTF8.begins_valid_sequence([b1]) == begins : Bool},
   +sub: List<&2, U32>, maximal: Laws.maximal_subpart.if(b1, more, begins, checked, sub)) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
       Laws.maximal_subpart.if(b1, more, begins, checked, subpart) &
       {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
-      {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>}))):
+      {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
+    utf8_proof.Progress(more, result)):
   match begins:
     case True{}:
       (prefix, facts) = maximal
       (rest, split) = prefix
       utf8_proof.replaced_from.sequence(b1, more, checked, sub, rest, split, facts)
     case False{}:
-      (Some{(Laws.replacement_char(), more)}, ([b1], (more, ({==}, ({==}, {==})))))
+      (Some{(Laws.replacement_char(), more)},
+        (([b1], (more, ({==}, ({==}, {==})))), (Nil{}, {==})))
 
 def utf8_proof.replaced_from(+b1: U32, +more: List<&2, U32>,
   found: Exists(List<&2, U32>, subpart => Laws.maximal_subpart(b1, more, subpart))) ->
-  Exists(Maybe<&1, U32 & List<&2, U32>>, result => Laws.decodes_first.replaced(b1, more, result)):
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Laws.decodes_first.replaced(b1, more, result) & utf8_proof.Progress(more, result)):
   (+sub, maximal) = found
   utf8_proof.replaced_from.if(b1, more, UTF8.begins_valid_sequence([b1]), {==}, sub, maximal)
 
 def utf8_proof.found_exists(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>,
   checked: {Laws.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
-  Exists(Maybe<&1, U32 & List<&2, U32>>, result => Laws.decodes_first.found(b1, more, found, result)):
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Laws.decodes_first.found(b1, more, found, result) & utf8_proof.Progress(more, result)):
   match found:
     case Some{x}:
-      (Some{x}, {==})
+      (Some{x}, ({==}, utf8_proof.next_progress_at(b1, more, Some{x}, checked)))
     case None{}:
       utf8_proof.replaced_from(b1, more, Laws.maximal_subpart_exists(b1, more, checked))
+
+# Decoding the first code point of a non-empty buffer has a result that
+# leaves a suffix of the bytes after the first.
+def utf8_proof.first_exists(+b1: U32, +more: List<&2, U32>) ->
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Laws.decodes_first(b1 <> more, result) & utf8_proof.Progress(more, result)):
+  utf8_proof.found_exists(b1, more, Laws.next_scalar(b1 <> more), {==})
+
+def utf8_proof.first_exists.drop(+b1: U32, +more: List<&2, U32>,
+  found: Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Laws.decodes_first(b1 <> more, result) & utf8_proof.Progress(more, result))) ->
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result => Laws.decodes_first(b1 <> more, result)):
+  (result, both) = found
+  (decoded, progress) = both
+  (result, decoded)
 
 def Laws.decodes_first_exists(bytes):
   match bytes:
     case Nil{}:
       (None{}, {==})
     case +b1 <> +more:
-      utf8_proof.found_exists(b1, more, Laws.next_scalar(b1 <> more), {==})
+      utf8_proof.first_exists.drop(b1, more, utf8_proof.first_exists(b1, more))
 
 def Laws.decodes_first_empty(result, decoded):
   decoded
@@ -3736,3 +3824,215 @@ def Laws.decodes_first_unique(bytes, r1, r2, d1, d2):
         Equal.sym(Maybe<&1, U32 & List<&2, U32>>, r2, None{}, d2))
     case +b1 <> +more:
       utf8_proof.found_unique(b1, more, Laws.next_scalar(b1 <> more), r1, r2, d1, d2)
+
+# Decoding a complete buffer
+# --------------------------
+
+# Existence: decode one code point at a time.  Bend accepts a recursion
+# only on a shrinking argument, so the recursion is on `fuel`, a list
+# that the remaining bytes are always a suffix of.
+
+def utf8_proof.suffix_nil(+b1: U32, +more: List<&2, U32>, +p: List<&2, U32>,
+  e: {List.append(&2, U32, p, b1 <> more) == Nil{} : List<&2, U32>}) -> Empty:
+  match p:
+    case Nil{}: utf8_proof.cons_nil(b1, more, e)
+    case +q <> +qs: utf8_proof.cons_nil(q, List.append(&2, U32, qs, b1 <> more), e)
+
+def utf8_proof.suffix_tail.split(+f: U32, +fs: List<&2, U32>, +b1: U32, +more: List<&2, U32>,
+  +p: List<&2, U32>, e: {List.append(&2, U32, p, b1 <> more) == f <> fs : List<&2, U32>}) ->
+  utf8_proof.Suffix(more, fs):
+  match p:
+    case Nil{}:
+      (Nil{}, utf8_proof.cons_tail(b1, f, more, fs, e))
+    case +q <> +qs:
+      (List.append(&2, U32, qs, [b1]),
+        Equal.trans(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, qs, [b1]), more),
+          List.append(&2, U32, qs, b1 <> more), fs, utf8_proof.append_assoc(qs, [b1], more),
+          utf8_proof.cons_tail(q, f, List.append(&2, U32, qs, b1 <> more), fs, e)))
+
+# If `b1 <> more` is a suffix of `f <> fs`, `more` is a suffix of `fs`.
+def utf8_proof.suffix_tail(+f: U32, +fs: List<&2, U32>, +b1: U32, +more: List<&2, U32>,
+  suffix: utf8_proof.Suffix(b1 <> more, f <> fs)) -> utf8_proof.Suffix(more, fs):
+  (+p, e) = suffix
+  utf8_proof.suffix_tail.split(f, fs, b1, more, p, e)
+
+def utf8_proof.suffix_nil_absurd(+b1: U32, +more: List<&2, U32>,
+  suffix: utf8_proof.Suffix(b1 <> more, Nil{})) -> Empty:
+  (+p, e) = suffix
+  utf8_proof.suffix_nil(b1, more, p, e)
+
+def utf8_proof.suffix_trans.regroup(+q: List<&2, U32>, +p: List<&2, U32>, +xs: List<&2, U32>,
+  +ys: List<&2, U32>, +zs: List<&2, U32>,
+  xy: {List.append(&2, U32, p, xs) == ys : List<&2, U32>},
+  yz: {List.append(&2, U32, q, ys) == zs : List<&2, U32>}) ->
+  {List.append(&2, U32, q, List.append(&2, U32, p, xs)) == zs : List<&2, U32>}:
+  %Equal.sym(List<&2, U32>, List.append(&2, U32, p, xs), ys, xy) :
+    {List.append(&2, U32, q, _) == zs : List<&2, U32>}
+  yz
+
+def utf8_proof.suffix_trans.split(+xs: List<&2, U32>, +ys: List<&2, U32>, +zs: List<&2, U32>,
+  +p: List<&2, U32>, xy: {List.append(&2, U32, p, xs) == ys : List<&2, U32>},
+  yz: utf8_proof.Suffix(ys, zs)) -> utf8_proof.Suffix(xs, zs):
+  (+q, e) = yz
+  (List.append(&2, U32, q, p),
+    Equal.trans(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, q, p), xs),
+      List.append(&2, U32, q, List.append(&2, U32, p, xs)), zs,
+      utf8_proof.append_assoc(q, p, xs),
+      utf8_proof.suffix_trans.regroup(q, p, xs, ys, zs, xy, e)))
+
+def utf8_proof.suffix_trans(+xs: List<&2, U32>, +ys: List<&2, U32>, +zs: List<&2, U32>,
+  xy: utf8_proof.Suffix(xs, ys), yz: utf8_proof.Suffix(ys, zs)) -> utf8_proof.Suffix(xs, zs):
+  (+p, e) = xy
+  utf8_proof.suffix_trans.split(xs, ys, zs, p, e, yz)
+
+# The scalars for `b1 <> more`, given the first result and the scalars
+# for what follows it.
+def utf8_proof.decodes_cons(+bytes: List<&2, U32>, +cp: U32, +rest: List<&2, U32>,
+  decoded: Laws.decodes_first(bytes, Some{(cp, rest)}),
+  tail: Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
+  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, bytes)):
+  (+cps, decoded_rest) = tail
+  (cp <> cps, (rest, (decoded, decoded_rest)))
+
+def utf8_proof.decodes_exists.pair(+fs: List<&2, U32>, +b1: U32, +more: List<&2, U32>,
+  more_fs: utf8_proof.Suffix(more, fs), p: U32 & List<&2, U32>,
+  decoded: Laws.decodes_first(b1 <> more, Some{p}),
+  progress: utf8_proof.Progress.pair(more, p),
+  recurse: @rest: List<&2, U32> -> utf8_proof.Suffix(rest, fs) ->
+    Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
+  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)):
+  (+cp, +rest) = p
+  utf8_proof.decodes_cons(b1 <> more, cp, rest, decoded,
+    recurse(rest, utf8_proof.suffix_trans(rest, more, fs, progress, more_fs)))
+
+def utf8_proof.decodes_exists.result(+fs: List<&2, U32>, +b1: U32, +more: List<&2, U32>,
+  more_fs: utf8_proof.Suffix(more, fs), result: Maybe<&1, U32 & List<&2, U32>>,
+  decoded: Laws.decodes_first(b1 <> more, result),
+  progress: utf8_proof.Progress(more, result),
+  recurse: @rest: List<&2, U32> -> utf8_proof.Suffix(rest, fs) ->
+    Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
+  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)):
+  match result:
+    case None{}:
+      (Nil{}, decoded)
+    case Some{p}:
+      utf8_proof.decodes_exists.pair(fs, b1, more, more_fs, p, decoded, progress, recurse)
+
+def utf8_proof.decodes_exists.step(+fs: List<&2, U32>, +b1: U32, +more: List<&2, U32>,
+  more_fs: utf8_proof.Suffix(more, fs),
+  first: Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Laws.decodes_first(b1 <> more, result) & utf8_proof.Progress(more, result)),
+  recurse: @rest: List<&2, U32> -> utf8_proof.Suffix(rest, fs) ->
+    Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, rest))) ->
+  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)):
+  (result, both) = first
+  (decoded, progress) = both
+  utf8_proof.decodes_exists.result(fs, b1, more, more_fs, result, decoded, progress, recurse)
+
+def utf8_proof.decodes_exists.go(+fuel: List<&2, U32>, +bytes: List<&2, U32>,
+  suffix: utf8_proof.Suffix(bytes, fuel)) ->
+  Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, bytes)):
+  match fuel bytes:
+    case _ Nil{}:
+      (Nil{}, {==})
+    case Nil{} +b1 <> +more:
+      Empty.absurd(Exists(List<&2, U32>, scalars => Laws.decodes.go(scalars, b1 <> more)),
+        utf8_proof.suffix_nil_absurd(b1, more, suffix))
+    case +f <> +fs +b1 <> +more:
+      utf8_proof.decodes_exists.step(fs, b1, more,
+        utf8_proof.suffix_tail(f, fs, b1, more, suffix),
+        utf8_proof.first_exists(b1, more),
+        rest => sfx => utf8_proof.decodes_exists.go(fs, rest, sfx))
+
+def Laws.decodes_exists(bytes):
+  utf8_proof.decodes_exists.go(bytes, bytes, (Nil{}, {==}))
+
+# Uniqueness: by induction on the two lists, using `decodes_first_unique`
+# at each step.
+
+def utf8_proof.first_of(d: U32, result: Maybe<&1, U32 & List<&2, U32>>) -> U32:
+  match result:
+    case None{}: d
+    case Some{p}: Pair.fst(U32, List<&2, U32>, p)
+
+def utf8_proof.rest_of(d: List<&2, U32>, result: Maybe<&1, U32 & List<&2, U32>>) -> List<&2, U32>:
+  match result:
+    case None{}: d
+    case Some{p}: Pair.snd(U32, List<&2, U32>, p)
+
+def utf8_proof.some_first(+c1: U32, +c2: U32, +r1: List<&2, U32>, +r2: List<&2, U32>,
+  e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>}) -> {c1 == c2 : U32}:
+  Equal.cong(Maybe<&1, U32 & List<&2, U32>>, U32, m => utf8_proof.first_of(c1, m),
+    Some{(c1, r1)}, Some{(c2, r2)}, e)
+
+def utf8_proof.some_rest(+c1: U32, +c2: U32, +r1: List<&2, U32>, +r2: List<&2, U32>,
+  e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>}) -> {r1 == r2 : List<&2, U32>}:
+  Equal.cong(Maybe<&1, U32 & List<&2, U32>>, List<&2, U32>, m => utf8_proof.rest_of(r1, m),
+    Some{(c1, r1)}, Some{(c2, r2)}, e)
+
+def utf8_proof.none_some(+c: U32, +r: List<&2, U32>,
+  e: {None{} == Some{(c, r)} : Maybe<&1, U32 & List<&2, U32>>}) -> Empty:
+  H.hex_u32.false_true(Equal.cong(Maybe<&1, U32 & List<&2, U32>>, Bool,
+    m => Maybe.is_some(&1, U32 & List<&2, U32>, m), None{}, Some{(c, r)}, e))
+
+def utf8_proof.decodes_at(+scalars: List<&2, U32>, +from: List<&2, U32>, +to: List<&2, U32>,
+  same: {from == to : List<&2, U32>}, decoded: Laws.decodes.go(scalars, from)) ->
+  Laws.decodes.go(scalars, to):
+  %same : Laws.decodes.go(scalars, _)
+  decoded
+
+def utf8_proof.decodes_unique.cons(+c1: U32, +c2: U32, +t1: List<&2, U32>, +t2: List<&2, U32>,
+  +r1: List<&2, U32>, +r2: List<&2, U32>,
+  +e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>},
+  g2: Laws.decodes.go(t2, r2),
+  tails: Laws.decodes.go(t2, r1) -> {t1 == t2 : List<&2, U32>}) ->
+  {c1 <> t1 == c2 <> t2 : List<&2, U32>}:
+  utf8_proof.cons_eq(c1, c2, t1, t2, utf8_proof.some_first(c1, c2, r1, r2, e),
+    tails(utf8_proof.decodes_at(t2, r2, r1,
+      Equal.sym(List<&2, U32>, r1, r2, utf8_proof.some_rest(c1, c2, r1, r2, e)), g2)))
+
+def utf8_proof.decodes_unique.go(+s1: List<&2, U32>, +s2: List<&2, U32>, +bytes: List<&2, U32>,
+  d1: Laws.decodes.go(s1, bytes), d2: Laws.decodes.go(s2, bytes)) -> {s1 == s2 : List<&2, U32>}:
+  match s1 s2:
+    case Nil{} Nil{}:
+      {==}
+    case Nil{} +c <> +cs:
+      (+rest, facts) = d2
+      (first, others) = facts
+      Empty.absurd({Nil{} == c <> cs : List<&2, U32>},
+        utf8_proof.none_some(c, rest,
+          Laws.decodes_first_unique(bytes, None{}, Some{(c, rest)}, d1, first)))
+    case +c <> +cs Nil{}:
+      (+rest, facts) = d1
+      (first, others) = facts
+      Empty.absurd({c <> cs == Nil{} : List<&2, U32>},
+        utf8_proof.none_some(c, rest,
+          Laws.decodes_first_unique(bytes, None{}, Some{(c, rest)}, d2, first)))
+    case +c1 <> +t1 +c2 <> +t2:
+      (+r1, facts1) = d1
+      (first1, g1) = facts1
+      (+r2, facts2) = d2
+      (first2, g2) = facts2
+      utf8_proof.decodes_unique.cons(c1, c2, t1, t2, r1, r2,
+        Laws.decodes_first_unique(bytes, Some{(c1, r1)}, Some{(c2, r2)}, first1, first2), g2,
+        g => utf8_proof.decodes_unique.go(t1, t2, r1, g1, g))
+
+def Laws.decodes_unique(bytes, s1, s2, d1, d2):
+  utf8_proof.decodes_unique.go(s1, s2, bytes, d1, d2)
+
+# Each example gives, for each scalar, the bytes left after it; for a
+# replaced scalar, also the maximal subpart and its proof.
+def Laws.decodes_examples():
+  ({==},
+  (([66], ({==}, ([], ({==}, {==})))),
+  (([], ({==}, {==})),
+  (([65], (([194], ([65], ((([65], {==}), ({==}, {==})), ({==}, {==})))),
+    ([], ({==}, {==})))),
+  (([128], (([192], ([128], ({==}, ({==}, {==})))),
+    ([], (([128], ([], ({==}, ({==}, {==})))), {==})))),
+  (([], (([194], ([], ((([], {==}), ({==}, Unit{})), ({==}, {==})))), {==})),
+  (([194, 169], (([194], ([194, 169], ((([194, 169], {==}), ({==}, {==})), ({==}, {==})))),
+    ([], ({==}, {==})))),
+  ([194, 169, 255], ({==},
+    ([255], ({==},
+      ([], (([255], ([], ({==}, ({==}, {==})))), {==})))))))))))))

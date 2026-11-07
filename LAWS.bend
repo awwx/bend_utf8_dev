@@ -531,6 +531,66 @@ law decodes_first_nonempty:
   for decoded: decodes_first(b1 <> more, result)
   {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}
 
+# Decoding a complete buffer
+# --------------------------
+
+# Decoding the complete buffer `bytes` gives the scalars `scalars`: an
+# empty list if there is nothing to decode, otherwise the scalar that
+# `decodes_first` gives followed by the scalars from decoding the bytes
+# after it.
+#
+# The recursion is on `scalars`, which shrinks at each step, so
+# `scalars` comes first in `decodes.go`.
+
+def decodes.go(scalars: List<&2, U32>, bytes: List<&2, U32>) -> Type:
+  match scalars:
+    case Nil{}:
+      decodes_first(bytes, None{})
+    case +cp <> +cps:
+      Exists(List<&2, U32>, rest =>
+        decodes_first(bytes, Some{(cp, rest)}) & decodes.go(cps, rest))
+
+def decodes(bytes: List<&2, U32>, scalars: List<&2, U32>) -> Type:
+  decodes.go(scalars, bytes)
+
+# Every buffer decodes to some list of scalars.
+
+law decodes_exists:
+  for +bytes: List<&2, U32>
+  Exists(List<&2, U32>, scalars => decodes(bytes, scalars))
+
+# A buffer decodes to only one list of scalars.
+
+law decodes_unique:
+  for +bytes: List<&2, U32>
+  for +s1: List<&2, U32>
+  for +s2: List<&2, U32>
+  for d1: decodes(bytes, s1)
+  for d2: decodes(bytes, s2)
+  {s1 == s2 : List<&2, U32>}
+
+# Bytes in hex: 65 = 0x41 "A", 66 = 0x42 "B", 72 = 0x48 "H",
+# 128 = 0x80, 169 = 0xA9, 192 = 0xC0, 194 = 0xC2, 255 = 0xFF.
+
+law decodes_examples:
+  # Nothing to decode.
+  decodes([], []) &
+  # One-byte sequences.
+  decodes([65, 66], [65, 66]) &
+  # A two-byte sequence: C2 A9 is U+00A9.
+  decodes([194, 169], [169]) &
+  # A lead byte followed by a byte that cannot continue it: the lead
+  # byte is replaced, and "A" decodes afresh.
+  decodes([194, 65], [replacement_char(), 65]) &
+  # C0 begins no valid sequence (it would be overlong), and neither does
+  # a lone continuation byte: each is replaced separately.
+  decodes([192, 128], [replacement_char(), replacement_char()]) &
+  # A sequence left unfinished at the end of the buffer is replaced.
+  decodes([194], [replacement_char()]) &
+  # The second C2 cannot continue the first; it then begins C2 A9.
+  decodes([194, 194, 169], [replacement_char(), 169]) &
+  # Valid sequences around a byte that never appears in UTF-8.
+  decodes([72, 194, 169, 255], [72, 169, replacement_char()])
 
 # `bytes` with its maximal subpart removed from the front.  The maximal
 # subpart is the longest non-empty prefix of `bytes` that begins a valid
