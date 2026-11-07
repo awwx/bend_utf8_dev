@@ -97,7 +97,7 @@ law valid_byte_string:
     (Nat.is_eq(String.length(s), 8n) &&
      List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s))) : Bool}
 
-# As of Bend 2.0.39 "if" statements are written this way.
+# As of Bend 2.0.40 "if" statements are written this way.
 
 def str_bit8.if(valid: Bool, bit8: Defs.Bit8()) -> Maybe<&1, Defs.Bit8()>:
   match valid:

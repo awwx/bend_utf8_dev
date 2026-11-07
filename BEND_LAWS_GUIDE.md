@@ -2,7 +2,8 @@
 
 This guide describes an approach to writing specifications as Bend laws, for
 any project that uses `LAWS.bend` / `PROOF.bend`. It was written against
-Bend 2.0.39, and version-specific details are marked as such.
+Bend 2.0.39 and checked against 2.0.40. Version-specific details are marked
+as such.
 
 The examples come from a UTF-8 encoding project. That project has three
 implementation modules, `binary.bend`, `hexdigits.bend` and `utf8.bend`,
@@ -450,8 +451,9 @@ argument of a function it calls, from other laws inside its own statement.
 
 A reference definition in a laws file may do the same, but only in an
 erased position, such as a function's `-` proof argument. Bend rejects a
-law used in live code ("an unfilled law is a dead claim: live code cannot
-use it"), which also rules out circular reasoning. Either way, the check
+law used in live code ("a def whose body is implemented before the def is
+used (defs are checked in file order, and an unfilled law has none)"), which
+also rules out circular reasoning. Either way, the check
 passes only once `PROOF.bend` proves every law that is used, so the proof
 stays out of the laws file. *Example:* a law states the fact that decoding
 needs, and the reference definition passes that law as the decoder's proof
@@ -639,9 +641,9 @@ it. Periodically look for unused definitions.
 
 ### 7.2 Branching on Bool, with evidence
 
-Bend 2.0.39 has no `if` statement. Write a `name.if` helper that matches on
-the Bool, and pass `{==}` as evidence of what was matched, so that each
-branch knows the condition's value:
+As of Bend 2.0.40 there is no `if` statement. Write a `name.if` helper
+that matches on the Bool, and pass `{==}` as evidence of what was matched,
+so that each branch knows the condition's value:
 
 ```bend
 def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
@@ -654,7 +656,7 @@ def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
   valid_two_bytes.if(b1, b2, has_two_byte_shape(b1, b2), {==})
 ```
 
-Put a short comment on version-specific idioms ("As of Bend 2.0.39 'if'
+Put a short comment on version-specific idioms ("As of Bend 2.0.40 'if'
 statements are written this way.") so they're easy to revisit.
 
 ### 7.3 Splitting validity proofs
@@ -692,7 +694,7 @@ single induction instead of a case split.
 
 ### 7.5 Matching, recursion and order
 
-As observed in Bend 2.0.39:
+As of Bend 2.0.40:
 
 - **A match can't scrutinize a computed value**, and a computed pair or
   `Exists` can't be unpacked. Pass the value to a helper def as a
@@ -705,8 +707,10 @@ As observed in Bend 2.0.39:
   left to right; each must be passed unchanged until one shrinks. So put the
   shrinking argument first. *Example:* `decodes.go(text, bytes)` recurses
   on `text`, while `decodes(bytes, text)` keeps the readable order.
-- **There is no mutual recursion.** Pass the recursive call to a helper as
-  a function. *Example:* `q => q_ok => utf8_proof.bytes_ok(rest, q, q_ok)`.
+- **There is no mutual recursion.** Either pass the recursive call to a
+  helper as a function, or merge the functions into one def with an extra
+  argument that selects which one to run (the Bend guide's suggestion).
+  *Example:* `q => q_ok => utf8_proof.bytes_ok(rest, q, q_ok)`.
 - **When nothing shrinks structurally, recurse on fuel.** *Example:* the
   bytes left after decoding a code point aren't simply the tail of the
   input.
@@ -714,8 +718,10 @@ As observed in Bend 2.0.39:
     which starts as the input.
   - It keeps the remaining bytes a suffix of the fuel. Each step consumes at
     least one byte, so the fuel shrinks.
-- **Define before use.** A def used above its definition doesn't unfold,
-  so a type that depends on it can't be computed.
+- **Define before use.** A def can only use defs written above it,
+  including ones that return a Type. Otherwise Bend reports "defs are
+  checked in file order". In `PROOF.bend` this includes laws: `def Laws.x`
+  must come before any proof that calls `Laws.x(...)`.
 
 ---
 
