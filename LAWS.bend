@@ -183,11 +183,14 @@ law utf8_overlong_two_bytes:
     UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid_shape)) : Bool}
 
 
+## Valid encodings
 
-# A valid one-byte encoding has the one-byte shape, and if it does
-# have the one-byte shape, it is not overlong and decodes to a Unicode
-# scalar.
-#
+# An encoding is valid when:
+# * It has the correct byte shape, and
+# * It is not overlong, and
+# * the code point it encodes is a Unicode scalar (not a forbidden
+#   surrogate).
+
 # Testing the shape first supplies the proof that decoding needs.
 
 def valid_one_byte.if(+byte: U32, shape: Bool,
@@ -207,7 +210,7 @@ law utf8_valid_one_byte:
   {UTF8.valid_one_byte(byte) == valid_one_byte(byte) : Bool}
 
 
-# Overlong means that the decoded code point fits in one byte.
+
 
 # A valid two-byte encoding has the two-byte shape, and, if it does
 # have the two-byte shape, it is not overlong and decodes to a Unicode
