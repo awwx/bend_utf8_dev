@@ -2961,8 +2961,8 @@ def Laws.utf8_begins_valid_sequence(seq):
   (begins => utf8_proof.begins_completion(seq, begins),
    completion => utf8_proof.begins_from_completion(seq, completion))
 
-# The implementation agrees with the reference decoder
-# ----------------------------------------------------
+# The implementation's scalar functions agree with the specification's
+# --------------------------------------------------------------------
 
 def utf8_proof.true_false(e: {True{} == False{} : Bool}) -> Empty:
   H.hex_u32.false_true(Equal.sym(Bool, True{}, False{}, e))
@@ -3013,81 +3013,6 @@ def utf8_proof.scalar_agrees(+seq: List<&2, U32>) ->
         Laws.valid_two_bytes(b1, b2), {==}, Laws.utf8_valid_two_bytes(b1, b2))
     case b1 <> b2 <> b3 <> rest: {==}
 
-def utf8_proof.prepend_agrees(+text: String, step: Laws.Step()) ->
-  {UTF8.decode_buffer.prepend(text, step) == Laws.Step.prepend(text, step) : Laws.Step()}:
-  (more, pending) = step
-  {==}
-
-def utf8_proof.advance_agrees.same(+seq: List<&2, U32>, +scalar: Maybe<&2, U32>,
-  +begins: Bool, -impl: Unit -> Laws.Step(), -spec: Unit -> Laws.Step(),
-  same: {impl(Unit{}) == spec(Unit{}) : Laws.Step()}) ->
-  {UTF8.decode_buffer.advance(seq, scalar, begins, impl) ==
-    Laws.advance(seq, scalar, begins, spec) : Laws.Step()}:
-  match scalar begins:
-    case Some{cp} _: {==}
-    case None{} True{}: {==}
-    case None{} False{}: same
-
-def utf8_proof.advance_agrees(+seq: List<&2, U32>, +impl_scalar: Maybe<&2, U32>,
-  +spec_scalar: Maybe<&2, U32>, scalar: {impl_scalar == spec_scalar : Maybe<&2, U32>},
-  +begins: Bool, -impl: Unit -> Laws.Step(), -spec: Unit -> Laws.Step(),
-  same: {impl(Unit{}) == spec(Unit{}) : Laws.Step()}) ->
-  {UTF8.decode_buffer.advance(seq, impl_scalar, begins, impl) ==
-    Laws.advance(seq, spec_scalar, begins, spec) : Laws.Step()}:
-  %scalar : {UTF8.decode_buffer.advance(seq, impl_scalar, begins, impl) ==
-    Laws.advance(seq, _, begins, spec) : Laws.Step()}
-  utf8_proof.advance_agrees.same(seq, impl_scalar, begins, impl, spec, same)
-
-def utf8_proof.start_agrees(+b: U32) ->
-  {UTF8.decode_buffer.start(b) == Laws.start_sequence(b) : Laws.Step()}:
-  utf8_proof.advance_agrees([b], UTF8.sequence_scalar([b]), Laws.sequence_scalar([b]),
-    utf8_proof.scalar_agrees([b]), UTF8.begins_valid_sequence([b]),
-    u => (UTF8.replacement_char_string(), Nil{}),
-    u => (Laws.replacement_char_string(), Nil{}), {==})
-
-def utf8_proof.extend_otherwise(+b: U32) ->
-  {UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(b)) ==
-    Laws.Step.prepend(Laws.replacement_char_string(), Laws.start_sequence(b)) : Laws.Step()}:
-  %utf8_proof.start_agrees(b) :
-    {UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(b)) ==
-      Laws.Step.prepend(Laws.replacement_char_string(), _) : Laws.Step()}
-  utf8_proof.prepend_agrees(UTF8.replacement_char_string(), UTF8.decode_buffer.start(b))
-
-def utf8_proof.extend_agrees(+pending: List<&2, U32>, +b: U32) ->
-  {UTF8.decode_buffer.extend(pending, b) == Laws.extend_sequence(pending, b) : Laws.Step()}:
-  +seq = List.append(&2, U32, pending, [b])
-  utf8_proof.advance_agrees(seq, UTF8.sequence_scalar(seq), Laws.sequence_scalar(seq),
-    utf8_proof.scalar_agrees(seq), UTF8.begins_valid_sequence(seq),
-    u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(b)),
-    u => Laws.Step.prepend(Laws.replacement_char_string(), Laws.start_sequence(b)),
-    utf8_proof.extend_otherwise(b))
-
-def utf8_proof.step_agrees(+pending: List<&2, U32>, +b: U32) ->
-  {UTF8.decode_buffer.step(pending, b) == Laws.step(pending, b) : Laws.Step()}:
-  match pending:
-    case Nil{}: utf8_proof.start_agrees(b)
-    case +p <> +ps: utf8_proof.extend_agrees(p <> ps, b)
-
-def utf8_proof.then_agrees(+rest: List<&2, U32>, stepped: Laws.Step(),
-  same: @q: List<&2, U32> -> {UTF8.decode_buffer.bytes(rest, q) == Laws.reference.go(rest, q) : Laws.Step()}) ->
-  {UTF8.decode_buffer.then(stepped, q => UTF8.decode_buffer.bytes(rest, q)) ==
-    Laws.reference.then(stepped, q => Laws.reference.go(rest, q)) : Laws.Step()}:
-  (+text, +q) = stepped
-  %same(q) : {UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.bytes(rest, q)) ==
-    Laws.Step.prepend(text, _) : Laws.Step()}
-  utf8_proof.prepend_agrees(text, UTF8.decode_buffer.bytes(rest, q))
-
-def utf8_proof.bytes_agrees(+bytes: List<&2, U32>, +pending: List<&2, U32>) ->
-  {UTF8.decode_buffer.bytes(bytes, pending) == Laws.reference.go(bytes, pending) : Laws.Step()}:
-  match bytes:
-    case Nil{}: {==}
-    case +b <> +rest:
-      %utf8_proof.step_agrees(pending, b) :
-        {UTF8.decode_buffer.then(UTF8.decode_buffer.step(pending, b), q => UTF8.decode_buffer.bytes(rest, q)) ==
-          Laws.reference.then(_, q => Laws.reference.go(rest, q)) : Laws.Step()}
-      utf8_proof.then_agrees(rest, UTF8.decode_buffer.step(pending, b),
-        q => utf8_proof.bytes_agrees(rest, q))
-
 # Splitting the input
 # -------------------
 
@@ -3100,54 +3025,54 @@ def utf8_proof.string_assoc(+a: String, +b: String, +c: String) ->
         {SCon{h, String.append(String.append(t, b), c)} == SCon{h, _} : String}
       {==}
 
-def utf8_proof.prepend_empty(step: Laws.Step()) ->
-  {Laws.Step.prepend("", step) == step : Laws.Step()}:
+def utf8_proof.prepend_empty(step: UTF8.decode_buffer.Step()) ->
+  {UTF8.decode_buffer.prepend("", step) == step : UTF8.decode_buffer.Step()}:
   (text, pending) = step
   {==}
 
-def utf8_proof.prepend_assoc(+a: String, +b: String, step: Laws.Step()) ->
-  {Laws.Step.prepend(String.append(a, b), step) ==
-    Laws.Step.prepend(a, Laws.Step.prepend(b, step)) : Laws.Step()}:
+def utf8_proof.prepend_assoc(+a: String, +b: String, step: UTF8.decode_buffer.Step()) ->
+  {UTF8.decode_buffer.prepend(String.append(a, b), step) ==
+    UTF8.decode_buffer.prepend(a, UTF8.decode_buffer.prepend(b, step)) : UTF8.decode_buffer.Step()}:
   (+c, +pending) = step
   %utf8_proof.string_assoc(a, b, c) :
-    {(String.append(String.append(a, b), c), pending) == (_, pending) : Laws.Step()}
+    {(String.append(String.append(a, b), c), pending) == (_, pending) : UTF8.decode_buffer.Step()}
   {==}
 
 # Continuing with `ys` after text was prepended is the same as prepending
 # the text to the continuation.
-def utf8_proof.prepend_then(+ys: List<&2, U32>, +text: String, step: Laws.Step()) ->
-  {Laws.reference.then(Laws.Step.prepend(text, step), q => Laws.reference.go(ys, q)) ==
-    Laws.Step.prepend(text, Laws.reference.then(step, q => Laws.reference.go(ys, q))) : Laws.Step()}:
+def utf8_proof.prepend_then(+ys: List<&2, U32>, +text: String, step: UTF8.decode_buffer.Step()) ->
+  {UTF8.decode_buffer.then(UTF8.decode_buffer.prepend(text, step), q => UTF8.decode_buffer.bytes(ys, q)) ==
+    UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.then(step, q => UTF8.decode_buffer.bytes(ys, q))) : UTF8.decode_buffer.Step()}:
   (+more, +pending) = step
-  utf8_proof.prepend_assoc(text, more, Laws.reference.go(ys, pending))
+  utf8_proof.prepend_assoc(text, more, UTF8.decode_buffer.bytes(ys, pending))
 
-def utf8_proof.go_append.then(+t: List<&2, U32>, +ys: List<&2, U32>, stepped: Laws.Step(),
+def utf8_proof.go_append.then(+t: List<&2, U32>, +ys: List<&2, U32>, stepped: UTF8.decode_buffer.Step(),
   same: @q: List<&2, U32> ->
-    {Laws.reference.go(List.append(&2, U32, t, ys), q) ==
-      Laws.reference.then(Laws.reference.go(t, q), r => Laws.reference.go(ys, r)) : Laws.Step()}) ->
-  {Laws.reference.then(stepped, q => Laws.reference.go(List.append(&2, U32, t, ys), q)) ==
-    Laws.reference.then(Laws.reference.then(stepped, q => Laws.reference.go(t, q)),
-      r => Laws.reference.go(ys, r)) : Laws.Step()}:
+    {UTF8.decode_buffer.bytes(List.append(&2, U32, t, ys), q) ==
+      UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(t, q), r => UTF8.decode_buffer.bytes(ys, r)) : UTF8.decode_buffer.Step()}) ->
+  {UTF8.decode_buffer.then(stepped, q => UTF8.decode_buffer.bytes(List.append(&2, U32, t, ys), q)) ==
+    UTF8.decode_buffer.then(UTF8.decode_buffer.then(stepped, q => UTF8.decode_buffer.bytes(t, q)),
+      r => UTF8.decode_buffer.bytes(ys, r)) : UTF8.decode_buffer.Step()}:
   (+text, +q) = stepped
-  %Equal.sym(Laws.Step(), Laws.reference.go(List.append(&2, U32, t, ys), q),
-      Laws.reference.then(Laws.reference.go(t, q), r => Laws.reference.go(ys, r)), same(q)) :
-    {Laws.Step.prepend(text, _) ==
-      Laws.reference.then(Laws.Step.prepend(text, Laws.reference.go(t, q)), r => Laws.reference.go(ys, r)) : Laws.Step()}
-  Equal.sym(Laws.Step(),
-    Laws.reference.then(Laws.Step.prepend(text, Laws.reference.go(t, q)), r => Laws.reference.go(ys, r)),
-    Laws.Step.prepend(text, Laws.reference.then(Laws.reference.go(t, q), r => Laws.reference.go(ys, r))),
-    utf8_proof.prepend_then(ys, text, Laws.reference.go(t, q)))
+  %Equal.sym(UTF8.decode_buffer.Step(), UTF8.decode_buffer.bytes(List.append(&2, U32, t, ys), q),
+      UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(t, q), r => UTF8.decode_buffer.bytes(ys, r)), same(q)) :
+    {UTF8.decode_buffer.prepend(text, _) ==
+      UTF8.decode_buffer.then(UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.bytes(t, q)), r => UTF8.decode_buffer.bytes(ys, r)) : UTF8.decode_buffer.Step()}
+  Equal.sym(UTF8.decode_buffer.Step(),
+    UTF8.decode_buffer.then(UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.bytes(t, q)), r => UTF8.decode_buffer.bytes(ys, r)),
+    UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(t, q), r => UTF8.decode_buffer.bytes(ys, r))),
+    utf8_proof.prepend_then(ys, text, UTF8.decode_buffer.bytes(t, q)))
 
 # Decoding `xs` then `ys` is decoding `xs ++ ys`.
 def utf8_proof.go_append(+xs: List<&2, U32>, +ys: List<&2, U32>, +pending: List<&2, U32>) ->
-  {Laws.reference.go(List.append(&2, U32, xs, ys), pending) ==
-    Laws.reference.then(Laws.reference.go(xs, pending), q => Laws.reference.go(ys, q)) : Laws.Step()}:
+  {UTF8.decode_buffer.bytes(List.append(&2, U32, xs, ys), pending) ==
+    UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(xs, pending), q => UTF8.decode_buffer.bytes(ys, q)) : UTF8.decode_buffer.Step()}:
   match xs:
     case Nil{}:
-      Equal.sym(Laws.Step(), Laws.Step.prepend("", Laws.reference.go(ys, pending)),
-        Laws.reference.go(ys, pending), utf8_proof.prepend_empty(Laws.reference.go(ys, pending)))
+      Equal.sym(UTF8.decode_buffer.Step(), UTF8.decode_buffer.prepend("", UTF8.decode_buffer.bytes(ys, pending)),
+        UTF8.decode_buffer.bytes(ys, pending), utf8_proof.prepend_empty(UTF8.decode_buffer.bytes(ys, pending)))
     case +h <> +t:
-      utf8_proof.go_append.then(t, ys, Laws.step(pending, h),
+      utf8_proof.go_append.then(t, ys, UTF8.decode_buffer.step(pending, h),
         q => utf8_proof.go_append(t, ys, q))
 
 def utf8_proof.all_bytes_cons(+h: U32, ok: Bool, -checked: {U32.is_le(h, 255) == ok : Bool},
@@ -3171,66 +3096,62 @@ def utf8_proof.all_bytes_append(+xs: List<&2, U32>, +ys: List<&2, U32>) ->
 # ---------------
 
 # What feeding should give: None if some value is above 255, otherwise
-# the reference decoder's state and text.
-def utf8_proof.fed_step(step: Laws.Step()) -> Laws.Fed():
+# the byte loop's state and text.
+def utf8_proof.fed_step(step: UTF8.decode_buffer.Step()) -> Laws.Fed():
   (text, pending) = step
   Some{(pending, text)}
 
-def utf8_proof.expected_fed(ok: Bool, step: Laws.Step()) -> Laws.Fed():
+def utf8_proof.expected_fed(ok: Bool, step: UTF8.decode_buffer.Step()) -> Laws.Fed():
   match ok:
     case False{}: None{}
     case True{}: utf8_proof.fed_step(step)
 
-def utf8_proof.fed_prepend(+text: String, ok: Bool, step: Laws.Step()) ->
+def utf8_proof.fed_prepend(+text: String, ok: Bool, step: UTF8.decode_buffer.Step()) ->
   {Laws.feed.prepend(text, utf8_proof.expected_fed(ok, step)) ==
-    utf8_proof.expected_fed(ok, Laws.Step.prepend(text, step)) : Laws.Fed()}:
+    utf8_proof.expected_fed(ok, UTF8.decode_buffer.prepend(text, step)) : Laws.Fed()}:
   match ok:
     case False{}: {==}
     case True{}:
       (more, pending) = step
       {==}
 
-def utf8_proof.feed_step(+rest: List<&2, List<&2, U32>>, stepped: Laws.Step(),
+def utf8_proof.feed_step(+rest: List<&2, List<&2, U32>>, stepped: UTF8.decode_buffer.Step(),
   same: @q: List<&2, U32> ->
     {Laws.feed(rest, q) == utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-      Laws.reference.go(List.concat(&2, U32, rest), q)) : Laws.Fed()}) ->
+      UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)) : Laws.Fed()}) ->
   {Laws.feed.then(UTF8.decode_buffer.result(stepped), s => Laws.feed(rest, s)) ==
     utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-      Laws.reference.then(stepped, q => Laws.reference.go(List.concat(&2, U32, rest), q))) : Laws.Fed()}:
+      UTF8.decode_buffer.then(stepped, q => UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : Laws.Fed()}:
   (+text, +q) = stepped
   %Equal.sym(Laws.Fed(), Laws.feed(rest, q),
-      utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)), Laws.reference.go(List.concat(&2, U32, rest), q)),
+      utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)), UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)),
       same(q)) :
     {Laws.feed.prepend(text, _) ==
       utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-        Laws.Step.prepend(text, Laws.reference.go(List.concat(&2, U32, rest), q))) : Laws.Fed()}
+        UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : Laws.Fed()}
   utf8_proof.fed_prepend(text, Laws.all_bytes(List.concat(&2, U32, rest)),
-    Laws.reference.go(List.concat(&2, U32, rest), q))
+    UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))
 
 def utf8_proof.feed_cons(+buffer: List<&2, U32>, +rest: List<&2, List<&2, U32>>,
   +pending: List<&2, U32>, ok: Bool,
   same: @q: List<&2, U32> ->
     {Laws.feed(rest, q) == utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-      Laws.reference.go(List.concat(&2, U32, rest), q)) : Laws.Fed()}) ->
+      UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)) : Laws.Fed()}) ->
   {Laws.feed.then(UTF8.decode_buffer.if(pending, buffer, ok), s => Laws.feed(rest, s)) ==
     utf8_proof.expected_fed(Bool.and(ok, Laws.all_bytes(List.concat(&2, U32, rest))),
-      Laws.reference.then(Laws.reference.go(buffer, pending),
-        q => Laws.reference.go(List.concat(&2, U32, rest), q))) : Laws.Fed()}:
+      UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(buffer, pending),
+        q => UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : Laws.Fed()}:
   match ok:
     case False{}: {==}
     case True{}:
-      %utf8_proof.bytes_agrees(buffer, pending) :
-        {Laws.feed.then(UTF8.decode_buffer.result(UTF8.decode_buffer.bytes(buffer, pending)), s => Laws.feed(rest, s)) ==
-          utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-            Laws.reference.then(_, q => Laws.reference.go(List.concat(&2, U32, rest), q))) : Laws.Fed()}
       utf8_proof.feed_step(rest, UTF8.decode_buffer.bytes(buffer, pending), same)
 
-# Feeding any list of buffers gives what the reference decoder gives for
-# their concatenation.
+# Feeding any list of buffers gives what the byte loop gives for their
+# concatenation.
 def utf8_proof.feed_agrees(+buffers: List<&2, List<&2, U32>>, +pending: List<&2, U32>) ->
   {Laws.feed(buffers, pending) ==
     utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, buffers)),
-      Laws.reference.go(List.concat(&2, U32, buffers), pending)) : Laws.Fed()}:
+      UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), pending)) : Laws.Fed()}:
   match buffers:
     case Nil{}: {==}
     case +buffer <> +rest:
@@ -3239,64 +3160,14 @@ def utf8_proof.feed_agrees(+buffers: List<&2, List<&2, U32>>, +pending: List<&2,
           utf8_proof.all_bytes_append(buffer, List.concat(&2, U32, rest))) :
         {Laws.feed(buffer <> rest, pending) ==
           utf8_proof.expected_fed(_,
-            Laws.reference.go(List.append(&2, U32, buffer, List.concat(&2, U32, rest)), pending)) : Laws.Fed()}
-      %Equal.sym(Laws.Step(), Laws.reference.go(List.append(&2, U32, buffer, List.concat(&2, U32, rest)), pending),
-          Laws.reference.then(Laws.reference.go(buffer, pending), q => Laws.reference.go(List.concat(&2, U32, rest), q)),
+            UTF8.decode_buffer.bytes(List.append(&2, U32, buffer, List.concat(&2, U32, rest)), pending)) : Laws.Fed()}
+      %Equal.sym(UTF8.decode_buffer.Step(), UTF8.decode_buffer.bytes(List.append(&2, U32, buffer, List.concat(&2, U32, rest)), pending),
+          UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(buffer, pending), q => UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)),
           utf8_proof.go_append(buffer, List.concat(&2, U32, rest), pending)) :
         {Laws.feed(buffer <> rest, pending) ==
           utf8_proof.expected_fed(Bool.and(Laws.all_bytes(buffer), Laws.all_bytes(List.concat(&2, U32, rest))), _) : Laws.Fed()}
       utf8_proof.feed_cons(buffer, rest, pending, Laws.all_bytes(buffer),
         q => utf8_proof.feed_agrees(rest, q))
-
-# The streaming laws
-# ------------------
-
-def utf8_proof.so_far_text(ok: Bool, step: Laws.Step()) ->
-  {Laws.decoded_so_far.text(utf8_proof.expected_fed(ok, step)) ==
-    Laws.when(String, ok, Laws.Step.text(step)) : Maybe<&2, String>}:
-  match ok:
-    case False{}: {==}
-    case True{}:
-      (text, pending) = step
-      {==}
-
-def utf8_proof.done_text.pending(+text: String, +pending: List<&2, U32>) ->
-  {Laws.decoded.text(utf8_proof.fed_step((text, pending))) ==
-    Laws.when(String, True{}, Laws.Step.final_text((text, pending))) : Maybe<&2, String>}:
-  match pending:
-    case Nil{}: {==}
-    case p <> ps: {==}
-
-def utf8_proof.done_text(ok: Bool, step: Laws.Step()) ->
-  {Laws.decoded.text(utf8_proof.expected_fed(ok, step)) ==
-    Laws.when(String, ok, Laws.Step.final_text(step)) : Maybe<&2, String>}:
-  match ok:
-    case False{}: {==}
-    case True{}:
-      (+text, +pending) = step
-      utf8_proof.done_text.pending(text, pending)
-
-def Laws.utf8_decode_buffer(buffers):
-  %Equal.sym(Laws.Fed(), Laws.feed(buffers, Nil{}),
-      utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, buffers)),
-        Laws.reference.go(List.concat(&2, U32, buffers), Nil{})),
-      utf8_proof.feed_agrees(buffers, Nil{})) :
-    {Laws.decoded_so_far.text(_) ==
-      Laws.when(String, Laws.all_bytes(List.concat(&2, U32, buffers)),
-        Laws.reference_so_far(List.concat(&2, U32, buffers))) : Maybe<&2, String>}
-  utf8_proof.so_far_text(Laws.all_bytes(List.concat(&2, U32, buffers)),
-    Laws.reference.go(List.concat(&2, U32, buffers), Nil{}))
-
-def Laws.utf8_decode_done(buffers):
-  %Equal.sym(Laws.Fed(), Laws.feed(buffers, Nil{}),
-      utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, buffers)),
-        Laws.reference.go(List.concat(&2, U32, buffers), Nil{})),
-      utf8_proof.feed_agrees(buffers, Nil{})) :
-    {Laws.decoded.text(_) ==
-      Laws.when(String, Laws.all_bytes(List.concat(&2, U32, buffers)),
-        Laws.reference_final(List.concat(&2, U32, buffers))) : Maybe<&2, String>}
-  utf8_proof.done_text(Laws.all_bytes(List.concat(&2, U32, buffers)),
-    Laws.reference.go(List.concat(&2, U32, buffers), Nil{}))
 
 # Uniqueness of maximal subparts and of decoding the first code point
 # --------------------------------------------------------------------
@@ -4353,11 +4224,342 @@ def utf8_proof.decodes_result(ok: Bool, +bytes: List<&2, U32>, step: UTF8.decode
 def Laws.utf8_decodes(buffers):
   +bytes = List.concat(&2, U32, buffers)
   %Equal.sym(Laws.Fed(), Laws.feed(buffers, Nil{}),
-      utf8_proof.expected_fed(Laws.all_bytes(bytes), Laws.reference.go(bytes, Nil{})),
+      utf8_proof.expected_fed(Laws.all_bytes(bytes), UTF8.decode_buffer.bytes(bytes, Nil{})),
       utf8_proof.feed_agrees(buffers, Nil{})) :
     Laws.decodes_result.if(Laws.all_bytes(bytes), bytes, Laws.decoded.text(_))
-  %utf8_proof.bytes_agrees(bytes, Nil{}) :
-    Laws.decodes_result.if(Laws.all_bytes(bytes), bytes,
-      Laws.decoded.text(utf8_proof.expected_fed(Laws.all_bytes(bytes), _)))
   utf8_proof.decodes_result(Laws.all_bytes(bytes), bytes, UTF8.decode_buffer.bytes(bytes, Nil{}),
     utf8_proof.bytes_ok(bytes, Nil{}, Unit{}))
+
+# Safe and prompt
+# ---------------
+
+def utf8_proof.step_text(step: UTF8.decode_buffer.Step()) -> String:
+  (text, pending) = step
+  text
+
+def utf8_proof.step_pending(step: UTF8.decode_buffer.Step()) -> List<&2, U32>:
+  (text, pending) = step
+  pending
+
+def utf8_proof.final_then(step: UTF8.decode_buffer.Step(), +ys: List<&2, U32>) ->
+  {utf8_proof.final_text(UTF8.decode_buffer.then(step, q => UTF8.decode_buffer.bytes(ys, q))) ==
+    utf8_proof.step_text(step) ++
+      utf8_proof.final_text(UTF8.decode_buffer.bytes(ys, utf8_proof.step_pending(step))) : String}:
+  (+t, +q) = step
+  utf8_proof.final_prepend(t, UTF8.decode_buffer.bytes(ys, q))
+
+# Decoding `xs ++ ys` from scratch gives the text so far for `xs`, then
+# what finishing with `ys` gives.
+def utf8_proof.decodes_split(+xs: List<&2, U32>, +ys: List<&2, U32>) ->
+  Laws.decodes(List.append(&2, U32, xs, ys),
+    utf8_proof.step_text(UTF8.decode_buffer.bytes(xs, Nil{})) ++
+    utf8_proof.final_text(UTF8.decode_buffer.bytes(ys,
+      utf8_proof.step_pending(UTF8.decode_buffer.bytes(xs, Nil{}))))):
+  %utf8_proof.final_then(UTF8.decode_buffer.bytes(xs, Nil{}), ys) :
+    Laws.decodes(List.append(&2, U32, xs, ys), _)
+  %utf8_proof.go_append(xs, ys, Nil{}) :
+    Laws.decodes(List.append(&2, U32, xs, ys), utf8_proof.final_text(_))
+  utf8_proof.bytes_ok(List.append(&2, U32, xs, ys), Nil{}, Unit{})
+
+# The decoder's pending bytes keep the invariant.
+def utf8_proof.pending_prepend(+t: String, s: UTF8.decode_buffer.Step()) ->
+  {utf8_proof.step_pending(UTF8.decode_buffer.prepend(t, s)) == utf8_proof.step_pending(s) : List<&2, U32>}:
+  (+more, +q) = s
+  {==}
+
+def utf8_proof.pending_ok.then(+pending: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
+  stepped: UTF8.decode_buffer.Step(), ok: utf8_proof.StepOK(pending, b, rest, stepped),
+  recurse: @q: List<&2, U32> -> utf8_proof.Pending(q) ->
+    utf8_proof.Pending(utf8_proof.step_pending(UTF8.decode_buffer.bytes(rest, q)))) ->
+  utf8_proof.Pending(utf8_proof.step_pending(
+    UTF8.decode_buffer.then(stepped, q => UTF8.decode_buffer.bytes(rest, q)))):
+  (+t, +q) = stepped
+  (pending_q, continue) = ok
+  %Equal.sym(List<&2, U32>,
+      utf8_proof.step_pending(UTF8.decode_buffer.prepend(t, UTF8.decode_buffer.bytes(rest, q))),
+      utf8_proof.step_pending(UTF8.decode_buffer.bytes(rest, q)),
+      utf8_proof.pending_prepend(t, UTF8.decode_buffer.bytes(rest, q))) :
+    utf8_proof.Pending(_)
+  recurse(q, pending_q)
+
+def utf8_proof.pending_ok(+bytes: List<&2, U32>, +pending: List<&2, U32>,
+  invariant: utf8_proof.Pending(pending)) ->
+  utf8_proof.Pending(utf8_proof.step_pending(UTF8.decode_buffer.bytes(bytes, pending))):
+  match bytes:
+    case Nil{}:
+      invariant
+    case +b <> +rest:
+      utf8_proof.pending_ok.then(pending, b, rest, UTF8.decode_buffer.step(pending, b),
+        utf8_proof.step_ok(pending, b, rest, invariant),
+        q => q_ok => utf8_proof.pending_ok(rest, q, q_ok))
+
+# The text so far is the text of the byte loop's result.
+def utf8_proof.string_or(d: String, m: Maybe<&2, String>) -> String:
+  match m:
+    case None{}: d
+    case Some{x}: x
+
+def utf8_proof.text_so_far(ok: Bool, step: UTF8.decode_buffer.Step(), +text: String,
+  e: {Laws.decoded_so_far.text(utf8_proof.expected_fed(ok, step)) == Some{text} : Maybe<&2, String>}) ->
+  {utf8_proof.step_text(step) == text : String}:
+  match ok:
+    case False{}:
+      Empty.absurd({utf8_proof.step_text(step) == text : String},
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, String>, Bool, m => Maybe.is_some(&2, String, m),
+          None{}, Some{text}, e)))
+    case True{}:
+      (+t, +q) = step
+      Equal.cong(Maybe<&2, String>, String, m => utf8_proof.string_or(t, m), Some{t}, Some{text}, e)
+
+def utf8_proof.so_far_at(+buffers: List<&2, List<&2, U32>>, +text: String,
+  so_far: {Laws.decoded_so_far(buffers) == Some{text} : Maybe<&2, String>}) ->
+  {Laws.decoded_so_far.text(utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, buffers)),
+    UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}))) == Some{text} : Maybe<&2, String>}:
+  %utf8_proof.feed_agrees(buffers, Nil{}) :
+    {Laws.decoded_so_far.text(_) == Some{text} : Maybe<&2, String>}
+  so_far
+
+# Safe.
+def utf8_proof.prefix_from.eq(+t: String, +text: String, +more: String, +full: String,
+  same_text: {t == text : String}, same_full: {full == t ++ more : String}) ->
+  {text ++ more == full : String}:
+  %same_text : {_ ++ more == full : String}
+  Equal.sym(String, full, t ++ more, same_full)
+
+def utf8_proof.prefix_from(+t: String, +text: String, +more: String, +full: String,
+  same_text: {t == text : String}, same_full: {full == t ++ more : String}) ->
+  Laws.is_text_prefix(text, full):
+  (more, utf8_proof.prefix_from.eq(t, text, more, full, same_text, same_full))
+
+def utf8_proof.safe.step(+bytes: List<&2, U32>, +rest: List<&2, U32>, +text: String, +full: String,
+  step: UTF8.decode_buffer.Step(),
+  text_is: {utf8_proof.step_text(step) == text : String},
+  split: Laws.decodes(List.append(&2, U32, bytes, rest),
+    utf8_proof.step_text(step) ++
+    utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, utf8_proof.step_pending(step)))),
+  decoded: Laws.decodes(List.append(&2, U32, bytes, rest), full)) ->
+  Laws.is_text_prefix(text, full):
+  (+t, +q) = step
+  utf8_proof.prefix_from(t, text, utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, q)), full, text_is,
+    Laws.decodes_unique(List.append(&2, U32, bytes, rest), full,
+      t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, q)), decoded, split))
+
+def Laws.utf8_decode_buffer_safe(buffers, text, so_far, rest, full, decoded):
+  utf8_proof.safe.step(List.concat(&2, U32, buffers), rest, text, full,
+    UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}),
+    utf8_proof.text_so_far(Laws.all_bytes(List.concat(&2, U32, buffers)),
+      UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}), text,
+      utf8_proof.so_far_at(buffers, text, so_far)),
+    utf8_proof.decodes_split(List.concat(&2, U32, buffers), rest), decoded)
+
+# Prompt.
+def utf8_proof.PromptGoal(+bytes: List<&2, U32>, +text: String, +c: U32) -> Type:
+  Exists(List<&2, U32>, rest =>
+    {Laws.all_bytes(rest) == True{} : Bool} &
+    Exists(String, full =>
+      Laws.decodes(List.append(&2, U32, bytes, rest), full) &
+      (Laws.is_text_prefix(text ++ Laws.code_point_to_string(c), full) -> Empty)))
+
+def utf8_proof.string_tail(s: String) -> String:
+  match s:
+    case SNil{}: SNil{}
+    case SCon{h, t}: t
+
+def utf8_proof.string_is_cons(s: String) -> Bool:
+  match s:
+    case SNil{}: False{}
+    case SCon{h, t}: True{}
+
+def utf8_proof.char_of(d: U32, s: String) -> U32:
+  match s:
+    case SNil{}: d
+    case SCon{Chr{x}, t}: x
+
+def utf8_proof.string_cancel(+t: String, +a: String, +b: String, +e: {t ++ a == t ++ b : String}) ->
+  {a == b : String}:
+  match t:
+    case SNil{}: e
+    case SCon{+h, +tt}:
+      utf8_proof.string_cancel(tt, a, b,
+        Equal.cong(String, String, utf8_proof.string_tail, SCon{h, tt ++ a}, SCon{h, tt ++ b}, e))
+
+def utf8_proof.not_prefix.regroup(+text: String, +t: String, +c: U32, +more: String, +rest: String,
+  +same: {t == text : String},
+  e: {(text ++ SCon{Chr{c}, SNil{}}) ++ more == t ++ rest : String}) ->
+  {text ++ SCon{Chr{c}, more} == text ++ rest : String}:
+  Equal.trans(String, text ++ SCon{Chr{c}, more}, (text ++ SCon{Chr{c}, SNil{}}) ++ more, text ++ rest,
+    Equal.sym(String, (text ++ SCon{Chr{c}, SNil{}}) ++ more, text ++ SCon{Chr{c}, more},
+      utf8_proof.string_assoc(text, SCon{Chr{c}, SNil{}}, more)),
+    Equal.trans(String, (text ++ SCon{Chr{c}, SNil{}}) ++ more, t ++ rest, text ++ rest, e,
+      Equal.cong(String, String, x => x ++ rest, t, text, same)))
+
+# Text that continues `t ++ rest` after `text` (which is `t`) with `c`
+# would make `rest` begin with `c`.
+def utf8_proof.not_prefix(+text: String, +t: String, +c: U32, +rest: String, +same: {t == text : String},
+  prefix: Laws.is_text_prefix(text ++ SCon{Chr{c}, SNil{}}, t ++ rest),
+  differs: @more: String -> {SCon{Chr{c}, more} == rest : String} -> Empty) -> Empty:
+  (+more, e) = prefix
+  differs(more, utf8_proof.string_cancel(text, SCon{Chr{c}, more}, rest,
+    utf8_proof.not_prefix.regroup(text, t, c, more, rest, same, e)))
+
+def utf8_proof.head_eq(+c1: U32, +c2: U32, +m1: String, +m2: String,
+  e: {SCon{Chr{c1}, m1} == SCon{Chr{c2}, m2} : String}) -> {c1 == c2 : U32}:
+  Equal.cong(String, U32, s => utf8_proof.char_of(c1, s), SCon{Chr{c1}, m1}, SCon{Chr{c2}, m2}, e)
+
+def utf8_proof.le_at(+x: U32, +y: U32, e: {x == y : U32},
+  le: {U32.is_le(x, 2047) == True{} : Bool}) -> {U32.is_le(y, 2047) == True{} : Bool}:
+  %e : {U32.is_le(_, 2047) == True{} : Bool}
+  le
+
+def utf8_proof.ends_here(+c: U32, +more: String, e: {SCon{Chr{c}, more} == SNil{} : String}) -> Empty:
+  utf8_proof.true_false(Equal.cong(String, Bool, utf8_proof.string_is_cons, SCon{Chr{c}, more}, SNil{}, e))
+
+def utf8_proof.not_replacement(+c: U32, +more: String,
+  small: {U32.is_le(c, 2047) == True{} : Bool},
+  e: {SCon{Chr{c}, more} == SCon{Chr{65533}, SNil{}} : String}) -> Empty:
+  H.hex_u32.false_true(utf8_proof.le_at(c, 65533, utf8_proof.head_eq(c, 65533, more, SNil{}, e), small))
+
+def utf8_proof.not_two_byte(+c: U32, +cp: U32, +more: String, +rest: String,
+  large: {U32.is_le(c, 2047) == False{} : Bool},
+  rest_is: {rest == SCon{Chr{cp}, SNil{}} : String},
+  bound: {U32.is_le(cp, 2047) == True{} : Bool},
+  e: {SCon{Chr{c}, more} == rest : String}) -> Empty:
+  utf8_proof.true_false(Equal.trans(Bool, True{}, U32.is_le(c, 2047), False{},
+    Equal.sym(Bool, U32.is_le(c, 2047), True{},
+      utf8_proof.le_at(cp, c, Equal.sym(U32, c, cp,
+        utf8_proof.head_eq(c, cp, more, SNil{},
+          Equal.trans(String, SCon{Chr{c}, more}, rest, SCon{Chr{cp}, SNil{}}, e, rest_is))), bound)),
+    large))
+
+# A pending byte begins a two-byte sequence, which 0x80 completes.
+def utf8_proof.lead_two.if(+p: U32, one: Bool, -checked: {UTF8.valid_one_byte(p) == one : Bool},
+  lead: {(one || UTF8.valid_two_bytes(p, 128)) == True{} : Bool},
+  alone: {UTF8.one_byte_scalar.if(p, one, checked) == None{} : Maybe<&2, U32>}) ->
+  {UTF8.valid_two_bytes(p, 128) == True{} : Bool}:
+  match one:
+    case False{}: lead
+    case True{}:
+      Empty.absurd({UTF8.valid_two_bytes(p, 128) == True{} : Bool},
+        utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+          UTF8.one_byte_scalar.if(p, True{}, checked), None{}, alone)))
+
+def utf8_proof.lead_two(+p: U32,
+  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}) ->
+  {UTF8.valid_two_bytes(p, 128) == True{} : Bool}:
+  utf8_proof.lead_two.if(p, UTF8.valid_one_byte(p), {==}, lead, alone)
+
+def utf8_proof.TwoAfter(+p: U32, step: UTF8.decode_buffer.Step()) -> Type:
+  Exists(U32, cp =>
+    {utf8_proof.final_text(UTF8.decode_buffer.then(step, q => UTF8.decode_buffer.bytes(Nil{}, q))) ==
+      SCon{Chr{cp}, SNil{}} : String} &
+    {U32.is_le(cp, 2047) == True{} : Bool})
+
+def utf8_proof.two_after.if(+p: U32, valid: Bool, +checked: {UTF8.valid_two_bytes(p, 128) == valid : Bool},
+  is_true: {valid == True{} : Bool}) ->
+  utf8_proof.TwoAfter(p, UTF8.decode_buffer.advance([p, 128], UTF8.two_byte_scalar.if(p, 128, valid, checked), valid,
+    u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(128)))):
+  match valid:
+    case True{}:
+      (UTF8.decode_two_bytes(p, 128, UTF8.valid_two_bytes.has_shape(p, 128, checked)),
+        ({==}, utf8_proof.exists_witness(
+          {UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(p, 128,
+            UTF8.valid_two_bytes.has_shape(p, 128, checked))) == True{} : Bool},
+          accepted => {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(p, 128,
+            UTF8.valid_two_bytes.has_shape(p, 128, checked)), accepted) == (p, 128) : U32 & U32},
+          utf8_proof.two_encode_decode((p, 128), UTF8.valid_two_bytes.has_shape(p, 128, checked)))))
+    case False{}:
+      Empty.absurd(utf8_proof.TwoAfter(p, UTF8.decode_buffer.advance([p, 128],
+          UTF8.two_byte_scalar.if(p, 128, False{}, checked), False{},
+          u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(128)))),
+        H.hex_u32.false_true(is_true))
+
+# With `p` pending, the continuation 0x80 gives one character, at most
+# 2047.
+def utf8_proof.two_after(+p: U32,
+  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}) ->
+  Exists(U32, cp =>
+    {utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])) == SCon{Chr{cp}, SNil{}} : String} &
+    {U32.is_le(cp, 2047) == True{} : Bool}):
+  utf8_proof.two_after.if(p, UTF8.valid_two_bytes(p, 128), {==}, utf8_proof.lead_two(p, lead, alone))
+
+def utf8_proof.prompt.large2(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32,
+  +same: {t == text : String},
+  split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
+    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, [p]))),
+  +large: {U32.is_le(c, 2047) == False{} : Bool}, +cp: U32,
+  +rest_is: {utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])) == SCon{Chr{cp}, SNil{}} : String},
+  +bound: {U32.is_le(cp, 2047) == True{} : Bool}) ->
+  utf8_proof.PromptGoal(bytes, text, c):
+  ([128], ({==}, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])),
+    (split([128]), prefix => utf8_proof.not_prefix(text, t, c,
+      utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])), same, prefix,
+      more => e => utf8_proof.not_two_byte(c, cp, more,
+        utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])), large, rest_is, bound, e))))))
+
+def utf8_proof.prompt.large(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32,
+  +same: {t == text : String},
+  split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
+    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, [p]))),
+  +large: {U32.is_le(c, 2047) == False{} : Bool},
+  after: Exists(U32, cp =>
+    {utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])) == SCon{Chr{cp}, SNil{}} : String} &
+    {U32.is_le(cp, 2047) == True{} : Bool})) ->
+  utf8_proof.PromptGoal(bytes, text, c):
+  (+cp, facts) = after
+  (rest_is, bound) = facts
+  utf8_proof.prompt.large2(bytes, text, c, t, p, same, split, large, cp, rest_is, bound)
+
+def utf8_proof.prompt.lead(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32,
+  +same: {t == text : String},
+  lead: {UTF8.begins_valid_sequence([p]) == True{} : Bool},
+  alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>},
+  split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
+    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, [p]))),
+  small: Bool, +small_is: {U32.is_le(c, 2047) == small : Bool}) ->
+  utf8_proof.PromptGoal(bytes, text, c):
+  match small:
+    case True{}:
+      (Nil{}, ({==}, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(Nil{}, [p])),
+        (split(Nil{}), prefix => utf8_proof.not_prefix(text, t, c, SCon{Chr{65533}, SNil{}}, same, prefix,
+          more => e => utf8_proof.not_replacement(c, more, small_is, e))))))
+    case False{}:
+      utf8_proof.prompt.large(bytes, text, c, t, p, same, split, small_is,
+        utf8_proof.two_after(p, lead, alone))
+
+def utf8_proof.prompt.pending(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String,
+  +q: List<&2, U32>, +same: {t == text : String}, pending: utf8_proof.Pending(q),
+  split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
+    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, q)))) ->
+  utf8_proof.PromptGoal(bytes, text, c):
+  match q:
+    case Nil{}:
+      (Nil{}, ({==}, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(Nil{}, Nil{})),
+        (split(Nil{}), prefix => utf8_proof.not_prefix(text, t, c, SNil{}, same, prefix,
+          more => e => utf8_proof.ends_here(c, more, e))))))
+    case +p <> Nil{}:
+      (lead, alone) = pending
+      utf8_proof.prompt.lead(bytes, text, c, t, p, same, lead, alone, split, U32.is_le(c, 2047), {==})
+    case p <> r <> more:
+      Empty.absurd(utf8_proof.PromptGoal(bytes, text, c), pending)
+
+def utf8_proof.prompt.step(+bytes: List<&2, U32>, +text: String, +c: U32,
+  step: UTF8.decode_buffer.Step(),
+  text_is: {utf8_proof.step_text(step) == text : String},
+  pending: utf8_proof.Pending(utf8_proof.step_pending(step)),
+  split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
+    utf8_proof.step_text(step) ++
+    utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, utf8_proof.step_pending(step))))) ->
+  utf8_proof.PromptGoal(bytes, text, c):
+  (+t, +q) = step
+  utf8_proof.prompt.pending(bytes, text, c, t, q, text_is, pending, split)
+
+def Laws.utf8_decode_buffer_prompt(buffers, text, so_far, c):
+  utf8_proof.prompt.step(List.concat(&2, U32, buffers), text, c,
+    UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}),
+    utf8_proof.text_so_far(Laws.all_bytes(List.concat(&2, U32, buffers)),
+      UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}), text,
+      utf8_proof.so_far_at(buffers, text, so_far)),
+    utf8_proof.pending_ok(List.concat(&2, U32, buffers), Nil{}, Unit{}),
+    rest => utf8_proof.decodes_split(List.concat(&2, U32, buffers), rest))

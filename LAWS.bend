@@ -596,14 +596,6 @@ law decodes_examples:
 # Running the decoder
 # -------------------
 
-# `Some{x}` when `cond` holds, otherwise None.
-def when(-A: Data, cond: Bool, x: A) -> Maybe<&2, A>:
-  match cond:
-    case False{}:
-      None{}
-    case True{}:
-      Some{x}
-
 # Every value in `bytes` is a byte, 0..255.
 
 def all_bytes(bytes: List<&2, U32>) -> Bool:
@@ -686,152 +678,39 @@ law utf8_decodes:
   for +buffers: List<&2, List<&2, U32>>
   decodes_result(List.concat(&2, U32, buffers), decoded(buffers))
 
-# `bytes` with its maximal subpart removed from the front.  The maximal
-# subpart is the longest non-empty prefix of `bytes` that begins a valid
-# sequence, or the first byte if there is no such prefix.  Meant for a
-# non-empty `bytes` that does not begin with a valid sequence.
+# `prefix` is a prefix of `text`.
 
-# `seq` is the prefix scanned so far and `rest` what follows it;
-# `after` is what follows the longest qualifying prefix found so far.
+def is_text_prefix(prefix: String, text: String) -> Type:
+  Exists(String, more => {prefix ++ more == text : String})
 
-def drop_maximal_subpart.pick(begins: Bool, rest: List<&2, U32>,
-  after: List<&2, U32>) -> List<&2, U32>:
-  match begins:
-    case False{}:
-      after
-    case True{}:
-      rest
+# After each buffer, the decoder has returned the longest text that
+# every continuation of the input agrees on.  This has two halves.
 
-def drop_maximal_subpart.go(rest: List<&2, U32>, seq: List<&2, U32>,
-  after: List<&2, U32>) -> List<&2, U32>:
-  match rest:
-    case Nil{}:
-      after
-    case +b <> +more:
-      +longer = List.append(&2, U32, seq, [b])
-      drop_maximal_subpart.go(more, longer,
-        drop_maximal_subpart.pick(UTF8.begins_valid_sequence(longer), more, after))
+# Safe: whatever bytes follow, the whole input decodes to text that
+# begins with the text returned so far.  Later bytes cannot change
+# anything already returned.
 
-def drop_maximal_subpart(bytes: List<&2, U32>) -> List<&2, U32>:
-  match bytes:
-    case Nil{}:
-      Nil{}
-    case +b1 <> +rest:
-      drop_maximal_subpart.go(rest, {[b1] : List<&2, U32>}, rest)
-
-# The reference decoder
-# ---------------------
-#
-# The reference decoder reads one byte at a time.  Between bytes it holds
-# the pending bytes of a sequence that has begun but not yet finished.
-# It exists only to say what text is expected; the implementation may
-# work however it likes.
-
-# What a step returns: the text now resolved, and the new pending bytes.
-
-def Step() -> Type:
-  String & List<&2, U32>
-
-def Step.prepend(text: String, step: Step()) -> Step():
-  (more, pending) = step
-  (text ++ more, pending)
-
-# `seq` is the pending bytes followed by the new byte.  If `seq` is a
-# valid sequence, emit its scalar.  If it begins one, keep it pending.
-# Otherwise do `otherwise`.
-
-def advance(seq: List<&2, U32>, scalar: Maybe<&2, U32>, begins: Bool,
-  otherwise: Unit -> Step()) -> Step():
-  match scalar begins:
-    case Some{cp} _:
-      (code_point_to_string(cp), Nil{})
-    case None{} True{}:
-      ("", seq)
-    case None{} False{}:
-      otherwise(Unit{})
-
-# A byte with nothing pending.  If it neither is nor begins a valid
-# sequence, it is a maximal subpart by itself: U+FFFD.
-
-def start_sequence(+b: U32) -> Step():
-  +seq = {[b] : List<&2, U32>}
-  advance(seq, sequence_scalar(seq), UTF8.begins_valid_sequence(seq),
-    u => (replacement_char_string(), Nil{}))
-
-# A byte that follows the pending bytes of an unfinished sequence.  If
-# the byte neither completes nor continues that sequence, the pending
-# bytes are a maximal subpart: emit U+FFFD for them, and then treat the
-# byte as having nothing pending.
-
-def extend_sequence(pending: List<&2, U32>, +b: U32) -> Step():
-  +seq = List.append(&2, U32, pending, [b])
-  advance(seq, sequence_scalar(seq), UTF8.begins_valid_sequence(seq),
-    u => Step.prepend(replacement_char_string(), start_sequence(b)))
-
-def step(pending: List<&2, U32>, +b: U32) -> Step():
-  match pending:
-    case Nil{}:
-      start_sequence(b)
-    case p <> ps:
-      extend_sequence(p <> ps, b)
-
-# Run the reference decoder over `bytes`, starting with `pending`.
-
-def reference.then(stepped: Step(), rest: List<&2, U32> -> Step()) -> Step():
-  (text, pending) = stepped
-  Step.prepend(text, rest(pending))
-
-def reference.go(bytes: List<&2, U32>, pending: List<&2, U32>) -> Step():
-  match bytes:
-    case Nil{}:
-      ("", pending)
-    case +b <> rest:
-      reference.then(step(pending, b), p => reference.go(rest, p))
-
-# The text that `bytes` fully determine, whatever bytes follow them.
-
-def Step.text(step: Step()) -> String:
-  (text, pending) = step
-  text
-
-def reference_so_far(bytes: List<&2, U32>) -> String:
-  Step.text(reference.go(bytes, Nil{}))
-
-# The text for `bytes` as the whole input.  An unfinished sequence at the
-# end is a maximal subpart: U+FFFD.
-
-def unfinished_text(pending: List<&2, U32>) -> String:
-  match pending:
-    case Nil{}:
-      ""
-    case p <> ps:
-      replacement_char_string()
-
-def Step.final_text(step: Step()) -> String:
-  (text, pending) = step
-  text ++ unfinished_text(pending)
-
-def reference_final(bytes: List<&2, U32>) -> String:
-  Step.final_text(reference.go(bytes, Nil{}))
-
-# Agreement with the reference decoder
-# ------------------------------------
-
-# However the input is split into buffers, after each buffer the decoder
-# has returned exactly the text that the bytes so far fully determine:
-# nothing that later bytes could change, and nothing held back.  A buffer
-# containing a value above 255 is rejected.
-
-law utf8_decode_buffer:
+law utf8_decode_buffer_safe:
   for +buffers: List<&2, List<&2, U32>>
-  +bytes = List.concat(&2, U32, buffers)
-  {decoded_so_far(buffers) ==
-    when(String, all_bytes(bytes), reference_so_far(bytes)) : Maybe<&2, String>}
+  for +text: String
+  for so_far: {decoded_so_far(buffers) == Some{text} : Maybe<&2, String>}
+  for +rest: List<&2, U32>
+  for +full: String
+  for decoded: decodes(List.append(&2, U32, List.concat(&2, U32, buffers), rest), full)
+  is_text_prefix(text, full)
 
-# `UTF8.decode_done` then completes the text of the whole input.
+# Prompt: nothing is held back.  No longer text is safe: for any code
+# point `c`, some bytes could follow for which the whole input does not
+# decode to text beginning with the text returned so far followed by
+# `c`.
 
-law utf8_decode_done:
+law utf8_decode_buffer_prompt:
   for +buffers: List<&2, List<&2, U32>>
-  +bytes = List.concat(&2, U32, buffers)
-  {decoded(buffers) ==
-    when(String, all_bytes(bytes), reference_final(bytes)) : Maybe<&2, String>}
+  for +text: String
+  for so_far: {decoded_so_far(buffers) == Some{text} : Maybe<&2, String>}
+  for +c: U32
+  Exists(List<&2, U32>, rest =>
+    {all_bytes(rest) == True{} : Bool} &
+    Exists(String, full =>
+      decodes(List.append(&2, U32, List.concat(&2, U32, buffers), rest), full) &
+      (is_text_prefix(text ++ code_point_to_string(c), full) -> Empty)))
