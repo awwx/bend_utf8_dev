@@ -2699,7 +2699,12 @@ def utf8_proof.valid_two_bytes_has_shape(+b1: U32, +b2: U32, shape: Bool,
       checked
 
 def Laws.valid_two_bytes_has_shape(b1, b2, valid):
-  utf8_proof.valid_two_bytes_has_shape(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}, valid)
+  +shape = UTF8.has_two_byte_shape(b1, b2)
+  utf8_proof.valid_two_bytes_has_shape(b1, b2, shape, {==},
+    Equal.trans(Bool, Laws.valid_two_bytes.if(b1, b2, shape, {==}), UTF8.valid_two_bytes(b1, b2), True{},
+      Equal.sym(Bool, UTF8.valid_two_bytes(b1, b2), Laws.valid_two_bytes.if(b1, b2, shape, {==}),
+        Laws.utf8_valid_two_bytes(b1, b2)),
+      valid))
 
 # Streaming decoder
 # =================
@@ -2860,7 +2865,7 @@ def utf8_proof.one_scalar_valid(+byte: U32, valid: Bool,
     case True{}: {==}
 
 def utf8_proof.two_scalar_some(+b1: U32, +b2: U32, valid: Bool,
-  -checked: {Laws.valid_two_bytes(b1, b2) == valid : Bool},
+  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
   is_true: {valid == True{} : Bool}) ->
   {Maybe.is_some(&2, U32, Laws.two_byte_scalar.if(b1, b2, valid, checked)) == True{} : Bool}:
   match valid:
@@ -2868,7 +2873,7 @@ def utf8_proof.two_scalar_some(+b1: U32, +b2: U32, valid: Bool,
     case True{}: {==}
 
 def utf8_proof.two_scalar_valid(+b1: U32, +b2: U32, valid: Bool,
-  -checked: {Laws.valid_two_bytes(b1, b2) == valid : Bool},
+  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
   some: {Maybe.is_some(&2, U32, Laws.two_byte_scalar.if(b1, b2, valid, checked)) == True{} : Bool}) ->
   {valid == True{} : Bool}:
   match valid:
@@ -2885,10 +2890,7 @@ def utf8_proof.one_valid_sequence(+b1: U32,
 def utf8_proof.two_valid_sequence(+b1: U32, +b2: U32,
   valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}) ->
   {Laws.is_valid_sequence([b1, b2]) == True{} : Bool}:
-  utf8_proof.two_scalar_some(b1, b2, Laws.valid_two_bytes(b1, b2), {==},
-    Equal.trans(Bool, Laws.valid_two_bytes(b1, b2), UTF8.valid_two_bytes(b1, b2), True{},
-      Equal.sym(Bool, UTF8.valid_two_bytes(b1, b2), Laws.valid_two_bytes(b1, b2), Laws.utf8_valid_two_bytes(b1, b2)),
-      valid))
+  utf8_proof.two_scalar_some(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, valid)
 
 def utf8_proof.one_valid_from_sequence(+b1: U32,
   valid: {Laws.is_valid_sequence([b1]) == True{} : Bool}) ->
@@ -2898,9 +2900,7 @@ def utf8_proof.one_valid_from_sequence(+b1: U32,
 def utf8_proof.two_valid_from_sequence(+b1: U32, +b2: U32,
   valid: {Laws.is_valid_sequence([b1, b2]) == True{} : Bool}) ->
   {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}:
-  Equal.trans(Bool, UTF8.valid_two_bytes(b1, b2), Laws.valid_two_bytes(b1, b2), True{},
-    Laws.utf8_valid_two_bytes(b1, b2),
-    utf8_proof.two_scalar_valid(b1, b2, Laws.valid_two_bytes(b1, b2), {==}, valid))
+  utf8_proof.two_scalar_valid(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, valid)
 
 def BeginsCompletion(+seq: List<&2, U32>) -> Type:
   Exists(List<&2, U32>, rest =>
@@ -2987,7 +2987,7 @@ def utf8_proof.one_scalar_agrees(+byte: U32, impl: Bool,
 
 def utf8_proof.two_scalar_agrees(+b1: U32, +b2: U32, impl: Bool,
   -impl_checked: {UTF8.valid_two_bytes(b1, b2) == impl : Bool}, spec: Bool,
-  -spec_checked: {Laws.valid_two_bytes(b1, b2) == spec : Bool},
+  -spec_checked: {UTF8.valid_two_bytes(b1, b2) == spec : Bool},
   same: {impl == spec : Bool}) ->
   {UTF8.two_byte_scalar.if(b1, b2, impl, impl_checked) ==
     Laws.two_byte_scalar.if(b1, b2, spec, spec_checked) : Maybe<&2, U32>}:
@@ -3010,7 +3010,7 @@ def utf8_proof.scalar_agrees(+seq: List<&2, U32>) ->
         UTF8.valid_one_byte(b1), {==}, {==})
     case +b1 <> +b2 <> Nil{}:
       utf8_proof.two_scalar_agrees(b1, b2, UTF8.valid_two_bytes(b1, b2), {==},
-        Laws.valid_two_bytes(b1, b2), {==}, Laws.utf8_valid_two_bytes(b1, b2))
+        UTF8.valid_two_bytes(b1, b2), {==}, {==})
     case b1 <> b2 <> b3 <> rest: {==}
 
 # Splitting the input

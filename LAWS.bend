@@ -217,13 +217,10 @@ def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
       Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)) &&
       is_unicode_scalar(UTF8.decode_two_bytes(b1, b2, checked))
 
-def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
-  valid_two_bytes.if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==})
-
 law utf8_valid_two_bytes:
   for +b1: U32
   for +b2: U32
-  {UTF8.valid_two_bytes(b1, b2) == valid_two_bytes(b1, b2) : Bool}
+  {UTF8.valid_two_bytes(b1, b2) == valid_two_bytes.if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}) : Bool}
 
 
 # Streaming decoding
@@ -287,14 +284,14 @@ def one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
 law valid_two_bytes_has_shape:
   for +b1: U32
   for +b2: U32
-  for valid: {valid_two_bytes(b1, b2) == True{} : Bool}
+  for valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}
   {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
 
 # Given any two bytes, return the scalar that the two-byte sequence
 # encodes if it is a valid sequence, otherwise return None.
 
 def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
-  -checked: {valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
+  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
   match valid:
     case False{}:
       None{}
@@ -302,7 +299,7 @@ def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
       Some{UTF8.decode_two_bytes(b1, b2, valid_two_bytes_has_shape(b1, b2, checked))}
 
 def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
-  two_byte_scalar.if(b1, b2, valid_two_bytes(b1, b2), {==})
+  two_byte_scalar.if(b1, b2, UTF8.valid_two_bytes(b1, b2), {==})
 
 # The scalar that `seq` encodes when `seq` is exactly one valid
 # sequence, otherwise None.
