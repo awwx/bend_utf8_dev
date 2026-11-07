@@ -320,6 +320,25 @@ def next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
         r => next_scalar.two(b1, r))
 
 
+## Begins a valid sequence
+
+# `UTF8.begins_valid_sequence(seq)` returns True iff `seq` begins a
+# valid sequence: there exists zero or more bytes which when added to
+# `seq` makes it a valid sequence.
+#
+# Later we may find out that the actual input doesn't describe a valid
+# sequence, so this says that if we've only seen `seq` so far, it
+# *could* be a valid prefix for a legal encoding (including being
+# itself a valid complete sequence).
+
+law utf8_begins_valid_sequence:
+  for +seq: List<&2, U32>
+  completion = Exists(List<&2, U32>, rest =>
+    {is_valid_sequence(List.append(&2, U32, seq, rest)) == True{} : Bool})
+  ({UTF8.begins_valid_sequence(seq) == True{} : Bool} -> completion) &
+  (completion -> {UTF8.begins_valid_sequence(seq) == True{} : Bool})
+
+
 
 # Streaming decoding
 # ==================
@@ -356,22 +375,6 @@ def replacement_char_string() -> String:
 
 
 
-
-# `UTF8.begins_valid_sequence(seq)` returns True iff `seq` begins a
-# valid sequence: there exists zero or more bytes which when added to
-# `seq` makes it a valid sequence.
-#
-# Later we may find out that the actual input doesn't describe a valid
-# sequence, so this says that if we've only seen `seq` so far, it
-# *could* be a valid prefix for a legal encoding (including being
-# itself a valid complete sequence).
-
-law utf8_begins_valid_sequence:
-  for +seq: List<&2, U32>
-  completion = Exists(List<&2, U32>, rest =>
-    {is_valid_sequence(List.append(&2, U32, seq, rest)) == True{} : Bool})
-  ({UTF8.begins_valid_sequence(seq) == True{} : Bool} -> completion) &
-  (completion -> {UTF8.begins_valid_sequence(seq) == True{} : Bool})
 
 # Maximal subparts
 # ----------------
