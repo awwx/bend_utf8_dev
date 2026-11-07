@@ -244,6 +244,47 @@ law valid_two_bytes_has_shape:
   {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
 
 
+## Decoding a valid sequence
+
+# Given a sequence of bytes, return the code point encoded by the
+# sequence if it's a valid sequence, or return None if the sequence is
+# invalid.
+
+def one_byte_scalar.if(+byte: U32, valid: Bool,
+  -checked: {UTF8.valid_one_byte(byte) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{UTF8.decode_one_byte(byte, valid_one_byte_has_shape(byte, checked))}
+
+def one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
+  one_byte_scalar.if(byte, UTF8.valid_one_byte(byte), {==})
+
+def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
+  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{UTF8.decode_two_bytes(b1, b2, valid_two_bytes_has_shape(b1, b2, checked))}
+
+def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
+  two_byte_scalar.if(b1, b2, UTF8.valid_two_bytes(b1, b2), {==})
+
+# The scalar that `seq` encodes when `seq` is exactly one valid
+# sequence, otherwise None.
+
+def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
+  match seq:
+    case +b1 <> Nil{}:
+      one_byte_scalar(b1)
+    case +b1 <> +b2 <> Nil{}:
+      two_byte_scalar(b1, b2)
+    case _:
+      None{}
+
+
 # Streaming decoding
 # ==================
 #
@@ -276,44 +317,8 @@ def replacement_char_string() -> String:
 # ---------------
 
 
-# The scalar that a valid one-byte sequence encodes, or None.
 
-def one_byte_scalar.if(+byte: U32, valid: Bool,
-  -checked: {UTF8.valid_one_byte(byte) == valid : Bool}) -> Maybe<&2, U32>:
-  match valid:
-    case False{}:
-      None{}
-    case True{}:
-      Some{UTF8.decode_one_byte(byte, valid_one_byte_has_shape(byte, checked))}
 
-def one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
-  one_byte_scalar.if(byte, UTF8.valid_one_byte(byte), {==})
-
-# Given any two bytes, return the scalar that the two-byte sequence
-# encodes if it is a valid sequence, otherwise return None.
-
-def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
-  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
-  match valid:
-    case False{}:
-      None{}
-    case True{}:
-      Some{UTF8.decode_two_bytes(b1, b2, valid_two_bytes_has_shape(b1, b2, checked))}
-
-def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
-  two_byte_scalar.if(b1, b2, UTF8.valid_two_bytes(b1, b2), {==})
-
-# The scalar that `seq` encodes when `seq` is exactly one valid
-# sequence, otherwise None.
-
-def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
-  match seq:
-    case +b1 <> Nil{}:
-      one_byte_scalar(b1)
-    case +b1 <> +b2 <> Nil{}:
-      two_byte_scalar(b1, b2)
-    case _:
-      None{}
 
 # `seq` is exactly one valid sequence.
 
