@@ -346,6 +346,17 @@ law utf8_is_valid_sequence_prefix:
 law utf8_empty_not_valid_sequence_prefix:
   {UTF8.is_valid_sequence_prefix(Nil{}) == False{} : Bool}
 
+# Bytes that are not a valid sequence prefix stay that way however
+# many bytes follow them.  (They must be non-empty: the empty list is
+# not a valid sequence prefix, but one byte can make it one.)
+
+law not_valid_sequence_prefix_extended:
+  for +b1: U32
+  for +more: List<&2, U32>
+  for +extra: List<&2, U32>
+  for invalid: {UTF8.is_valid_sequence_prefix(b1 <> more) == False{} : Bool}
+  {UTF8.is_valid_sequence_prefix(List.append(&2, U32, b1 <> more, extra)) == False{} : Bool}
+
 
 ## Byte prefix
 
@@ -355,24 +366,6 @@ law utf8_empty_not_valid_sequence_prefix:
 def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
   Exists(List<&2, U32>, rest =>
     {List.append(&2, U32, prefix, rest) == bytes : List<&2, U32>})
-
-
-## Next byte after a prefix.
-
-# Returns the byte that follows a prefix, if the buffer is longer than
-# the prefix, or None if there are no bytes following the prefix.
-#
-# This is a convenience function, we only pass in `prefix` for its length.
-
-def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
-  Maybe<&2, U32>:
-  match bytes prefix:
-    case Nil{} _:
-      None{}
-    case b <> rest Nil{}:
-      Some{b}
-    case b <> rest p <> ps:
-      next_byte_after(rest, ps)
 
 
 ## Maximal subparts
@@ -389,43 +382,33 @@ def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
 # In the second case the prefix stops short of a whole sequence:
 # either the input ends after it, or the next byte cannot extend it.
 
-# A relation saying that `subpart` cannot be extended by `next`, the
-# single byte after it in the input, if any: either there is no next
-# byte, or `subpart` followed by `next` is not a valid sequence
-# prefix.
-#
-# By itself this doesn't say that a valid sequence prefix couldn't be
-# formed by adding *more* bytes from the input; that will be covered
-# next.
+# No prefix of `bytes` longer than `subpart` is a valid sequence
+# prefix.  A longer prefix is `subpart` followed by some byte `c` and
+# then any further bytes `extra`.
 
-def maximal_subpart.not_extended_by(subpart: List<&2, U32>, next: Maybe<&2, U32>) -> Type:
-  match next:
-    case None{}:
-      Unit
-    case Some{b}:
-      {UTF8.is_valid_sequence_prefix(List.append(&2, U32, subpart, [b])) == False{} : Bool}
+def maximal_subpart.longest(subpart: List<&2, U32>, bytes: List<&2, U32>) -> Type:
+  @c: U32 -> @extra: List<&2, U32> ->
+    is_prefix(List.append(&2, U32, subpart, c <> extra), bytes) ->
+    {UTF8.is_valid_sequence_prefix(List.append(&2, U32, subpart, c <> extra)) == False{} : Bool}
 
 # The maximal subpart when the first byte is a valid sequence prefix:
 # `subpart` is the longest prefix of `b1 <> more` that is a valid
 # sequence prefix.  (Unicode's "initial subsequence of a well-formed
 # code unit sequence".)
-#
-# It suffices that adding the next byte does not give a valid sequence
-# prefix: by `utf8_is_valid_sequence_prefix`, every non-empty prefix of
-# a valid sequence prefix is also one, so no longer prefix can be one
-# either.
 
 def maximal_subpart.sequence_prefix(+b1: U32, +more: List<&2, U32>,
   -first: {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool},
   +subpart: List<&2, U32>) -> Type:
   is_prefix(subpart, b1 <> more) &
   {UTF8.is_valid_sequence_prefix(subpart) == True{} : Bool} &
-  maximal_subpart.not_extended_by(subpart, next_byte_after(b1 <> more, subpart))
+  maximal_subpart.longest(subpart, b1 <> more)
 
 # The maximal subpart when the first byte is not a valid sequence
 # prefix: `subpart` is that byte alone.  (Unicode's "subsequence of
-# length one".)  By `utf8_is_valid_sequence_prefix`, no longer prefix
-# is a valid sequence prefix either.
+# length one".)  Unicode takes the longest subsequence that is either
+# a valid sequence prefix or one byte long; here, by
+# `not_valid_sequence_prefix_extended`, no longer prefix is a valid
+# sequence prefix, so only the one-byte case applies.
 
 def maximal_subpart.single_byte(+b1: U32, +more: List<&2, U32>,
   -first: {UTF8.is_valid_sequence_prefix([b1]) == False{} : Bool},
@@ -450,16 +433,15 @@ def maximal_subpart(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
   maximal_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==}, subpart)
 
-# A non-empty buffer that does not begin with a valid sequence has a
-# maximal subpart.
+# Now we check that given our definition of "maximal subpart", a
+# maximal subpart for a non-empty buffer that doesn't not begin with a
+# valid sequence both exists and is unique.
 
 law maximal_subpart_exists:
   for +b1: U32
   for +more: List<&2, U32>
   for invalid: {next_scalar(b1 <> more) == None{} : Maybe<&1, U32 & List<&2, U32>>}
   Exists(List<&2, U32>, subpart => maximal_subpart(b1, more, subpart))
-
-# A buffer has only one maximal subpart.
 
 law maximal_subpart_unique:
   for +b1: U32
@@ -471,18 +453,10 @@ law maximal_subpart_unique:
   {s1 == s2 : List<&2, U32>}
 
 
+## Decoding a complete buffer
 
 
 
-# Streaming decoding
-# ==================
-#
-# `UTF8.decode_start()` is the decoder state before any input.
-# `UTF8.decode_buffer(state, buffer)` takes the next buffer of bytes and
-# returns the new state and the text that is now fully resolved.
-# `UTF8.decode_done(state)` returns the text that ends the input.  The
-# state type, `UTF8.DecodeState()`, is the implementation's choice: the
-# laws below only describe the text that comes out.
 #
 # Ill-formed input is replaced as the Unicode Standard recommends (§3.9,
 # "U+FFFD Substitution of Maximal Subparts"): each maximal subpart, the
@@ -650,6 +624,18 @@ law decodes_examples:
   # Valid sequences around a byte that never appears in UTF-8.
   decodes([72, 194, 169, 255],
     "H" ++ code_point_to_string(169) ++ replacement_char_string())
+
+
+# Streaming decoding
+# ==================
+#
+# `UTF8.decode_start()` is the decoder state before any input.
+# `UTF8.decode_buffer(state, buffer)` takes the next buffer of bytes and
+# returns the new state and the text that is now fully resolved.
+# `UTF8.decode_done(state)` returns the text that ends the input.  The
+# state type, `UTF8.DecodeState()`, is the implementation's choice: the
+# laws below only describe the text that comes out.
+
 
 # Running the decoder
 # -------------------
