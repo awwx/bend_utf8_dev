@@ -349,9 +349,12 @@ def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
     {List.append(&2, U32, prefix, rest) == bytes : List<&2, U32>})
 
 
-# The byte in `bytes` that follows `prefix`, or None if `bytes` ends
-# there.  Only meaningful when `prefix` is a prefix of `bytes`; only its
-# length is used.
+## Next byte after a prefix.
+
+# Returns the byte that follows a prefix, if the buffer is longer than
+# the prefix, or None if there are no bytes following the prefix.
+#
+# This is a convenience function, we only pass in `prefix` for its length.
 
 def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
   Maybe<&2, U32>:
