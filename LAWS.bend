@@ -339,6 +339,31 @@ law utf8_begins_valid_sequence:
   (completion -> {UTF8.begins_valid_sequence(seq) == True{} : Bool})
 
 
+## Byte prefix
+
+# Define a "prefix" to mean that the buffer begins with the prefix
+# bytes.
+
+def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
+  Exists(List<&2, U32>, rest =>
+    {List.append(&2, U32, prefix, rest) == bytes : List<&2, U32>})
+
+
+# The byte in `bytes` that follows `prefix`, or None if `bytes` ends
+# there.  Only meaningful when `prefix` is a prefix of `bytes`; only its
+# length is used.
+
+def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
+  Maybe<&2, U32>:
+  match bytes prefix:
+    case Nil{} _:
+      None{}
+    case b <> rest Nil{}:
+      Some{b}
+    case b <> rest p <> ps:
+      next_byte_after(rest, ps)
+
+
 
 # Streaming decoding
 # ==================
@@ -378,26 +403,6 @@ def replacement_char_string() -> String:
 
 # Maximal subparts
 # ----------------
-
-# `prefix` is a prefix of `bytes`.
-
-def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
-  Exists(List<&2, U32>, rest =>
-    {List.append(&2, U32, prefix, rest) == bytes : List<&2, U32>})
-
-# The byte in `bytes` that follows `prefix`, or None if `bytes` ends
-# there.  Only meaningful when `prefix` is a prefix of `bytes`; only its
-# length is used.
-
-def next_byte_after(bytes: List<&2, U32>, prefix: List<&2, U32>) ->
-  Maybe<&2, U32>:
-  match bytes prefix:
-    case Nil{} _:
-      None{}
-    case b <> rest Nil{}:
-      Some{b}
-    case b <> rest p <> ps:
-      next_byte_after(rest, ps)
 
 # `subpart` cannot be extended by `next`, the byte after it, if any.
 
