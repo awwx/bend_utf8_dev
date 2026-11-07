@@ -150,7 +150,7 @@ of truth (§1.2). Don't choose one because it would run well.
 | `LAWS.bend` | Laws for the project's main subject. It imports the `*_LAWS.bend` files it builds on. |
 | `defs.bend` | Type aliases and definitions shared by several laws or implementation files. *Example:* `Bit8()`, a tuple of eight `Bool`. |
 | `PROOF.bend` | Proofs of every law in every laws file, plus all proof-only helpers. |
-| `AGENTS.md` | The independence rule (§1.1), for coding agents working on the project. |
+| `AGENTS.md` | Project rules for coding agents: the independence rule (§1.1), how to validate, and notes on the environment. |
 
 How the files fit together:
 
@@ -486,6 +486,81 @@ accepted = Equal.trans(Bool, UTF8.can_encode_as_two_bytes(cp),
     Laws.two_byte_shape(cp), Some{(b1, b2)}, produced))
 ```
 
+### 5.10 Define a correct result as a relation
+
+Sometimes correctness is clearest as "what makes a result right" rather
+than "how to compute it". Then write a definition that returns a `Type`: a
+relation between the input and a candidate result. A value of that type is
+a proof that the result is correct. (Such definitions are also called type
+families, predicates or relations.)
+
+*Example:* `decodes(bytes, text)` holds when `text` is what the complete
+buffer `bytes` decodes to. It is built one code point at a time from
+`decodes_first`, without saying how a decoder should find the result:
+
+```bend
+def decodes.go(text: String, bytes: List<&2, U32>) -> Type:
+  match text:
+    case SNil{}:
+      decodes_first(bytes, None{})
+    case SCon{Chr{cp}, more}:
+      Exists(List<&2, U32>, rest =>
+        decodes_first(bytes, Some{(cp, rest)}) & decodes.go(more, rest))
+```
+
+- **Branch with helper defs.** A Type-valued definition chooses its case
+  by matching on data, so a computed condition goes through a `name.if`
+  helper (§7.2), or a helper that takes the value as a parameter (§7.5).
+- **Prove existence and uniqueness.** `decodes_exists` (every buffer
+  decodes to some text) and `decodes_unique` (to only one) together show
+  that the relation behaves like a function.
+  - Without existence, other laws about the relation can hold vacuously
+    for an input the relation fails to cover.
+  - Without uniqueness, the relation may leave the result open.
+- **Add examples** (§6.1). Each proof supplies the witnesses for the
+  relation's `Exists`, and `{==}` does the rest.
+
+### 5.11 Check that a law can't hold vacuously
+
+A law of the form "if the implementation returns `Some{x}`, then `x` is
+correct" holds for an implementation that always returns None. Say what
+happens in both cases, either with a second law or in one definition:
+
+```bend
+def decodes_result.if(ok: Bool, +bytes: List<&2, U32>, result: Maybe<&2, String>) -> Type:
+  match ok:
+    case False{}:
+      {result == None{} : Maybe<&2, String>}
+    case True{}:
+      Exists(String, text => {result == Some{text} : Maybe<&2, String>} & decodes(bytes, text))
+```
+
+More generally, for each hypothesis of a law, ask whether some
+implementation could make it impossible to satisfy, so that the law says
+nothing.
+
+### 5.12 Streaming output: safe and prompt
+
+A streaming function returns output as its input arrives. It should
+return everything the input so far determines, and nothing that later
+input could change. State this without describing incomplete input, by
+quantifying over every possible continuation:
+
+- **Safe.** For every continuation `rest`, the result for the whole input
+  begins with the output so far.
+- **Prompt.** No longer output is safe: for any possible next piece of
+  output, some continuation contradicts it.
+
+Together they say that the output so far is the longest output that every
+continuation agrees on. *Example:* `utf8_decode_buffer_safe` and
+`utf8_decode_buffer_prompt`. The prompt proof picks a continuation that
+rules out each candidate. For a pending lead byte, ending the input gives
+U+FFFD, while continuing with 0x80 gives a two-byte character.
+
+A weaker condition doesn't work. For example, "the final call adds at most
+one replacement character" still allows a decoder to hold back a
+replacement character until the end.
+
 ---
 
 ## 6. Examples and redundant checks
@@ -557,6 +632,10 @@ it. Periodically look for unused definitions.
     `+e: {h1 <> t1 == h2 <> t2 : List<&2, U32>}`. The same equality then
     gives both `h1 == h2` (by `Equal.cong` with a head function) and
     `t1 == t2` (by `Equal.cong` with `List.tail`).
+- **Don't mark an equality `+` while unpacking it**, as in
+  `(+rest, +split) = prefix`. This can break type inference ("cannot
+  infer"). Unpack it plainly, then pass it to a helper whose parameter is
+  `+`. *Example:* `utf8_proof.replaced_from.sequence`.
 
 ### 7.2 Branching on Bool, with evidence
 
@@ -611,6 +690,33 @@ single induction instead of a case split.
 - **Use `Maybe` for "may not exist", in reference definitions.** In
   implementations, prefer a precondition proof over returning `Maybe`.
 
+### 7.5 Matching, recursion and order
+
+As observed in Bend 2.0.39:
+
+- **A match can't scrutinize a computed value**, and a computed pair or
+  `Exists` can't be unpacked. Pass the value to a helper def as a
+  parameter, and match or unpack it there.
+- **Match parameters in the order they're declared.** Matching an earlier
+  parameter after a later one, or after a local statement, fails with
+  "can't be matched in this position". To match two together, use one
+  `match a b:`.
+- **Recursion must visibly shrink an argument.** Bend reads the arguments
+  left to right; each must be passed unchanged until one shrinks. So put the
+  shrinking argument first. *Example:* `decodes.go(text, bytes)` recurses
+  on `text`, while `decodes(bytes, text)` keeps the readable order.
+- **There is no mutual recursion.** Pass the recursive call to a helper as
+  a function. *Example:* `q => q_ok => utf8_proof.bytes_ok(rest, q, q_ok)`.
+- **When nothing shrinks structurally, recurse on fuel.** *Example:* the
+  bytes left after decoding a code point aren't simply the tail of the
+  input.
+  - The existence proof for `decodes` therefore recurses on a fuel list,
+    which starts as the input.
+  - It keeps the remaining bytes a suffix of the fuel. Each step consumes at
+    least one byte, so the fuel shrinks.
+- **Define before use.** A def used above its definition doesn't unfold,
+  so a type that depends on it can't be computed.
+
 ---
 
 ## 8. Proofs
@@ -629,6 +735,14 @@ single induction instead of a case split.
 - **Mutation-test new laws.** Temporarily make a law or example wrong,
   confirm that `bend PROOF.bend` fails at that law, then revert. Also try
   invalid inputs with `{==}`, to confirm that preconditions reject them.
+  - **Mutate the implementation too**, to confirm that the proofs catch real
+    bugs.
+  - **Weaken with a replacement of the same shape**, such as a trivially
+    true `{x == x : T}` in place of a clause. Deleting a clause makes proofs
+    fail only because a tuple's shape changed, which shows nothing.
+  - **Bend reports only the first failure.** If that is in an earlier
+    proof, it says nothing about the proof under test. Rerun against a
+    temporary copy of `PROOF.bend` without the earlier proofs.
 - **Organize proofs by law.** State each proof's goal as a named type, prove
   a general `*_agrees` lemma, and then bind `def Laws.name(...)` to it.
 
@@ -695,7 +809,8 @@ single induction instead of a case split.
    - an exact equation, or
    - equality with a reference definition, or
    - an iff with a witness, or
-   - inverse laws.
+   - inverse laws, or
+   - a relation, with existence and uniqueness laws (§5.10).
 
    Use only implementation functions whose relevant behavior is already
    fixed by laws (§1.1).
