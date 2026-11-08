@@ -326,9 +326,11 @@ def next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
 ## Valid sequence prefix
 
 # A "valid sequence prefix" is one or more bytes that begin a valid
-# sequence: there exists zero or more bytes which when added to them
-# make a valid sequence.  The empty list is not a valid sequence
-# prefix; a valid sequence is also a valid sequence prefix.
+# sequence (or could begin a valid sequence): there exists zero or
+# more bytes which when added to them make a valid sequence.
+#
+# The empty list is not a valid sequence prefix; a valid sequence is
+# also a valid sequence prefix.
 #
 # Later we may find out that the actual input doesn't describe a valid
 # sequence, so this says that if we've only seen these bytes so far,
