@@ -3,7 +3,6 @@ import ./defs.bend as Defs
 import ./binary.bend as B
 import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
-import ./hexdigits.bend as H
 import ./func_LAWS.bend as Func
 
 
@@ -12,16 +11,16 @@ import ./func_LAWS.bend as Func
 # Surrogate code points are U+D800..U+DFFF.
 
 def is_surrogate_code_point(+cp: U32) -> Bool:
-  U32.is_ge(cp, H.hex_u32("D800", {==})) &&
-  U32.is_le(cp, H.hex_u32("DFFF", {==}))
+  U32.is_ge(cp, Char.to_u32('\u{D800}')) &&
+  U32.is_le(cp, Char.to_u32('\u{DFFF}'))
 
 law is_surrogate_code_point_examples:
-  {is_surrogate_code_point(H.hex_u32("0000", {==})) == False{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("D7FF", {==})) == False{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("D800", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("DC00", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("DFFF", {==})) == True{} : Bool} &
-  {is_surrogate_code_point(H.hex_u32("E000", {==})) == False{} : Bool}
+  {is_surrogate_code_point(Char.to_u32('\u{0000}')) == False{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{D7FF}')) == False{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{D800}')) == True{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{DC00}')) == True{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{DFFF}')) == True{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{E000}')) == False{} : Bool}
 
 
 ## Unicode scalars
@@ -30,8 +29,8 @@ law is_surrogate_code_point_examples:
 # surrogate code points.
 
 def is_unicode_scalar(+cp: U32) -> Bool:
-  U32.is_ge(cp, H.hex_u32("000000", {==})) &&
-  U32.is_le(cp, H.hex_u32("10FFFF", {==})) &&
+  U32.is_ge(cp, Char.to_u32('\u{000000}')) &&
+  U32.is_le(cp, Char.to_u32('\u{10FFFF}')) &&
   Bool.not(is_surrogate_code_point(cp))
 
 
@@ -469,7 +468,7 @@ def code_point_to_string(cp: U32) -> String:
 # U+FFFD REPLACEMENT CHARACTER.
 
 def replacement_char() -> U32:
-  H.hex_u32("FFFD", {==})
+  Char.to_u32('\u{FFFD}')
 
 # U+FFFD REPLACEMENT CHARACTER, as a one-character string.
 

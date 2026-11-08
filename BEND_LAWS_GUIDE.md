@@ -578,7 +578,7 @@ proved with `{==}`.
 - **Include negative cases.** For example, an empty string, a string one
   character too long, an invalid character, and an out-of-range value.
 - **Make examples read like the domain.** If the domain writes values in
-  hex, write them in hex (here, through `H.hex_u32("D800", {==})`). Keep
+  hex, write them in hex (here, as `Char.to_u32('\u{D800}')`). Keep
   notation consistent within one expression. For example, give all hex
   literals in an expression the same width, dropping only the leading zeros
   that *every* literal in it can lose: `"000000"` and `"10FFFF"`, not `"0"`
