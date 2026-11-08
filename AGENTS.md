@@ -23,6 +23,11 @@ details. They may use implementation functions when the behavior
 relied upon is established by other independently specified and proved
 laws. Do not rely on behavior that those laws leave unspecified.
 
+As much as possible, write LAWS.bend as a clear specification: state
+what the correct outcome is in an understandable way.  Prefer the
+clearer specification even when it needs more proofs; so far coding
+agents have written proofs quickly and easily.
+
 Verify by running `bend PROOF.bend`; it must print "ALL PROOFS CHECK".
 "N TODOs found" means some laws don't have proofs yet.
 
