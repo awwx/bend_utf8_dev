@@ -3661,11 +3661,11 @@ def utf8_proof.replaced_from(+b1: U32, +more: List<&2, U32>,
   (+sub, maximal) = found
   utf8_proof.replaced_from.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==}, sub, maximal)
 
-def utf8_proof.found_exists(+b1: U32, +more: List<&2, U32>,
+def utf8_proof.nonempty_exists(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>,
   checked: {Laws.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
-    Laws.decodes_first.found(b1, more, found, result) & utf8_proof.Progress(more, result)):
+    Laws.decodes_first.nonempty(b1, more, found, result) & utf8_proof.Progress(more, result)):
   match found:
     case Some{x}:
       (Some{x}, ({==}, utf8_proof.next_progress_at(b1, more, Some{x}, checked)))
@@ -3677,7 +3677,7 @@ def utf8_proof.found_exists(+b1: U32, +more: List<&2, U32>,
 def utf8_proof.first_exists(+b1: U32, +more: List<&2, U32>) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Laws.decodes_first(b1 <> more, result) & utf8_proof.Progress(more, result)):
-  utf8_proof.found_exists(b1, more, Laws.next_scalar(b1 <> more), {==})
+  utf8_proof.nonempty_exists(b1, more, Laws.next_scalar(b1 <> more), {==})
 
 def utf8_proof.first_exists.drop(+b1: U32, +more: List<&2, U32>,
   found: Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
@@ -3697,9 +3697,9 @@ def Laws.decodes_first_exists(bytes):
 def Laws.decodes_first_empty(result, decoded):
   decoded
 
-def utf8_proof.found_some(+b1: U32, +more: List<&2, U32>,
+def utf8_proof.nonempty_some(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>, result: Maybe<&1, U32 & List<&2, U32>>,
-  decoded: Laws.decodes_first.found(b1, more, found, result)) ->
+  decoded: Laws.decodes_first.nonempty(b1, more, found, result)) ->
   {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}:
   match found:
     case Some{x}:
@@ -3717,7 +3717,7 @@ def utf8_proof.found_some(+b1: U32, +more: List<&2, U32>,
       {==}
 
 def Laws.decodes_first_nonempty(b1, more, result, decoded):
-  utf8_proof.found_some(b1, more, Laws.next_scalar(b1 <> more), result, decoded)
+  utf8_proof.nonempty_some(b1, more, Laws.next_scalar(b1 <> more), result, decoded)
 
 def utf8_proof.replaced_unique(+b1: U32, +more: List<&2, U32>,
   r1: Maybe<&1, U32 & List<&2, U32>>, r2: Maybe<&1, U32 & List<&2, U32>>,
@@ -3745,11 +3745,11 @@ def utf8_proof.replaced_unique(+b1: U32, +more: List<&2, U32>,
         x => Some{(Laws.replacement_char(), x)}, rest1, rest2, same_rest),
       Equal.sym(Maybe<&1, U32 & List<&2, U32>>, r2, Some{(Laws.replacement_char(), rest2)}, res2)))
 
-def utf8_proof.found_unique(+b1: U32, +more: List<&2, U32>,
+def utf8_proof.nonempty_unique(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>,
   r1: Maybe<&1, U32 & List<&2, U32>>, r2: Maybe<&1, U32 & List<&2, U32>>,
-  d1: Laws.decodes_first.found(b1, more, found, r1),
-  d2: Laws.decodes_first.found(b1, more, found, r2)) ->
+  d1: Laws.decodes_first.nonempty(b1, more, found, r1),
+  d2: Laws.decodes_first.nonempty(b1, more, found, r2)) ->
   {r1 == r2 : Maybe<&1, U32 & List<&2, U32>>}:
   match found:
     case Some{x}:
@@ -3764,7 +3764,7 @@ def Laws.decodes_first_unique(bytes, r1, r2, d1, d2):
       Equal.trans(Maybe<&1, U32 & List<&2, U32>>, r1, None{}, r2, d1,
         Equal.sym(Maybe<&1, U32 & List<&2, U32>>, r2, None{}, d2))
     case +b1 <> +more:
-      utf8_proof.found_unique(b1, more, Laws.next_scalar(b1 <> more), r1, r2, d1, d2)
+      utf8_proof.nonempty_unique(b1, more, Laws.next_scalar(b1 <> more), r1, r2, d1, d2)
 
 # Decoding a complete buffer
 # --------------------------
@@ -4152,7 +4152,7 @@ def utf8_proof.first_found(+b1: U32, +more: List<&2, U32>, -x: U32 & List<&2, U3
   e: {Laws.next_scalar(b1 <> more) == Some{x} : Maybe<&1, U32 & List<&2, U32>>}) ->
   Laws.decodes_first(b1 <> more, Some{x}):
   %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, Laws.next_scalar(b1 <> more), Some{x}, e) :
-    Laws.decodes_first.found(b1, more, _, Some{x})
+    Laws.decodes_first.nonempty(b1, more, _, Some{x})
   {==}
 
 def utf8_proof.first_replaced(+b1: U32, +more: List<&2, U32>, +sub: List<&2, U32>,
@@ -4162,7 +4162,7 @@ def utf8_proof.first_replaced(+b1: U32, +more: List<&2, U32>, +sub: List<&2, U32
   split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>}) ->
   Laws.decodes_first(b1 <> more, Some{(Laws.replacement_char(), rest)}):
   %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, Laws.next_scalar(b1 <> more), None{}, e) :
-    Laws.decodes_first.found(b1, more, _, Some{(Laws.replacement_char(), rest)})
+    Laws.decodes_first.nonempty(b1, more, _, Some{(Laws.replacement_char(), rest)})
   (sub, (rest, (maximal, (split, {==}))))
 
 # A step with nothing pending.

@@ -513,10 +513,12 @@ def decodes_first.replaced(+b1: U32, +more: List<&2, U32>,
     {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
     {result == Some{(replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>}))
 
-# `found` is the scalar of a valid sequence at the front of the bytes,
-# and the bytes after it, if they begin with one.
+# Decoding the first code point of the non-empty buffer `b1 <> more`
+# gives `result`, where `found` is the scalar of the valid sequence at
+# the front of the buffer and the bytes after it, or None if the buffer
+# doesn't begin with one.
 
-def decodes_first.found(+b1: U32, +more: List<&2, U32>,
+def decodes_first.nonempty(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>,
   result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
   match found:
@@ -535,7 +537,7 @@ def decodes_first(bytes: List<&2, U32>,
     case Nil{}:
       {result == None{} : Maybe<&1, U32 & List<&2, U32>>}
     case +b1 <> +more:
-      decodes_first.found(b1, more, next_scalar(b1 <> more), result)
+      decodes_first.nonempty(b1, more, next_scalar(b1 <> more), result)
 
 # Now we add some checks for our definition.
 
