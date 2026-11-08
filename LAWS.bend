@@ -103,8 +103,8 @@ law utf8_can_encode_as_two_bytes:
 
 ## Encode as
 
-# Require that given a supplied proof that a code point *can* be encoded
-# as a byte sequence, `encode_as_*` returns those bytes.
+# Given a code point and a supplied proof that the code point *can* be
+# encoded as a byte sequence, `encode_as_*` returns those bytes.
 # (Supplying the proof means that we don't have to return a Maybe.)
 
 law utf8_encode_as_one_byte:
@@ -185,13 +185,16 @@ law utf8_overlong_two_bytes:
     UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid_shape)) : Bool}
 
 
-## Valid encodings
+## Valid sequences
 
-# An encoding is valid when:
+# A UTF-8 encoding is valid when:
 # * It has the correct byte shape, and
 # * It is not overlong, and
 # * the code point it encodes is a Unicode scalar (not a forbidden
 #   surrogate).
+#
+# A "valid sequence" is a sequence of bytes which are a valid UTF-8
+# encoding.
 
 # Testing the shape first supplies the proof that decoding needs.
 
@@ -325,12 +328,12 @@ def next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
 # A "valid sequence prefix" is one or more bytes that begin a valid
 # sequence: there exists zero or more bytes which when added to them
 # make a valid sequence.  The empty list is not a valid sequence
-# prefix.
+# prefix; a valid sequence is also a valid sequence prefix.
 #
 # Later we may find out that the actual input doesn't describe a valid
 # sequence, so this says that if we've only seen these bytes so far,
 # they *could* be the start of a legal encoding (including being
-# themselves a valid complete sequence).
+# themselves a complete valid complete).
 #
 # `UTF8.is_valid_sequence_prefix(seq)` returns True iff `seq` is a
 # valid sequence prefix.
@@ -346,9 +349,14 @@ law utf8_is_valid_sequence_prefix:
 law utf8_empty_not_valid_sequence_prefix:
   {UTF8.is_valid_sequence_prefix(Nil{}) == False{} : Bool}
 
-# Bytes that are not a valid sequence prefix stay that way however
-# many bytes follow them.  (They must be non-empty: the empty list is
-# not a valid sequence prefix, but one byte can make it one.)
+# While a non-valid sequence can sometimes become a valid sequence by
+# adding more bytes (i.e. to complete the sequence), a non-empty
+# sequence of bytes that is not a valid sequence *prefix* cannot
+# become a valid prefix by adding more bytes.
+#
+# That is, a non-empty prefix which is not a valid sequence prefix
+# stays as an invalid prefix no matter what bytes might be added to
+# it.
 
 law not_valid_sequence_prefix_extended:
   for +b1: U32
@@ -360,8 +368,8 @@ law not_valid_sequence_prefix_extended:
 
 ## Byte prefix
 
-# Define a "prefix" to mean that the buffer begins with the prefix
-# bytes.
+# We define a "prefix" to mean that the buffer begins with the bytes
+# of the prefix.
 
 def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
   Exists(List<&2, U32>, rest =>
@@ -376,17 +384,22 @@ def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
 #
 # * the first byte alone, when it is not a valid sequence prefix; or,
 #
-# * the longest run of bytes at the front that is a valid sequence
-#   prefix, when the first byte is one.
+# * when the first byte is a valid sequence prefix, the longest run of
+#   bytes at the front is also a valid sequence prefix.
 #
 # In the second case the prefix stops short of a whole sequence:
 # either the input ends after it, or the next byte cannot extend it.
 
-# No prefix of `bytes` longer than `subpart` is a valid sequence
-# prefix.  A longer prefix is `subpart` followed by some byte `c` and
-# then any further bytes `extra`.
+# `longer_not_valid_prefix` is a relation that states that if
+# `subpart` is a prefix of `bytes`, adding one or more of the following
+# bytes from `bytes` to the subpart will not produce a valid sequence
+# prefix.
+#
+# By itself this relation doesn't say anything about whether `subpart`
+# itself is a valid prefix, only that no longer prefix of `bytes` is a
+# valid prefix.
 
-def maximal_subpart.longest(subpart: List<&2, U32>, bytes: List<&2, U32>) -> Type:
+def maximal_subpart.longer_not_valid_prefix(subpart: List<&2, U32>, bytes: List<&2, U32>) -> Type:
   @c: U32 -> @extra: List<&2, U32> ->
     is_prefix(List.append(&2, U32, subpart, c <> extra), bytes) ->
     {UTF8.is_valid_sequence_prefix(List.append(&2, U32, subpart, c <> extra)) == False{} : Bool}
@@ -401,7 +414,7 @@ def maximal_subpart.sequence_prefix(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
   is_prefix(subpart, b1 <> more) &
   {UTF8.is_valid_sequence_prefix(subpart) == True{} : Bool} &
-  maximal_subpart.longest(subpart, b1 <> more)
+  maximal_subpart.longer_not_valid_prefix(subpart, b1 <> more)
 
 # The maximal subpart when the first byte is not a valid sequence
 # prefix: `subpart` is that byte alone.  (Unicode's "subsequence of
@@ -453,11 +466,8 @@ law maximal_subpart_unique:
   {s1 == s2 : List<&2, U32>}
 
 
-## Decoding a complete buffer
+## Unicode replacement character
 
-
-
-#
 # Ill-formed input is replaced as the Unicode Standard recommends (§3.9,
 # "U+FFFD Substitution of Maximal Subparts"): each maximal subpart, the
 # longest run of bytes that is a valid sequence prefix or else a single
@@ -477,18 +487,10 @@ def replacement_char_string() -> String:
   code_point_to_string(replacement_char())
 
 
+## Decoding the first code point of a complete buffer
 
-
-
-
-# Decoding the first code point of a complete buffer
-# --------------------------------------------------
-#
-# The buffer is complete: nothing more will follow it, so a sequence
-# left unfinished at its end is not valid and is replaced.
-
-# The bytes do not begin with a valid sequence: decoding gives U+FFFD
-# and the bytes after the maximal subpart.
+# These relations are on complete buffers: an incomplete sequence at
+# the end of the buffer results in a replacement character.
 
 def decodes_first.replaced(+b1: U32, +more: List<&2, U32>,
   result: Maybe<&1, U32 & List<&2, U32>>) -> Type:

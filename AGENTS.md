@@ -33,3 +33,6 @@ TypeScript checker and its kernel.
 Tips and suggestions are available in `BEND_LAWS_GUIDE.md` in this
 directory. These are not requirements; use your own judgment about
 when to use something from the file.
+
+The user doesn't read `PROOF.bend`.  Write `PROOF.bend` for coding
+agents.
