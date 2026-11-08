@@ -226,56 +226,6 @@ law utf8_valid_two_bytes:
   {UTF8.valid_two_bytes(b1, b2) == valid_two_bytes.if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}) : Bool}
 
 
-## Valid sequences have their correct byte shape.
-
-# Since our definition of a valid sequence includes that a sequence is
-# only valid when it has the correct byte shape, if we have a valid
-# sequence we know that it has a correct byte shape.
-#
-# We use this law below when we have a valid sequence and we need
-# a proof that it has a correct byte shape.
-
-law valid_one_byte_has_shape:
-  for +byte: U32
-  for valid: {UTF8.valid_one_byte(byte) == True{} : Bool}
-  {UTF8.has_one_byte_shape(byte) == True{} : Bool}
-
-law valid_two_bytes_has_shape:
-  for +b1: U32
-  for +b2: U32
-  for valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}
-  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
-
-
-## Decoding a valid sequence
-
-# Given a sequence of bytes, return the code point encoded by the
-# sequence if it's a valid sequence, or return None if the sequence is
-# invalid.
-
-def one_byte_scalar.if(+byte: U32, valid: Bool,
-  -checked: {UTF8.valid_one_byte(byte) == valid : Bool}) -> Maybe<&2, U32>:
-  match valid:
-    case False{}:
-      None{}
-    case True{}:
-      Some{UTF8.decode_one_byte(byte, valid_one_byte_has_shape(byte, checked))}
-
-def one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
-  one_byte_scalar.if(byte, UTF8.valid_one_byte(byte), {==})
-
-def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
-  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
-  match valid:
-    case False{}:
-      None{}
-    case True{}:
-      Some{UTF8.decode_two_bytes(b1, b2, valid_two_bytes_has_shape(b1, b2, checked))}
-
-def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
-  two_byte_scalar.if(b1, b2, UTF8.valid_two_bytes(b1, b2), {==})
-
-
 ## is_valid_sequence
 
 # Returns True when the sequence is exactly a valid sequence.
@@ -290,37 +240,74 @@ def is_valid_sequence(seq: List<&2, U32>) -> Bool:
       False{}
 
 
-## Decode the first sequence from a buffer.
+## Encoding
 
-# If the buffer starts with a valid sequence, returns the scalar that
-# the sequence encodes and the remaining buffer after that sequence.
-#
-# Returns None if the buffer doesn't start with a valid sequence.
+# The UTF-8 encoding of `cp` is its shortest byte shape: one byte when
+# `cp` has a one-byte shape, otherwise two.  (A two-byte encoding of a
+# code point that has a one-byte shape would be overlong.)  Only one-
+# and two-byte encodings are covered so far, so code points above 2047
+# have no encoding here.
 
-def next_scalar.found(scalar: Maybe<&2, U32>, rest: List<&2, U32>,
-  otherwise: List<&2, U32> -> Maybe<&1, U32 & List<&2, U32>>) ->
-  Maybe<&1, U32 & List<&2, U32>>:
-  match scalar:
-    case Some{cp}:
-      Some{(cp, rest)}
+def encoding.two(shape: Maybe<&1, U32 & U32>) -> Maybe<&1, List<&2, U32>>:
+  match shape:
     case None{}:
-      otherwise(rest)
-
-def next_scalar.two(+b1: U32, rest: List<&2, U32>) ->
-  Maybe<&1, U32 & List<&2, U32>>:
-  match rest:
-    case Nil{}:
       None{}
-    case +b2 <> after:
-      next_scalar.found(two_byte_scalar(b1, b2), after, r => None{})
+    case Some{(b1, b2)}:
+      Some{[b1, b2]}
 
-def next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
-  match bytes:
-    case Nil{}:
-      None{}
-    case +b1 <> rest:
-      next_scalar.found(one_byte_scalar(b1), rest,
-        r => next_scalar.two(b1, r))
+def encoding.if(cp: U32, one: Maybe<&2, U32>) -> Maybe<&1, List<&2, U32>>:
+  match one:
+    case Some{b1}:
+      Some{[b1]}
+    case None{}:
+      encoding.two(two_byte_shape(cp))
+
+def encoding(+cp: U32) -> Maybe<&1, List<&2, U32>>:
+  encoding.if(cp, one_byte_shape(cp))
+
+# `seq` is the UTF-8 encoding of the Unicode scalar `cp`.
+
+def encodes(seq: List<&2, U32>, +cp: U32) -> Type:
+  {is_unicode_scalar(cp) == True{} : Bool} &
+  {encoding(cp) == Some{seq} : Maybe<&1, List<&2, U32>>}
+
+# The valid sequences are exactly the encodings of Unicode scalars.
+
+law valid_sequence_encodes:
+  for +seq: List<&2, U32>
+  encodes_some = Exists(U32, cp => encodes(seq, cp))
+  ({is_valid_sequence(seq) == True{} : Bool} -> encodes_some) &
+  (encodes_some -> {is_valid_sequence(seq) == True{} : Bool})
+
+
+## A valid sequence at the front of a buffer
+
+# `bytes` begins with a valid sequence that encodes `cp`, and `rest` is
+# the bytes after it.
+
+def begins_with_scalar(bytes: List<&2, U32>, cp: U32, rest: List<&2, U32>) -> Type:
+  Exists(List<&2, U32>, seq =>
+    encodes(seq, cp) &
+    {List.append(&2, U32, seq, rest) == bytes : List<&2, U32>})
+
+# `bytes` does not begin with a valid sequence.
+
+def no_valid_sequence(bytes: List<&2, U32>) -> Type:
+  @cp: U32 -> @rest: List<&2, U32> -> begins_with_scalar(bytes, cp, rest) -> Empty
+
+# No valid sequence is a proper prefix of another, so a buffer begins
+# with at most one valid sequence: the scalar and the bytes after it
+# are unique.
+
+law begins_with_scalar_unique:
+  for +bytes: List<&2, U32>
+  for +cp1: U32
+  for +rest1: List<&2, U32>
+  for +cp2: U32
+  for +rest2: List<&2, U32>
+  for first: begins_with_scalar(bytes, cp1, rest1)
+  for second: begins_with_scalar(bytes, cp2, rest2)
+  {cp1 == cp2 : U32} & {rest1 == rest2 : List<&2, U32>}
 
 
 ## Valid sequence prefix
@@ -456,7 +443,7 @@ def maximal_subpart(+b1: U32, +more: List<&2, U32>,
 law maximal_subpart_exists:
   for +b1: U32
   for +more: List<&2, U32>
-  for invalid: {next_scalar(b1 <> more) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+  for invalid: no_valid_sequence(b1 <> more)
   Exists(List<&2, U32>, subpart => maximal_subpart(b1, more, subpart))
 
 law maximal_subpart_unique:
@@ -513,19 +500,24 @@ def decodes_first.replaced(+b1: U32, +more: List<&2, U32>,
     {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
     {result == Some{(replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>}))
 
+# `bytes` begins with a valid sequence, and `result` is the scalar that
+# it encodes and the bytes after it.
+
+def decodes_first.scalar(bytes: List<&2, U32>,
+  result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
+  Exists(U32, cp => Exists(List<&2, U32>, rest =>
+    begins_with_scalar(bytes, cp, rest) &
+    {result == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}))
+
 # Decoding the first code point of the non-empty buffer `b1 <> more`
-# gives `result`, where `found` is the scalar of the valid sequence at
-# the front of the buffer and the bytes after it, or None if the buffer
-# doesn't begin with one.
+# gives `result`: the scalar of the valid sequence at the front of the
+# buffer and the bytes after it, or, when the buffer doesn't begin with
+# a valid sequence, the replaced result.
 
 def decodes_first.nonempty(+b1: U32, +more: List<&2, U32>,
-  found: Maybe<&1, U32 & List<&2, U32>>,
   result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
-  match found:
-    case Some{scalar_rest}:
-      {result == Some{scalar_rest} : Maybe<&1, U32 & List<&2, U32>>}
-    case None{}:
-      decodes_first.replaced(b1, more, result)
+  Or(decodes_first.scalar(b1 <> more, result),
+    no_valid_sequence(b1 <> more) & decodes_first.replaced(b1, more, result))
 
 # Decoding the first code point of the complete buffer `bytes` gives
 # `result`: None if `bytes` is empty, otherwise the code point and the
@@ -537,7 +529,7 @@ def decodes_first(bytes: List<&2, U32>,
     case Nil{}:
       {result == None{} : Maybe<&1, U32 & List<&2, U32>>}
     case +b1 <> +more:
-      decodes_first.nonempty(b1, more, next_scalar(b1 <> more), result)
+      decodes_first.nonempty(b1, more, result)
 
 # Now we add some checks for our definition.
 

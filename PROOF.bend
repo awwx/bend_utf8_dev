@@ -2665,9 +2665,9 @@ def BinaryLaws.strbyte_injective(s1, s2, valid1, valid2, equal):
         B.strbyte(s1, v1), B.strbyte(s2, v2), equal),
       strbyte_injective.inverse(s2, v2)))
 
-# A valid one-byte sequence has the one-byte shape: when the shape test
-# fails, `valid_one_byte.if` is False, contradicting `valid`.
-def utf8_proof.valid_one_byte_has_shape(+byte: U32, shape: Bool,
+# Split on the shape: when the shape test fails, `valid_one_byte.if` is
+# False, contradicting `valid`.
+def utf8_proof.valid_one_byte_has_shape.if(+byte: U32, shape: Bool,
   checked: {UTF8.has_one_byte_shape(byte) == shape : Bool},
   valid: {Laws.valid_one_byte.if(byte, shape, checked) == True{} : Bool}) ->
   {UTF8.has_one_byte_shape(byte) == True{} : Bool}:
@@ -2678,16 +2678,19 @@ def utf8_proof.valid_one_byte_has_shape(+byte: U32, shape: Bool,
     case True{}:
       checked
 
-def Laws.valid_one_byte_has_shape(byte, valid):
+# A valid one-byte sequence has the one-byte shape.
+def utf8_proof.valid_one_byte_has_shape(+byte: U32,
+  valid: {UTF8.valid_one_byte(byte) == True{} : Bool}) ->
+  {UTF8.has_one_byte_shape(byte) == True{} : Bool}:
   +shape = UTF8.has_one_byte_shape(byte)
-  utf8_proof.valid_one_byte_has_shape(byte, shape, {==},
+  utf8_proof.valid_one_byte_has_shape.if(byte, shape, {==},
     Equal.trans(Bool, Laws.valid_one_byte.if(byte, shape, {==}), UTF8.valid_one_byte(byte), True{},
       Equal.sym(Bool, UTF8.valid_one_byte(byte), Laws.valid_one_byte.if(byte, shape, {==}),
         Laws.utf8_valid_one_byte(byte)),
       valid))
 
-# A valid two-byte sequence has the two-byte shape, in the same way.
-def utf8_proof.valid_two_bytes_has_shape(+b1: U32, +b2: U32, shape: Bool,
+# The same split, for two bytes.
+def utf8_proof.valid_two_bytes_has_shape.if(+b1: U32, +b2: U32, shape: Bool,
   checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool},
   valid: {Laws.valid_two_bytes.if(b1, b2, shape, checked) == True{} : Bool}) ->
   {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}:
@@ -2698,9 +2701,12 @@ def utf8_proof.valid_two_bytes_has_shape(+b1: U32, +b2: U32, shape: Bool,
     case True{}:
       checked
 
-def Laws.valid_two_bytes_has_shape(b1, b2, valid):
+# A valid two-byte sequence has the two-byte shape.
+def utf8_proof.valid_two_bytes_has_shape(+b1: U32, +b2: U32,
+  valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}) ->
+  {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}:
   +shape = UTF8.has_two_byte_shape(b1, b2)
-  utf8_proof.valid_two_bytes_has_shape(b1, b2, shape, {==},
+  utf8_proof.valid_two_bytes_has_shape.if(b1, b2, shape, {==},
     Equal.trans(Bool, Laws.valid_two_bytes.if(b1, b2, shape, {==}), UTF8.valid_two_bytes(b1, b2), True{},
       Equal.sym(Bool, UTF8.valid_two_bytes(b1, b2), Laws.valid_two_bytes.if(b1, b2, shape, {==}),
         Laws.utf8_valid_two_bytes(b1, b2)),
@@ -2907,8 +2913,37 @@ def Laws.utf8_is_valid_sequence_prefix(b1, more):
 def Laws.utf8_empty_not_valid_sequence_prefix():
   {==}
 
-# The implementation's scalar functions agree with the specification's
-# --------------------------------------------------------------------
+# Decoding a valid sequence
+# -------------------------
+#
+# The scalar that a valid one- or two-byte sequence encodes, or None.
+# `utf8_proof.next_scalar` computes with these, and `utf8_proof.Decodes`
+# relates them to `Laws.encodes`.
+
+def utf8_proof.one_byte_scalar.if(+byte: U32, valid: Bool,
+  -checked: {UTF8.valid_one_byte(byte) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{UTF8.decode_one_byte(byte, utf8_proof.valid_one_byte_has_shape(byte, checked))}
+
+def utf8_proof.one_byte_scalar(+byte: U32) -> Maybe<&2, U32>:
+  utf8_proof.one_byte_scalar.if(byte, UTF8.valid_one_byte(byte), {==})
+
+def utf8_proof.two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
+  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{UTF8.decode_two_bytes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked))}
+
+def utf8_proof.two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
+  utf8_proof.two_byte_scalar.if(b1, b2, UTF8.valid_two_bytes(b1, b2), {==})
+
+# The implementation's scalar functions agree with these
+# -------------------------------------------------------
 
 def utf8_proof.true_false(e: {True{} == False{} : Bool}) -> Empty:
   H.hex_u32.false_true(Equal.sym(Bool, True{}, False{}, e))
@@ -2920,12 +2955,12 @@ def utf8_proof.one_scalar_agrees(+byte: U32, impl: Bool,
   -spec_checked: {UTF8.valid_one_byte(byte) == spec : Bool},
   same: {impl == spec : Bool}) ->
   {UTF8.one_byte_scalar.if(byte, impl, impl_checked) ==
-    Laws.one_byte_scalar.if(byte, spec, spec_checked) : Maybe<&2, U32>}:
+    utf8_proof.one_byte_scalar.if(byte, spec, spec_checked) : Maybe<&2, U32>}:
   match impl spec:
     case False{} False{}: {==}
     case True{} True{}: {==}
     case False{} True{}:
-      Empty.absurd({None{} == Some{UTF8.decode_one_byte(byte, Laws.valid_one_byte_has_shape(byte, spec_checked))} : Maybe<&2, U32>},
+      Empty.absurd({None{} == Some{UTF8.decode_one_byte(byte, utf8_proof.valid_one_byte_has_shape(byte, spec_checked))} : Maybe<&2, U32>},
         H.hex_u32.false_true(same))
     case True{} False{}:
       Empty.absurd({Some{UTF8.decode_one_byte(byte, impl_checked)} == None{} : Maybe<&2, U32>},
@@ -2936,12 +2971,12 @@ def utf8_proof.two_scalar_agrees(+b1: U32, +b2: U32, impl: Bool,
   -spec_checked: {UTF8.valid_two_bytes(b1, b2) == spec : Bool},
   same: {impl == spec : Bool}) ->
   {UTF8.two_byte_scalar.if(b1, b2, impl, impl_checked) ==
-    Laws.two_byte_scalar.if(b1, b2, spec, spec_checked) : Maybe<&2, U32>}:
+    utf8_proof.two_byte_scalar.if(b1, b2, spec, spec_checked) : Maybe<&2, U32>}:
   match impl spec:
     case False{} False{}: {==}
     case True{} True{}: {==}
     case False{} True{}:
-      Empty.absurd({None{} == Some{UTF8.decode_two_bytes(b1, b2, Laws.valid_two_bytes_has_shape(b1, b2, spec_checked))} : Maybe<&2, U32>},
+      Empty.absurd({None{} == Some{UTF8.decode_two_bytes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, spec_checked))} : Maybe<&2, U32>},
         H.hex_u32.false_true(same))
     case True{} False{}:
       Empty.absurd({Some{UTF8.decode_two_bytes(b1, b2, UTF8.valid_two_bytes.has_shape(b1, b2, impl_checked))} == None{} : Maybe<&2, U32>},
@@ -3551,6 +3586,630 @@ def utf8_proof.append_same_left(+s1: List<&2, U32>, +s2: List<&2, U32>, +rest: L
   %Equal.sym(List<&2, U32>, s1, s2, same) : {List.append(&2, U32, _, rest) == bytes : List<&2, U32>}
   e
 
+# Computing the first scalar
+# --------------------------
+#
+# `next_scalar` computes what `Laws.begins_with_scalar` describes: the
+# scalar of the valid sequence at the front of a buffer and the bytes
+# after it, or None if there is no valid sequence there.  The proofs
+# about `decodes_first` compute with it, in the form
+# `utf8_proof.Decoded.nonempty`; `utf8_proof.to_first` and
+# `utf8_proof.from_first` convert between that form and the law's.
+
+def utf8_proof.next_scalar.found(scalar: Maybe<&2, U32>, rest: List<&2, U32>,
+  otherwise: List<&2, U32> -> Maybe<&1, U32 & List<&2, U32>>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match scalar:
+    case Some{cp}:
+      Some{(cp, rest)}
+    case None{}:
+      otherwise(rest)
+
+def utf8_proof.next_scalar.two(+b1: U32, rest: List<&2, U32>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match rest:
+    case Nil{}:
+      None{}
+    case +b2 <> after:
+      utf8_proof.next_scalar.found(utf8_proof.two_byte_scalar(b1, b2), after, r => None{})
+
+def utf8_proof.next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
+  match bytes:
+    case Nil{}:
+      None{}
+    case +b1 <> rest:
+      utf8_proof.next_scalar.found(utf8_proof.one_byte_scalar(b1), rest,
+        r => utf8_proof.next_scalar.two(b1, r))
+
+# `Laws.decodes_first.nonempty`, given `found = next_scalar(b1 <> more)`.
+def utf8_proof.Decoded.nonempty(+b1: U32, +more: List<&2, U32>,
+  found: Maybe<&1, U32 & List<&2, U32>>,
+  result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
+  match found:
+    case Some{scalar_rest}:
+      {result == Some{scalar_rest} : Maybe<&1, U32 & List<&2, U32>>}
+    case None{}:
+      Laws.decodes_first.replaced(b1, more, result)
+
+def utf8_proof.first_of(d: U32, result: Maybe<&1, U32 & List<&2, U32>>) -> U32:
+  match result:
+    case None{}: d
+    case Some{p}: Pair.fst(U32, List<&2, U32>, p)
+
+def utf8_proof.rest_of(d: List<&2, U32>, result: Maybe<&1, U32 & List<&2, U32>>) -> List<&2, U32>:
+  match result:
+    case None{}: d
+    case Some{p}: Pair.snd(U32, List<&2, U32>, p)
+
+def utf8_proof.some_first(+c1: U32, +c2: U32, +r1: List<&2, U32>, +r2: List<&2, U32>,
+  e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>}) -> {c1 == c2 : U32}:
+  Equal.cong(Maybe<&1, U32 & List<&2, U32>>, U32, m => utf8_proof.first_of(c1, m),
+    Some{(c1, r1)}, Some{(c2, r2)}, e)
+
+def utf8_proof.some_rest(+c1: U32, +c2: U32, +r1: List<&2, U32>, +r2: List<&2, U32>,
+  e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>}) -> {r1 == r2 : List<&2, U32>}:
+  Equal.cong(Maybe<&1, U32 & List<&2, U32>>, List<&2, U32>, m => utf8_proof.rest_of(r1, m),
+    Some{(c1, r1)}, Some{(c2, r2)}, e)
+
+def utf8_proof.none_some(+c: U32, +r: List<&2, U32>,
+  e: {None{} == Some{(c, r)} : Maybe<&1, U32 & List<&2, U32>>}) -> Empty:
+  H.hex_u32.false_true(Equal.cong(Maybe<&1, U32 & List<&2, U32>>, Bool,
+    m => Maybe.is_some(&1, U32 & List<&2, U32>, m), None{}, Some{(c, r)}, e))
+
+def utf8_proof.next_one(+b: U32, +rest: List<&2, U32>, +cp: U32,
+  one: {utf8_proof.one_byte_scalar(b) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar(b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.one_byte_scalar(b), Some{cp}, one) :
+    {utf8_proof.next_scalar.found(_, rest, r => utf8_proof.next_scalar.two(b, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  {==}
+
+def utf8_proof.next_two(+p: U32, +b: U32, +rest: List<&2, U32>, +cp: U32,
+  one: {utf8_proof.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
+  two: {utf8_proof.two_byte_scalar(p, b) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar(p <> b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.one_byte_scalar(p), None{}, one) :
+    {utf8_proof.next_scalar.found(_, b <> rest, r => utf8_proof.next_scalar.two(p, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(p, b), Some{cp}, two) :
+    {utf8_proof.next_scalar.found(_, rest, r => None{}) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  {==}
+
+# Prefix-free: a lead byte with the two-byte shape is 110xxxxx, so it
+# does not have the one-byte shape.
+def utf8_proof.lead_not_one_bits(+high: Word(5n)) ->
+  {UTF8.has_one_byte_shape(utf8_proof.first_byte(high)) == False{} : Bool}:
+  match high:
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+
+def utf8_proof.lead_not_one.payload(+b1: U32,
+  first: Exists(Word(5n), high => {b1 == utf8_proof.first_byte(high) : U32})) ->
+  {UTF8.has_one_byte_shape(b1) == False{} : Bool}:
+  (+high, e) = first
+  %Equal.sym(U32, b1, utf8_proof.first_byte(high), e) : {UTF8.has_one_byte_shape(_) == False{} : Bool}
+  utf8_proof.lead_not_one_bits(high)
+
+def utf8_proof.lead_not_one(+b1: U32, +b2: U32,
+  valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}) ->
+  {UTF8.has_one_byte_shape(b1) == False{} : Bool}:
+  +shape = utf8_proof.valid_two_bytes_has_shape(b1, b2, valid)
+  utf8_proof.lead_not_one.payload(b1,
+    utf8_proof.first_payload(b1, bool_and_left_true(B.byte_mask("110xxxxx", b1, {==}),
+      B.byte_mask("10xxxxxx", b2, {==}), shape)))
+
+def utf8_proof.two_scalar_valid(+b1: U32, +b2: U32, +cp: U32, valid: Bool,
+  checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
+  e: {utf8_proof.two_byte_scalar.if(b1, b2, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}:
+  match valid:
+    case False{}:
+      Empty.absurd({UTF8.valid_two_bytes(b1, b2) == True{} : Bool},
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+          None{}, Some{cp}, e)))
+    case True{}:
+      checked
+
+def utf8_proof.one_scalar_false(+byte: U32, valid: Bool,
+  -checked: {UTF8.valid_one_byte(byte) == valid : Bool},
+  invalid: {valid == False{} : Bool}) ->
+  {utf8_proof.one_byte_scalar.if(byte, valid, checked) == None{} : Maybe<&2, U32>}:
+  match valid:
+    case False{}:
+      {==}
+    case True{}:
+      Empty.absurd({utf8_proof.one_byte_scalar.if(byte, True{}, checked) == None{} : Maybe<&2, U32>},
+        utf8_proof.true_false(invalid))
+
+# No valid two-byte sequence begins with a valid one-byte sequence.
+def utf8_proof.lead_one_none(+b1: U32, +b2: U32, +cp: U32,
+  two: {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.one_byte_scalar(b1) == None{} : Maybe<&2, U32>}:
+  +not_one = utf8_proof.lead_not_one(b1, b2,
+    utf8_proof.two_scalar_valid(b1, b2, cp, UTF8.valid_two_bytes(b1, b2), {==}, two))
+  utf8_proof.one_scalar_false(b1, UTF8.valid_one_byte(b1), {==}, not_one)
+
+def utf8_proof.next_two_valid(+b1: U32, +b2: U32, +rest: List<&2, U32>, +cp: U32,
+  +two: {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar(b1 <> b2 <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  utf8_proof.next_two(b1, b2, rest, cp, utf8_proof.lead_one_none(b1, b2, cp, two), two)
+
+# The two directions of `Laws.encodes`
+# -------------------------------------
+#
+# `Laws.encodes` says that `seq` is the encoding of `cp`.
+# `utf8_proof.Decodes` says the same thing in the decoding direction:
+# `seq` is a valid one- or two-byte sequence and `cp` is the scalar it
+# decodes to.  `utf8_proof.from_old` and `utf8_proof.to_old` convert
+# between them.
+
+def utf8_proof.Decodes(seq: List<&2, U32>, cp: U32) -> Type:
+  match seq:
+    case +b1 <> Nil{}:
+      {utf8_proof.one_byte_scalar(b1) == Some{cp} : Maybe<&2, U32>}
+    case +b1 <> +b2 <> Nil{}:
+      {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}
+    case _:
+      Empty
+
+def utf8_proof.some_value(+a: U32, +b: U32, e: {Some{a} == Some{b} : Maybe<&2, U32>}) -> {a == b : U32}:
+  Equal.cong(Maybe<&2, U32>, U32, m => Maybe.default(&2, U32, m, 0), Some{a}, Some{b}, e)
+
+def utf8_proof.some_list(+a: List<&2, U32>, +b: List<&2, U32>,
+  e: {Some{a} == Some{b} : Maybe<&1, List<&2, U32>>}) -> {a == b : List<&2, U32>}:
+  Equal.cong(Maybe<&1, List<&2, U32>>, List<&2, U32>, m => Maybe.default(&1, List<&2, U32>, m, Nil{}),
+    Some{a}, Some{b}, e)
+
+def utf8_proof.not_true(+x: Bool, e: {Bool.not(x) == True{} : Bool}) -> {x == False{} : Bool}:
+  match x:
+    case False{}:
+      {==}
+    case True{}:
+      Empty.absurd({True{} == False{} : Bool}, H.hex_u32.false_true(e))
+
+def utf8_proof.none_from_is_some(m: Maybe<&2, U32>,
+  e: {Maybe.is_some(&2, U32, m) == False{} : Bool}) -> {m == None{} : Maybe<&2, U32>}:
+  match m:
+    case None{}:
+      {==}
+    case Some{x}:
+      Empty.absurd({Some{x} == None{} : Maybe<&2, U32>}, utf8_proof.true_false(e))
+
+# Decoding direction to encoding direction, one byte.  A valid byte is a
+# scalar, and its one-byte shape is itself.
+
+def utf8_proof.one_encoding(+b: U32, +shape: {UTF8.has_one_byte_shape(b) == True{} : Bool}) ->
+  {Laws.encoding(b) == Some{[b]} : Maybe<&1, List<&2, U32>>}:
+  %Laws.utf8_encode_as_one_byte(b, shape) : {Laws.encoding.if(b, _) == Some{[b]} : Maybe<&1, List<&2, U32>>}
+  {==}
+
+def utf8_proof.one_encodes(+b: U32, +valid: {UTF8.valid_one_byte(b) == True{} : Bool}) ->
+  Laws.encodes([b], b):
+  +shape = utf8_proof.valid_one_byte_has_shape(b, valid)
+  (Equal.trans(Bool, Laws.is_unicode_scalar(b), UTF8.valid_one_byte(b), True{},
+     Equal.sym(Bool, UTF8.valid_one_byte(b), Laws.is_unicode_scalar(b), utf8_proof.valid_one_byte(b, shape)),
+     valid),
+   utf8_proof.one_encoding(b, shape))
+
+def utf8_proof.one_encodes.if(+b: U32, valid: Bool, +checked: {UTF8.valid_one_byte(b) == valid : Bool},
+  +cp: U32, e: {utf8_proof.one_byte_scalar.if(b, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  Laws.encodes([b], cp):
+  match valid:
+    case False{}:
+      Empty.absurd(Laws.encodes([b], cp),
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+          None{}, Some{cp}, e)))
+    case True{}:
+      %utf8_proof.some_value(b, cp, e) : Laws.encodes([b], _)
+      utf8_proof.one_encodes(b, checked)
+
+# Decoding direction to encoding direction, two bytes.  The decoded
+# value is a scalar; it has no one-byte shape, since the pair is not
+# overlong; and its two-byte shape is the pair.
+
+def utf8_proof.two_encoding(+cp: U32, +b1: U32, +b2: U32,
+  no_one: {Laws.one_byte_shape(cp) == None{} : Maybe<&2, U32>},
+  two: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
+  {Laws.encoding(cp) == Some{[b1, b2]} : Maybe<&1, List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_shape(cp), None{}, no_one) :
+    {Laws.encoding.if(cp, _) == Some{[b1, b2]} : Maybe<&1, List<&2, U32>>}
+  %Equal.sym(Maybe<&1, U32 & U32>, Laws.two_byte_shape(cp), Some{(b1, b2)}, two) :
+    {Laws.encoding.two(_) == Some{[b1, b2]} : Maybe<&1, List<&2, U32>>}
+  {==}
+
+def utf8_proof.two_encodes(+b1: U32, +b2: U32,
+  +shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
+  valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}) ->
+  Laws.encodes([b1, b2], UTF8.decode_two_bytes(b1, b2, shape)):
+  +cp = UTF8.decode_two_bytes(b1, b2, shape)
+  +fits = Equal.trans(Bool, Bool.not(UTF8.can_encode_as_one_byte(cp)), UTF8.valid_two_bytes(b1, b2), True{},
+    Equal.sym(Bool, UTF8.valid_two_bytes(b1, b2), Bool.not(UTF8.can_encode_as_one_byte(cp)),
+      utf8_proof.valid_from_facts(cp, b1, b2, shape, Laws.utf8_overlong_two_bytes(b1, b2, shape))),
+    valid)
+  +not_one = utf8_proof.not_true(UTF8.can_encode_as_one_byte(cp), fits)
+  +no_one = utf8_proof.none_from_is_some(Laws.one_byte_shape(cp),
+    Equal.trans(Bool, Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), UTF8.can_encode_as_one_byte(cp), False{},
+      Equal.sym(Bool, UTF8.can_encode_as_one_byte(cp), Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)),
+        Laws.utf8_can_encode_as_one_byte(cp)),
+      not_one))
+  +two = utf8_proof.decode_result_representation(b1, b2, shape, utf8_proof.shape_witness(b1, b2, shape))
+  (utf8_proof.two_decoded_scalar(b1, b2, shape), utf8_proof.two_encoding(cp, b1, b2, no_one, two))
+
+def utf8_proof.two_encodes.if(+b1: U32, +b2: U32, valid: Bool,
+  +checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool}, +cp: U32,
+  e: {utf8_proof.two_byte_scalar.if(b1, b2, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  Laws.encodes([b1, b2], cp):
+  match valid:
+    case False{}:
+      Empty.absurd(Laws.encodes([b1, b2], cp),
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+          None{}, Some{cp}, e)))
+    case True{}:
+      %utf8_proof.some_value(UTF8.decode_two_bytes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked)), cp, e) :
+        Laws.encodes([b1, b2], _)
+      utf8_proof.two_encodes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked), checked)
+
+def utf8_proof.from_old(+seq: List<&2, U32>, +cp: U32, decoded: utf8_proof.Decodes(seq, cp)) ->
+  Laws.encodes(seq, cp):
+  match seq:
+    case Nil{}:
+      Empty.absurd(Laws.encodes(Nil{}, cp), decoded)
+    case +x <> +xs:
+      match xs:
+        case Nil{}:
+          utf8_proof.one_encodes.if(x, UTF8.valid_one_byte(x), {==}, cp, decoded)
+        case +y <> +ys:
+          match ys:
+            case Nil{}:
+              utf8_proof.two_encodes.if(x, y, UTF8.valid_two_bytes(x, y), {==}, cp, decoded)
+            case +z <> +zs:
+              Empty.absurd(Laws.encodes(x <> y <> z <> zs, cp), decoded)
+
+# Encoding direction to decoding direction.  A one-byte shape is the code
+# point itself, which is a valid byte.  A two-byte shape with no
+# one-byte shape is a valid pair that decodes to the code point.
+
+def utf8_proof.one_scalar_some(+b: U32, valid: Bool,
+  -checked: {UTF8.valid_one_byte(b) == valid : Bool}, is_true: {valid == True{} : Bool}) ->
+  {utf8_proof.one_byte_scalar.if(b, valid, checked) == Some{b} : Maybe<&2, U32>}:
+  match valid:
+    case False{}:
+      Empty.absurd({None{} == Some{b} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+    case True{}:
+      {==}
+
+def utf8_proof.one_decodes(+cp: U32, +b: U32,
+  +produced: {Laws.one_byte_shape(cp) == Some{b} : Maybe<&2, U32>}) ->
+  {utf8_proof.one_byte_scalar(b) == Some{cp} : Maybe<&2, U32>}:
+  +accepted = Equal.trans(Bool, UTF8.can_encode_as_one_byte(cp), Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), True{},
+    Laws.utf8_can_encode_as_one_byte(cp),
+    Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), Laws.one_byte_shape(cp), Some{b}, produced))
+  +same = utf8_proof.some_value(cp, b,
+    Equal.trans(Maybe<&2, U32>, Some{cp}, Laws.one_byte_shape(cp), Some{b},
+      Laws.utf8_encode_as_one_byte(cp, accepted), produced))
+  %same : {utf8_proof.one_byte_scalar(_) == Some{cp} : Maybe<&2, U32>}
+  utf8_proof.one_scalar_some(cp, UTF8.valid_one_byte(cp), {==}, accepted)
+
+def utf8_proof.two_scalar_some(+b1: U32, +b2: U32, +cp: U32, valid: Bool,
+  +checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool}, is_true: {valid == True{} : Bool},
+  +produced: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
+  {utf8_proof.two_byte_scalar.if(b1, b2, valid, checked) == Some{cp} : Maybe<&2, U32>}:
+  match valid:
+    case False{}:
+      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+    case True{}:
+      Equal.cong(U32, Maybe<&2, U32>, x => Some{x},
+        UTF8.decode_two_bytes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked)), cp,
+        utf8_proof.decode_model_produced(cp, b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked), produced))
+
+def utf8_proof.two_decodes(+cp: U32, +b1: U32, +b2: U32,
+  +no_one: {Laws.one_byte_shape(cp) == None{} : Maybe<&2, U32>},
+  +produced: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
+  {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}:
+  +shape = utf8_proof.model_pair_accepted(cp, b1, b2, produced)
+  +decoded = utf8_proof.decode_model_produced(cp, b1, b2, shape, produced)
+  +not_one = Equal.trans(Bool, UTF8.can_encode_as_one_byte(cp), Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), False{},
+    Laws.utf8_can_encode_as_one_byte(cp),
+    Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), Laws.one_byte_shape(cp), None{}, no_one))
+  +overlong = Equal.trans(Bool, UTF8.overlong_two_bytes(b1, b2, shape),
+    UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, shape)), UTF8.can_encode_as_one_byte(cp),
+    Laws.utf8_overlong_two_bytes(b1, b2, shape),
+    Equal.cong(U32, Bool, x => UTF8.can_encode_as_one_byte(x), UTF8.decode_two_bytes(b1, b2, shape), cp, decoded))
+  +valid = Equal.trans(Bool, UTF8.valid_two_bytes(b1, b2), Bool.not(UTF8.can_encode_as_one_byte(cp)), True{},
+    utf8_proof.valid_from_facts(cp, b1, b2, shape, overlong),
+    Equal.cong(Bool, Bool, x => Bool.not(x), UTF8.can_encode_as_one_byte(cp), False{}, not_one))
+  utf8_proof.two_scalar_some(b1, b2, cp, UTF8.valid_two_bytes(b1, b2), {==}, valid, produced)
+
+def utf8_proof.to_old.two(+seq: List<&2, U32>, +cp: U32,
+  +no_one: {Laws.one_byte_shape(cp) == None{} : Maybe<&2, U32>},
+  two: Maybe<&1, U32 & U32>, +checked: {Laws.two_byte_shape(cp) == two : Maybe<&1, U32 & U32>},
+  e: {Laws.encoding.two(two) == Some{seq} : Maybe<&1, List<&2, U32>>}) ->
+  utf8_proof.Decodes(seq, cp):
+  match two:
+    case None{}:
+      Empty.absurd(utf8_proof.Decodes(seq, cp),
+        H.hex_u32.false_true(Equal.cong(Maybe<&1, List<&2, U32>>, Bool,
+          m => Maybe.is_some(&1, List<&2, U32>, m), None{}, Some{seq}, e)))
+    case Some{p}:
+      (+b1, +b2) = p
+      %utf8_proof.some_list([b1, b2], seq, e) : utf8_proof.Decodes(_, cp)
+      utf8_proof.two_decodes(cp, b1, b2, no_one, checked)
+
+def utf8_proof.to_old.one(+seq: List<&2, U32>, +cp: U32, one: Maybe<&2, U32>,
+  +checked: {Laws.one_byte_shape(cp) == one : Maybe<&2, U32>},
+  e: {Laws.encoding.if(cp, one) == Some{seq} : Maybe<&1, List<&2, U32>>}) ->
+  utf8_proof.Decodes(seq, cp):
+  match one:
+    case Some{+b}:
+      %utf8_proof.some_list([b], seq, e) : utf8_proof.Decodes(_, cp)
+      utf8_proof.one_decodes(cp, b, checked)
+    case None{}:
+      utf8_proof.to_old.two(seq, cp, checked, Laws.two_byte_shape(cp), {==}, e)
+
+def utf8_proof.to_old(+seq: List<&2, U32>, +cp: U32, enc: Laws.encodes(seq, cp)) ->
+  utf8_proof.Decodes(seq, cp):
+  (scalar, e) = enc
+  utf8_proof.to_old.one(seq, cp, Laws.one_byte_shape(cp), {==}, e)
+
+# The valid sequences are exactly the encodings.
+
+def utf8_proof.one_scalar_valid(+b: U32, +cp: U32, valid: Bool,
+  +checked: {UTF8.valid_one_byte(b) == valid : Bool},
+  e: {utf8_proof.one_byte_scalar.if(b, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  {UTF8.valid_one_byte(b) == True{} : Bool}:
+  match valid:
+    case False{}:
+      Empty.absurd({UTF8.valid_one_byte(b) == True{} : Bool},
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+          None{}, Some{cp}, e)))
+    case True{}:
+      checked
+
+def utf8_proof.decodes_valid(+seq: List<&2, U32>, +cp: U32, decoded: utf8_proof.Decodes(seq, cp)) ->
+  {Laws.is_valid_sequence(seq) == True{} : Bool}:
+  match seq:
+    case Nil{}:
+      Empty.absurd({Laws.is_valid_sequence(Nil{}) == True{} : Bool}, decoded)
+    case +x <> +xs:
+      match xs:
+        case Nil{}:
+          utf8_proof.one_scalar_valid(x, cp, UTF8.valid_one_byte(x), {==}, decoded)
+        case +y <> +ys:
+          match ys:
+            case Nil{}:
+              utf8_proof.two_scalar_valid(x, y, cp, UTF8.valid_two_bytes(x, y), {==}, decoded)
+            case +z <> +zs:
+              Empty.absurd({Laws.is_valid_sequence(x <> y <> z <> zs) == True{} : Bool}, decoded)
+
+def utf8_proof.two_valid_encodes(+x: U32, +y: U32, +valid: {UTF8.valid_two_bytes(x, y) == True{} : Bool}) ->
+  Exists(U32, cp => Laws.encodes([x, y], cp)):
+  +shape = utf8_proof.valid_two_bytes_has_shape(x, y, valid)
+  (UTF8.decode_two_bytes(x, y, shape), utf8_proof.two_encodes(x, y, shape, valid))
+
+def utf8_proof.valid_encodes(+seq: List<&2, U32>, valid: {Laws.is_valid_sequence(seq) == True{} : Bool}) ->
+  Exists(U32, cp => Laws.encodes(seq, cp)):
+  match seq:
+    case Nil{}:
+      Empty.absurd(Exists(U32, cp => Laws.encodes(Nil{}, cp)), H.hex_u32.false_true(valid))
+    case +x <> +xs:
+      match xs:
+        case Nil{}:
+          (x, utf8_proof.one_encodes(x, valid))
+        case +y <> +ys:
+          match ys:
+            case Nil{}:
+              utf8_proof.two_valid_encodes(x, y, valid)
+            case +z <> +zs:
+              Empty.absurd(Exists(U32, cp => Laws.encodes(x <> y <> z <> zs, cp)), H.hex_u32.false_true(valid))
+
+def utf8_proof.encodes_valid(+seq: List<&2, U32>, some: Exists(U32, cp => Laws.encodes(seq, cp))) ->
+  {Laws.is_valid_sequence(seq) == True{} : Bool}:
+  (+cp, enc) = some
+  utf8_proof.decodes_valid(seq, cp, utf8_proof.to_old(seq, cp, enc))
+
+def Laws.valid_sequence_encodes(seq):
+  (valid => utf8_proof.valid_encodes(seq, valid),
+   some => utf8_proof.encodes_valid(seq, some))
+
+# A valid sequence at the front of the buffer is what `next_scalar` finds.
+def utf8_proof.next_of_encodes(+seq: List<&2, U32>, +cp: U32, +rest: List<&2, U32>,
+  enc: utf8_proof.Decodes(seq, cp)) ->
+  {utf8_proof.next_scalar(List.append(&2, U32, seq, rest)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  match seq:
+    case Nil{}:
+      Empty.absurd({utf8_proof.next_scalar(rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}, enc)
+    case +x <> +xs:
+      match xs:
+        case Nil{}:
+          utf8_proof.next_one(x, rest, cp, enc)
+        case +y <> +ys:
+          match ys:
+            case Nil{}:
+              utf8_proof.next_two_valid(x, y, rest, cp, enc)
+            case +z <> +zs:
+              Empty.absurd({utf8_proof.next_scalar(x <> y <> z <> List.append(&2, U32, zs, rest)) ==
+                Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}, enc)
+
+def utf8_proof.next_of_begins(+bytes: List<&2, U32>, +cp: U32, +rest: List<&2, U32>,
+  begins: Laws.begins_with_scalar(bytes, cp, rest)) ->
+  {utf8_proof.next_scalar(bytes) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  (+seq, facts) = begins
+  (enc, split) = facts
+  %split : {utf8_proof.next_scalar(_) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  utf8_proof.next_of_encodes(seq, cp, rest, utf8_proof.to_old(seq, cp, enc))
+
+def Laws.begins_with_scalar_unique(bytes, cp1, rest1, cp2, rest2, first, second):
+  +same = Equal.trans(Maybe<&1, U32 & List<&2, U32>>, Some{(cp1, rest1)},
+    utf8_proof.next_scalar(bytes), Some{(cp2, rest2)},
+    Equal.sym(Maybe<&1, U32 & List<&2, U32>>, utf8_proof.next_scalar(bytes), Some{(cp1, rest1)},
+      utf8_proof.next_of_begins(bytes, cp1, rest1, first)),
+    utf8_proof.next_of_begins(bytes, cp2, rest2, second))
+  (utf8_proof.some_first(cp1, cp2, rest1, rest2, same),
+   utf8_proof.some_rest(cp1, cp2, rest1, rest2, same))
+
+def utf8_proof.no_valid_from_none.at(+bytes: List<&2, U32>,
+  +none: {utf8_proof.next_scalar(bytes) == None{} : Maybe<&1, U32 & List<&2, U32>>},
+  +cp: U32, +rest: List<&2, U32>, begins: Laws.begins_with_scalar(bytes, cp, rest)) -> Empty:
+  utf8_proof.none_some(cp, rest,
+    Equal.trans(Maybe<&1, U32 & List<&2, U32>>, None{}, utf8_proof.next_scalar(bytes), Some{(cp, rest)},
+      Equal.sym(Maybe<&1, U32 & List<&2, U32>>, utf8_proof.next_scalar(bytes), None{}, none),
+      utf8_proof.next_of_begins(bytes, cp, rest, begins)))
+
+def utf8_proof.no_valid_from_none(+bytes: List<&2, U32>,
+  +none: {utf8_proof.next_scalar(bytes) == None{} : Maybe<&1, U32 & List<&2, U32>>}) ->
+  Laws.no_valid_sequence(bytes):
+  cp => rest => begins => utf8_proof.no_valid_from_none.at(bytes, none, cp, rest, begins)
+
+# What `next_scalar` finds is a valid sequence at the front.
+def utf8_proof.Finds(bytes: List<&2, U32>, found: Maybe<&1, U32 & List<&2, U32>>) -> Type:
+  match found:
+    case None{}:
+      Unit
+    case Some{(cp, rest)}:
+      Laws.begins_with_scalar(bytes, cp, rest)
+
+def utf8_proof.finds.pair(+b1: U32, +b2: U32, +after: List<&2, U32>, m: Maybe<&2, U32>,
+  checked: {utf8_proof.two_byte_scalar(b1, b2) == m : Maybe<&2, U32>}) ->
+  utf8_proof.Finds(b1 <> b2 <> after, utf8_proof.next_scalar.found(m, after, r => None{})):
+  match m:
+    case None{}:
+      Unit{}
+    case Some{+c}:
+      ([b1, b2], (utf8_proof.from_old([b1, b2], c, checked), {==}))
+
+def utf8_proof.finds.two(+b1: U32, +rest: List<&2, U32>) ->
+  utf8_proof.Finds(b1 <> rest, utf8_proof.next_scalar.two(b1, rest)):
+  match rest:
+    case Nil{}:
+      Unit{}
+    case +b2 <> +after:
+      utf8_proof.finds.pair(b1, b2, after, utf8_proof.two_byte_scalar(b1, b2), {==})
+
+def utf8_proof.finds.one(+b1: U32, +rest: List<&2, U32>, m: Maybe<&2, U32>,
+  checked: {utf8_proof.one_byte_scalar(b1) == m : Maybe<&2, U32>}) ->
+  utf8_proof.Finds(b1 <> rest,
+    utf8_proof.next_scalar.found(m, rest, r => utf8_proof.next_scalar.two(b1, r))):
+  match m:
+    case None{}:
+      utf8_proof.finds.two(b1, rest)
+    case Some{+c}:
+      ([b1], (utf8_proof.from_old([b1], c, checked), {==}))
+
+def utf8_proof.finds(+bytes: List<&2, U32>) ->
+  utf8_proof.Finds(bytes, utf8_proof.next_scalar(bytes)):
+  match bytes:
+    case Nil{}:
+      Unit{}
+    case +b1 <> +rest:
+      utf8_proof.finds.one(b1, rest, utf8_proof.one_byte_scalar(b1), {==})
+
+def utf8_proof.finds_at(+bytes: List<&2, U32>, -found: Maybe<&1, U32 & List<&2, U32>>,
+  checked: {utf8_proof.next_scalar(bytes) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
+  utf8_proof.Finds(bytes, found):
+  %checked : utf8_proof.Finds(bytes, _)
+  utf8_proof.finds(bytes)
+
+def utf8_proof.to_first.if(+b1: U32, +more: List<&2, U32>,
+  found: Maybe<&1, U32 & List<&2, U32>>,
+  checked: {utf8_proof.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>},
+  -result: Maybe<&1, U32 & List<&2, U32>>,
+  decoded: utf8_proof.Decoded.nonempty(b1, more, found, result)) ->
+  Laws.decodes_first.nonempty(b1, more, result):
+  match found:
+    case Some{x}:
+      (+cp, +rest) = x
+      Inl{(cp, (rest, (utf8_proof.finds_at(b1 <> more, Some{(cp, rest)}, checked), decoded)))}
+    case None{}:
+      Inr{(utf8_proof.no_valid_from_none(b1 <> more, checked), decoded)}
+
+def utf8_proof.to_first(+b1: U32, +more: List<&2, U32>,
+  -result: Maybe<&1, U32 & List<&2, U32>>,
+  decoded: utf8_proof.Decoded.nonempty(b1, more, utf8_proof.next_scalar(b1 <> more), result)) ->
+  Laws.decodes_first(b1 <> more, result):
+  utf8_proof.to_first.if(b1, more, utf8_proof.next_scalar(b1 <> more), {==}, result, decoded)
+
+def utf8_proof.from_first.scalar(+b1: U32, +more: List<&2, U32>,
+  -result: Maybe<&1, U32 & List<&2, U32>>,
+  scalar: Laws.decodes_first.scalar(b1 <> more, result)) ->
+  utf8_proof.Decoded.nonempty(b1, more, utf8_proof.next_scalar(b1 <> more), result):
+  (+cp, s1) = scalar
+  (+rest, s2) = s1
+  (begins, produced) = s2
+  %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, utf8_proof.next_scalar(b1 <> more), Some{(cp, rest)},
+      utf8_proof.next_of_begins(b1 <> more, cp, rest, begins)) :
+    utf8_proof.Decoded.nonempty(b1, more, _, result)
+  produced
+
+def utf8_proof.from_first.none(+b1: U32, +more: List<&2, U32>,
+  found: Maybe<&1, U32 & List<&2, U32>>,
+  checked: {utf8_proof.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>},
+  -result: Maybe<&1, U32 & List<&2, U32>>,
+  none: Laws.no_valid_sequence(b1 <> more),
+  replaced: Laws.decodes_first.replaced(b1, more, result)) ->
+  utf8_proof.Decoded.nonempty(b1, more, found, result):
+  match found:
+    case None{}:
+      replaced
+    case Some{x}:
+      (+cp, +rest) = x
+      Empty.absurd({result == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>},
+        none(cp, rest, utf8_proof.finds_at(b1 <> more, Some{(cp, rest)}, checked)))
+
+def utf8_proof.from_first(+b1: U32, +more: List<&2, U32>,
+  -result: Maybe<&1, U32 & List<&2, U32>>,
+  decoded: Laws.decodes_first(b1 <> more, result)) ->
+  utf8_proof.Decoded.nonempty(b1, more, utf8_proof.next_scalar(b1 <> more), result):
+  match decoded:
+    case Inl{scalar}:
+      utf8_proof.from_first.scalar(b1, more, result, scalar)
+    case Inr{replaced}:
+      (none, rep) = replaced
+      utf8_proof.from_first.none(b1, more, utf8_proof.next_scalar(b1 <> more), {==}, result, none, rep)
+
+# `decodes_first` for a buffer where `next_scalar` finds a scalar.
+def utf8_proof.first_found(+b1: U32, +more: List<&2, U32>, +cp: U32, +rest: List<&2, U32>,
+  e: {utf8_proof.next_scalar(b1 <> more) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}) ->
+  Laws.decodes_first(b1 <> more, Some{(cp, rest)}):
+  Inl{(cp, (rest, (utf8_proof.finds_at(b1 <> more, Some{(cp, rest)}, e), {==})))}
+
+# `decodes_first` for a buffer that does not begin with a valid
+# sequence, given its maximal subpart.
+def utf8_proof.first_replaced(+b1: U32, +more: List<&2, U32>, +sub: List<&2, U32>,
+  +rest: List<&2, U32>,
+  e: {utf8_proof.next_scalar(b1 <> more) == None{} : Maybe<&1, U32 & List<&2, U32>>},
+  maximal: Laws.maximal_subpart(b1, more, sub),
+  split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>}) ->
+  Laws.decodes_first(b1 <> more, Some{(Laws.replacement_char(), rest)}):
+  Inr{(utf8_proof.no_valid_from_none(b1 <> more, e), (sub, (rest, (maximal, (split, {==})))))}
+
 # Decoding the first code point makes progress
 # ---------------------------------------------
 #
@@ -3576,29 +4235,29 @@ def utf8_proof.next_found_progress(scalar: Maybe<&2, U32>, +rest: List<&2, U32>,
   -otherwise: List<&2, U32> -> Maybe<&1, U32 & List<&2, U32>>, +more: List<&2, U32>,
   suffix: utf8_proof.Suffix(rest, more),
   other: utf8_proof.Progress(more, otherwise(rest))) ->
-  utf8_proof.Progress(more, Laws.next_scalar.found(scalar, rest, otherwise)):
+  utf8_proof.Progress(more, utf8_proof.next_scalar.found(scalar, rest, otherwise)):
   match scalar:
     case Some{cp}: suffix
     case None{}: other
 
 def utf8_proof.next_two_progress(+b1: U32, +more: List<&2, U32>) ->
-  utf8_proof.Progress(more, Laws.next_scalar.two(b1, more)):
+  utf8_proof.Progress(more, utf8_proof.next_scalar.two(b1, more)):
   match more:
     case Nil{}:
       Unit{}
     case +b2 <> +after:
-      utf8_proof.next_found_progress(Laws.two_byte_scalar(b1, b2), after, r => None{},
+      utf8_proof.next_found_progress(utf8_proof.two_byte_scalar(b1, b2), after, r => None{},
         b2 <> after, ([b2], {==}), Unit{})
 
 def utf8_proof.next_progress(+b1: U32, +more: List<&2, U32>) ->
-  utf8_proof.Progress(more, Laws.next_scalar(b1 <> more)):
-  utf8_proof.next_found_progress(Laws.one_byte_scalar(b1), more,
-    r => Laws.next_scalar.two(b1, r), more, (Nil{}, {==}),
+  utf8_proof.Progress(more, utf8_proof.next_scalar(b1 <> more)):
+  utf8_proof.next_found_progress(utf8_proof.one_byte_scalar(b1), more,
+    r => utf8_proof.next_scalar.two(b1, r), more, (Nil{}, {==}),
     utf8_proof.next_two_progress(b1, more))
 
 def utf8_proof.next_progress_at(+b1: U32, +more: List<&2, U32>,
   -found: Maybe<&1, U32 & List<&2, U32>>,
-  checked: {Laws.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
+  checked: {utf8_proof.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
   utf8_proof.Progress(more, found):
   %checked : utf8_proof.Progress(more, _)
   utf8_proof.next_progress(b1, more)
@@ -3663,21 +4322,33 @@ def utf8_proof.replaced_from(+b1: U32, +more: List<&2, U32>,
 
 def utf8_proof.nonempty_exists(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>,
-  checked: {Laws.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
+  checked: {utf8_proof.next_scalar(b1 <> more) == found : Maybe<&1, U32 & List<&2, U32>>}) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
-    Laws.decodes_first.nonempty(b1, more, found, result) & utf8_proof.Progress(more, result)):
+    utf8_proof.Decoded.nonempty(b1, more, found, result) & utf8_proof.Progress(more, result)):
   match found:
     case Some{x}:
       (Some{x}, ({==}, utf8_proof.next_progress_at(b1, more, Some{x}, checked)))
     case None{}:
-      utf8_proof.replaced_from(b1, more, Laws.maximal_subpart_exists(b1, more, checked))
+      utf8_proof.replaced_from(b1, more,
+        Laws.maximal_subpart_exists(b1, more, utf8_proof.no_valid_from_none(b1 <> more, checked)))
 
 # Decoding the first code point of a non-empty buffer has a result that
 # leaves a suffix of the bytes after the first.
+def utf8_proof.first_exists.convert(+b1: U32, +more: List<&2, U32>,
+  found: Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    utf8_proof.Decoded.nonempty(b1, more, utf8_proof.next_scalar(b1 <> more), result) &
+    utf8_proof.Progress(more, result))) ->
+  Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
+    Laws.decodes_first(b1 <> more, result) & utf8_proof.Progress(more, result)):
+  (result, both) = found
+  (decoded, progress) = both
+  (result, (utf8_proof.to_first(b1, more, result, decoded), progress))
+
 def utf8_proof.first_exists(+b1: U32, +more: List<&2, U32>) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Laws.decodes_first(b1 <> more, result) & utf8_proof.Progress(more, result)):
-  utf8_proof.nonempty_exists(b1, more, Laws.next_scalar(b1 <> more), {==})
+  utf8_proof.first_exists.convert(b1, more,
+    utf8_proof.nonempty_exists(b1, more, utf8_proof.next_scalar(b1 <> more), {==}))
 
 def utf8_proof.first_exists.drop(+b1: U32, +more: List<&2, U32>,
   found: Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
@@ -3699,7 +4370,7 @@ def Laws.decodes_first_empty(result, decoded):
 
 def utf8_proof.nonempty_some(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>, result: Maybe<&1, U32 & List<&2, U32>>,
-  decoded: Laws.decodes_first.nonempty(b1, more, found, result)) ->
+  decoded: utf8_proof.Decoded.nonempty(b1, more, found, result)) ->
   {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}:
   match found:
     case Some{x}:
@@ -3717,7 +4388,8 @@ def utf8_proof.nonempty_some(+b1: U32, +more: List<&2, U32>,
       {==}
 
 def Laws.decodes_first_nonempty(b1, more, result, decoded):
-  utf8_proof.nonempty_some(b1, more, Laws.next_scalar(b1 <> more), result, decoded)
+  utf8_proof.nonempty_some(b1, more, utf8_proof.next_scalar(b1 <> more), result,
+    utf8_proof.from_first(b1, more, result, decoded))
 
 def utf8_proof.replaced_unique(+b1: U32, +more: List<&2, U32>,
   r1: Maybe<&1, U32 & List<&2, U32>>, r2: Maybe<&1, U32 & List<&2, U32>>,
@@ -3748,8 +4420,8 @@ def utf8_proof.replaced_unique(+b1: U32, +more: List<&2, U32>,
 def utf8_proof.nonempty_unique(+b1: U32, +more: List<&2, U32>,
   found: Maybe<&1, U32 & List<&2, U32>>,
   r1: Maybe<&1, U32 & List<&2, U32>>, r2: Maybe<&1, U32 & List<&2, U32>>,
-  d1: Laws.decodes_first.nonempty(b1, more, found, r1),
-  d2: Laws.decodes_first.nonempty(b1, more, found, r2)) ->
+  d1: utf8_proof.Decoded.nonempty(b1, more, found, r1),
+  d2: utf8_proof.Decoded.nonempty(b1, more, found, r2)) ->
   {r1 == r2 : Maybe<&1, U32 & List<&2, U32>>}:
   match found:
     case Some{x}:
@@ -3764,7 +4436,8 @@ def Laws.decodes_first_unique(bytes, r1, r2, d1, d2):
       Equal.trans(Maybe<&1, U32 & List<&2, U32>>, r1, None{}, r2, d1,
         Equal.sym(Maybe<&1, U32 & List<&2, U32>>, r2, None{}, d2))
     case +b1 <> +more:
-      utf8_proof.nonempty_unique(b1, more, Laws.next_scalar(b1 <> more), r1, r2, d1, d2)
+      utf8_proof.nonempty_unique(b1, more, utf8_proof.next_scalar(b1 <> more), r1, r2,
+        utf8_proof.from_first(b1, more, r1, d1), utf8_proof.from_first(b1, more, r2, d2))
 
 # Decoding a complete buffer
 # --------------------------
@@ -3891,31 +4564,6 @@ def Laws.decodes_exists(bytes):
 # Uniqueness: by induction on the two lists, using `decodes_first_unique`
 # at each step.
 
-def utf8_proof.first_of(d: U32, result: Maybe<&1, U32 & List<&2, U32>>) -> U32:
-  match result:
-    case None{}: d
-    case Some{p}: Pair.fst(U32, List<&2, U32>, p)
-
-def utf8_proof.rest_of(d: List<&2, U32>, result: Maybe<&1, U32 & List<&2, U32>>) -> List<&2, U32>:
-  match result:
-    case None{}: d
-    case Some{p}: Pair.snd(U32, List<&2, U32>, p)
-
-def utf8_proof.some_first(+c1: U32, +c2: U32, +r1: List<&2, U32>, +r2: List<&2, U32>,
-  e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>}) -> {c1 == c2 : U32}:
-  Equal.cong(Maybe<&1, U32 & List<&2, U32>>, U32, m => utf8_proof.first_of(c1, m),
-    Some{(c1, r1)}, Some{(c2, r2)}, e)
-
-def utf8_proof.some_rest(+c1: U32, +c2: U32, +r1: List<&2, U32>, +r2: List<&2, U32>,
-  e: {Some{(c1, r1)} == Some{(c2, r2)} : Maybe<&1, U32 & List<&2, U32>>}) -> {r1 == r2 : List<&2, U32>}:
-  Equal.cong(Maybe<&1, U32 & List<&2, U32>>, List<&2, U32>, m => utf8_proof.rest_of(r1, m),
-    Some{(c1, r1)}, Some{(c2, r2)}, e)
-
-def utf8_proof.none_some(+c: U32, +r: List<&2, U32>,
-  e: {None{} == Some{(c, r)} : Maybe<&1, U32 & List<&2, U32>>}) -> Empty:
-  H.hex_u32.false_true(Equal.cong(Maybe<&1, U32 & List<&2, U32>>, Bool,
-    m => Maybe.is_some(&1, U32 & List<&2, U32>, m), None{}, Some{(c, r)}, e))
-
 def utf8_proof.decodes_at(+text: String, +from: List<&2, U32>, +to: List<&2, U32>,
   same: {from == to : List<&2, U32>}, decoded: Laws.decodes.go(text, from)) ->
   Laws.decodes.go(text, to):
@@ -3972,18 +4620,18 @@ def Laws.decodes_unique(bytes, t1, t2, d1, d2):
 # replaced scalar, also the maximal subpart and its proof.
 def Laws.decodes_examples():
   ({==},
-  (([66], ({==}, ([], ({==}, {==})))),
-  (([], ({==}, {==})),
-  (([65], (([194], ([65], ((([65], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 65], {==}))), ({==}, {==})))),
-    ([], ({==}, {==})))),
-  (([128], (([192], ([128], ({==}, ({==}, {==})))),
-    ([], (([128], ([], ({==}, ({==}, {==})))), {==})))),
-  (([], (([194], ([], ((([], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194], Unit{}))), ({==}, {==})))), {==})),
-  (([194, 169], (([194], ([194, 169], ((([194, 169], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 194, 169], {==}))), ({==}, {==})))),
-    ([], ({==}, {==})))),
-  ([194, 169, 255], ({==},
-    ([255], ({==},
-      ([], (([255], ([], ({==}, ({==}, {==})))), {==})))))))))))))
+  (([66], (utf8_proof.first_found(65, [66], 65, [66], {==}), ([], (utf8_proof.first_found(66, [], 66, [], {==}), {==})))),
+  (([], (utf8_proof.first_found(194, [169], 169, [], {==}), {==})),
+  (([65], (utf8_proof.first_replaced(194, [65], [194], [65], {==}, (([65], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 65], {==}))), {==}),
+    ([], (utf8_proof.first_found(65, [], 65, [], {==}), {==})))),
+  (([128], (utf8_proof.first_replaced(192, [128], [192], [128], {==}, {==}, {==}),
+    ([], (utf8_proof.first_replaced(128, [], [128], [], {==}, {==}, {==}), {==})))),
+  (([], (utf8_proof.first_replaced(194, [], [194], [], {==}, (([], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194], Unit{}))), {==}), {==})),
+  (([194, 169], (utf8_proof.first_replaced(194, [194, 169], [194], [194, 169], {==}, (([194, 169], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 194, 169], {==}))), {==}),
+    ([], (utf8_proof.first_found(194, [169], 169, [], {==}), {==})))),
+  (([194, 169, 255], (utf8_proof.first_found(72, [194, 169, 255], 72, [194, 169, 255], {==}),
+    ([255], (utf8_proof.first_found(194, [169, 255], 169, [255], {==}),
+      ([], (utf8_proof.first_replaced(255, [], [255], [], {==}, {==}, {==}), {==}))))))))))))))
 
 # Running the decoder satisfies `decodes`
 # ---------------------------------------
@@ -4021,17 +4669,17 @@ def utf8_proof.final_text(step: UTF8.decode_buffer.Step()) -> String:
 # The implementation's scalar is the reference definition's.
 def utf8_proof.one_scalar_is(+b1: U32, -m: Maybe<&2, U32>,
   e: {UTF8.sequence_scalar([b1]) == m : Maybe<&2, U32>}) ->
-  {Laws.one_byte_scalar(b1) == m : Maybe<&2, U32>}:
-  Equal.trans(Maybe<&2, U32>, Laws.one_byte_scalar(b1), UTF8.sequence_scalar([b1]), m,
-    Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar([b1]), Laws.one_byte_scalar(b1),
+  {utf8_proof.one_byte_scalar(b1) == m : Maybe<&2, U32>}:
+  Equal.trans(Maybe<&2, U32>, utf8_proof.one_byte_scalar(b1), UTF8.sequence_scalar([b1]), m,
+    Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar([b1]), utf8_proof.one_byte_scalar(b1),
       utf8_proof.one_scalar_agrees(b1, UTF8.valid_one_byte(b1), {==},
         UTF8.valid_one_byte(b1), {==}, {==})), e)
 
 def utf8_proof.two_scalar_is(+b1: U32, +b2: U32, -m: Maybe<&2, U32>,
   e: {UTF8.sequence_scalar([b1, b2]) == m : Maybe<&2, U32>}) ->
-  {Laws.two_byte_scalar(b1, b2) == m : Maybe<&2, U32>}:
-  Equal.trans(Maybe<&2, U32>, Laws.two_byte_scalar(b1, b2), UTF8.sequence_scalar([b1, b2]), m,
-    Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar([b1, b2]), Laws.two_byte_scalar(b1, b2),
+  {utf8_proof.two_byte_scalar(b1, b2) == m : Maybe<&2, U32>}:
+  Equal.trans(Maybe<&2, U32>, utf8_proof.two_byte_scalar(b1, b2), UTF8.sequence_scalar([b1, b2]), m,
+    Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar([b1, b2]), utf8_proof.two_byte_scalar(b1, b2),
       utf8_proof.two_scalar_agrees(b1, b2, UTF8.valid_two_bytes(b1, b2), {==},
         UTF8.valid_two_bytes(b1, b2), {==}, {==})), e)
 
@@ -4045,73 +4693,56 @@ def utf8_proof.prefix_contra(+b: U32,
 def utf8_proof.one_scalar_none(+byte: U32, valid: Bool,
   -checked: {UTF8.valid_one_byte(byte) == valid : Bool},
   invalid: {valid == True{} : Bool} -> Empty) ->
-  {Laws.one_byte_scalar.if(byte, valid, checked) == None{} : Maybe<&2, U32>}:
+  {utf8_proof.one_byte_scalar.if(byte, valid, checked) == None{} : Maybe<&2, U32>}:
   match valid:
     case False{}: {==}
-    case True{}: Empty.absurd({Laws.one_byte_scalar.if(byte, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
+    case True{}: Empty.absurd({utf8_proof.one_byte_scalar.if(byte, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
 
 def utf8_proof.two_scalar_none(+b1: U32, +b2: U32, valid: Bool,
   -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
   invalid: {valid == True{} : Bool} -> Empty) ->
-  {Laws.two_byte_scalar.if(b1, b2, valid, checked) == None{} : Maybe<&2, U32>}:
+  {utf8_proof.two_byte_scalar.if(b1, b2, valid, checked) == None{} : Maybe<&2, U32>}:
   match valid:
     case False{}: {==}
-    case True{}: Empty.absurd({Laws.two_byte_scalar.if(b1, b2, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
+    case True{}: Empty.absurd({utf8_proof.two_byte_scalar.if(b1, b2, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
 
 # A byte that is not a valid sequence prefix is not a valid sequence,
 # nor the start of a two-byte one.
 def utf8_proof.not_one(+b: U32, +not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) ->
-  {Laws.one_byte_scalar(b) == None{} : Maybe<&2, U32>}:
+  {utf8_proof.one_byte_scalar(b) == None{} : Maybe<&2, U32>}:
   utf8_proof.one_scalar_none(b, UTF8.valid_one_byte(b), {==},
     valid => utf8_proof.prefix_contra(b, utf8_proof.prefix_from_valid(b, Nil{}, Nil{}, valid), not_begins))
 
 def utf8_proof.not_two(+b: U32, +b2: U32,
   +not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) ->
-  {Laws.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}:
+  {utf8_proof.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}:
   utf8_proof.two_scalar_none(b, b2, UTF8.valid_two_bytes(b, b2), {==},
     valid => utf8_proof.prefix_contra(b, utf8_proof.prefix_from_valid(b, Nil{}, [b2], valid), not_begins))
 
 def utf8_proof.two_none_all(+b: U32, +rest: List<&2, U32>,
-  none: @b2: U32 -> {Laws.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}) ->
-  {Laws.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  none: @b2: U32 -> {utf8_proof.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
   match rest:
     case Nil{}: {==}
     case +b2 <> +after:
-      %Equal.sym(Maybe<&2, U32>, Laws.two_byte_scalar(b, b2), None{}, none(b2)) :
-        {Laws.next_scalar.found(_, after, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+      %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(b, b2), None{}, none(b2)) :
+        {utf8_proof.next_scalar.found(_, after, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
       {==}
 
 def utf8_proof.two_none_at(+p: U32, +b: U32, +rest: List<&2, U32>,
-  none: {Laws.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
-  {Laws.next_scalar.two(p, b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
-  %Equal.sym(Maybe<&2, U32>, Laws.two_byte_scalar(p, b), None{}, none) :
-    {Laws.next_scalar.found(_, rest, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+  none: {utf8_proof.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar.two(p, b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(p, b), None{}, none) :
+    {utf8_proof.next_scalar.found(_, rest, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
   {==}
 
 def utf8_proof.next_none(+b: U32, +rest: List<&2, U32>,
-  one: {Laws.one_byte_scalar(b) == None{} : Maybe<&2, U32>},
-  two: {Laws.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}) ->
-  {Laws.next_scalar(b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
-  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_scalar(b), None{}, one) :
-    {Laws.next_scalar.found(_, rest, r => Laws.next_scalar.two(b, r)) == None{} : Maybe<&1, U32 & List<&2, U32>>}
+  one: {utf8_proof.one_byte_scalar(b) == None{} : Maybe<&2, U32>},
+  two: {utf8_proof.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}) ->
+  {utf8_proof.next_scalar(b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.one_byte_scalar(b), None{}, one) :
+    {utf8_proof.next_scalar.found(_, rest, r => utf8_proof.next_scalar.two(b, r)) == None{} : Maybe<&1, U32 & List<&2, U32>>}
   two
-
-def utf8_proof.next_one(+b: U32, +rest: List<&2, U32>, +cp: U32,
-  one: {Laws.one_byte_scalar(b) == Some{cp} : Maybe<&2, U32>}) ->
-  {Laws.next_scalar(b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
-  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_scalar(b), Some{cp}, one) :
-    {Laws.next_scalar.found(_, rest, r => Laws.next_scalar.two(b, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
-  {==}
-
-def utf8_proof.next_two(+p: U32, +b: U32, +rest: List<&2, U32>, +cp: U32,
-  one: {Laws.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
-  two: {Laws.two_byte_scalar(p, b) == Some{cp} : Maybe<&2, U32>}) ->
-  {Laws.next_scalar(p <> b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
-  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_scalar(p), None{}, one) :
-    {Laws.next_scalar.found(_, b <> rest, r => Laws.next_scalar.two(p, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
-  %Equal.sym(Maybe<&2, U32>, Laws.two_byte_scalar(p, b), Some{cp}, two) :
-    {Laws.next_scalar.found(_, rest, r => None{}) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
-  {==}
 
 # A byte that is not a valid sequence prefix is its own maximal subpart.
 def utf8_proof.single_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
@@ -4148,23 +4779,6 @@ def utf8_proof.lead_subpart(+p: U32, +more: List<&2, U32>,
   Laws.maximal_subpart(p, more, [p]):
   utf8_proof.lead_subpart.if(p, more, UTF8.is_valid_sequence_prefix([p]), {==}, lead, not_extended)
 
-def utf8_proof.first_found(+b1: U32, +more: List<&2, U32>, -x: U32 & List<&2, U32>,
-  e: {Laws.next_scalar(b1 <> more) == Some{x} : Maybe<&1, U32 & List<&2, U32>>}) ->
-  Laws.decodes_first(b1 <> more, Some{x}):
-  %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, Laws.next_scalar(b1 <> more), Some{x}, e) :
-    Laws.decodes_first.nonempty(b1, more, _, Some{x})
-  {==}
-
-def utf8_proof.first_replaced(+b1: U32, +more: List<&2, U32>, +sub: List<&2, U32>,
-  +rest: List<&2, U32>,
-  e: {Laws.next_scalar(b1 <> more) == None{} : Maybe<&1, U32 & List<&2, U32>>},
-  maximal: Laws.maximal_subpart(b1, more, sub),
-  split: {List.append(&2, U32, sub, rest) == b1 <> more : List<&2, U32>}) ->
-  Laws.decodes_first(b1 <> more, Some{(Laws.replacement_char(), rest)}):
-  %Equal.sym(Maybe<&1, U32 & List<&2, U32>>, Laws.next_scalar(b1 <> more), None{}, e) :
-    Laws.decodes_first.nonempty(b1, more, _, Some{(Laws.replacement_char(), rest)})
-  (sub, (rest, (maximal, (split, {==}))))
-
 # A step with nothing pending.
 def utf8_proof.start_ok.if(+b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
   scalar_is: {UTF8.sequence_scalar([b]) == scalar : Maybe<&2, U32>}, begins: Bool,
@@ -4174,7 +4788,7 @@ def utf8_proof.start_ok.if(+b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>
   match scalar begins:
     case Some{+cp} _:
       (Unit{}, after => d =>
-        (rest, (utf8_proof.first_found(b, rest, (cp, rest),
+        (rest, (utf8_proof.first_found(b, rest, cp, rest,
           utf8_proof.next_one(b, rest, cp, utf8_proof.one_scalar_is(b, Some{cp}, scalar_is))), d)))
     case None{} True{}:
       ((begins_is, scalar_is), after => d => d)
@@ -4195,9 +4809,9 @@ def utf8_proof.start_ok(+b: U32, +rest: List<&2, U32>) ->
 def utf8_proof.extend_fail(+p: U32, +b: U32, +rest: List<&2, U32>,
   s: UTF8.decode_buffer.Step(), started: utf8_proof.StepOK(Nil{}, b, rest, s),
   lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
-  one: {Laws.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
+  one: {utf8_proof.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
   not_begins: {UTF8.is_valid_sequence_prefix([p, b]) == False{} : Bool},
-  two: {Laws.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
+  two: {utf8_proof.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
   utf8_proof.StepOK([p], b, rest,
     UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), s)):
   (+t, +q) = s
@@ -4229,7 +4843,7 @@ def utf8_proof.extend_ok.if(+p: U32, +b: U32, +rest: List<&2, U32>, scalar: Mayb
     case Some{+cp} _:
       (lead, alone) = pending
       (Unit{}, after => d =>
-        (rest, (utf8_proof.first_found(p, b <> rest, (cp, rest),
+        (rest, (utf8_proof.first_found(p, b <> rest, cp, rest,
           utf8_proof.next_two(p, b, rest, cp, utf8_proof.one_scalar_is(p, None{}, alone),
             utf8_proof.two_scalar_is(p, b, Some{cp}, scalar_is))), d)))
     case None{} True{}:
