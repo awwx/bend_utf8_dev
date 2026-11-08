@@ -446,9 +446,10 @@ def maximal_subpart(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
   maximal_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==}, subpart)
 
-# Now we check that given our definition of "maximal subpart", a
-# maximal subpart for a non-empty buffer that doesn't not begin with a
-# valid sequence both exists and is unique.
+# Now we check our definition of "maximal subpart".
+#
+# Given a non-empty buffer that doesn't begin with a valid sequence, a
+# maximal subpart both exists and is unique.
 
 law maximal_subpart_exists:
   for +b1: U32
@@ -491,6 +492,17 @@ def replacement_char_string() -> String:
 
 # These relations are on complete buffers: an incomplete sequence at
 # the end of the buffer results in a replacement character.
+
+# For use with a non-empty buffer (the first byte `b1` and the
+# remaining bytes `more`) that doesn't begin with a valid sequence,
+# `decodes_first.replaced` is a relation which states that, for some
+# `subpart` and `rest`:
+#
+# * `subpart` is the maximal subpart at the front of the buffer;
+#
+# * the buffer is `subpart` followed by `rest`; and
+#
+# * `result` is the Unicode replacement character and `rest`.
 
 def decodes_first.replaced(+b1: U32, +more: List<&2, U32>,
   result: Maybe<&1, U32 & List<&2, U32>>) -> Type:
