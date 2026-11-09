@@ -5,9 +5,9 @@ any project that uses `LAWS.bend` / `PROOF.bend`. It was written against
 Bend 2.0.39 and checked against 2.0.40. Version-specific details are marked
 as such.
 
-The examples come from a UTF-8 encoding project. That project has three
-implementation modules, `binary.bend`, `hexdigits.bend` and `utf8.bend`,
-imported as `B`, `H` and `UTF8`. The examples are illustrations; the
+The examples come from a UTF-8 encoding project. That project has two
+implementation modules, `binary.bend` and `utf8.bend`, imported as `B`
+and `UTF8`. The examples are illustrations; the
 practices themselves are general.
 
 The goal: the laws are a specification that a reader can trust. They state
@@ -65,7 +65,7 @@ independently.
 | Use in a law | Why it's acceptable or not |
 |---|---|
 | `B.first(UTF8.encode_as_two_bytes(cp, valid))` | OK: `law first` fixes `B.first` completely. |
-| `H.hex_u32("D800", {==})` used as a constant | OK: `law hex_u32` fixes the value of every valid input. |
+| `B.strbyte("01000001", {==})` used as a constant | OK: `law strbyte` fixes the value of every valid input. |
 | A reference definition that used `B.bit32` to split a code point into bits | Violation: no law fixed `bit32`'s bit positions. |
 | A reference definition that used `B.bit_to_char` to define a binary string | Violation: nothing fixed `False → '0'`, `True → '1'`. |
 
@@ -129,8 +129,8 @@ Examples:
 
 - A UTF-8 shape spec splits a `U32` into 32 booleans and pattern-matches
   them against the encoding table. The implementation uses shifts and masks.
-- A hex-string spec builds a list of nibbles and then folds it. The
-  implementation accumulates directly.
+- A binary-string spec parses the string into eight bits and adds up their
+  weights. The implementation folds the bits into an accumulator.
 - "Decode is the code point whose encoding is these bytes" would, as an
   algorithm, search all 2³² code points. As a spec it's a single inverse
   law.
@@ -172,7 +172,7 @@ How the files fit together:
   includes lemmas and lists of proofs that only a proof uses.
 - **Put a type where it belongs.** A type shared by several files goes in
   `defs.bend`. A type that belongs to one subject goes at the top of that
-  subject's laws file. *Example:* `Nibble` lives in `hexdigits_LAWS.bend`.
+  subject's laws file.
 - **Group related definitions together** within a laws file: a reference
   definition, then the laws that use it, then their examples.
 
@@ -238,8 +238,8 @@ the laws file, and write a law equating the implementation to it.
 Keep a reference definition when it states something independently that is
 clearer than the implementation. Delete it, and call the implementation
 function instead, once the implementation is pinned down by a law that is
-just as clear. For example, a duplicate `is_hex_digit_spec` is unnecessary
-once `law is_hex_digit` defines `H.is_hex_digit` exactly.
+just as clear. For example, a duplicate `is_binary_digit_spec` is unnecessary
+once `law is_binary_digit` defines `B.is_binary_digit` exactly.
 
 ### 4.3 Prefer stating a layout over computing it
 
@@ -295,11 +295,11 @@ Validators are specified the same way, as a formula over `String.length`,
 `List.all`, and so on:
 
 ```bend
-law is_valid_hex_u32_input:
+law valid_byte_string:
   for +s: String
-  {H.is_valid_hex_u32(s) ==
-    ((Nat.is_ge(String.length(s), 1n) && Nat.is_le(String.length(s), 8n)) &&
-     List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s))) : Bool}
+  {B.valid_byte_string(s) ==
+    (Nat.is_eq(String.length(s), 8n) &&
+     List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s))) : Bool}
 ```
 
 ### 5.2 Functions with preconditions take a proof
@@ -403,11 +403,13 @@ implementation's own validator, have the proof show that the implementation
 accepts the input, using `exs`:
 
 ```bend
-law hex_u32:
-  for +s: String
-  for valid: {H.is_valid_hex_u32(s) == True{} : Bool}
-  exs accepted: {H.is_valid_hex_u32(s) == True{} : Bool}
-  {H.hex_u32(s, accepted) == hex_u32_spec(s) : U32}
+law byte_mask:
+  for +mask: String
+  for +byte: U32
+  for valid: {B.is_valid_byte_mask(mask) == True{} : Bool}
+  exs accepted: {B.is_valid_byte_mask(mask) == True{} : Bool}
+  {B.byte_mask(mask, byte, accepted) ==
+    (U32.is_le(byte, 255) && mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
 ```
 
 The law then quantifies over the *specified* inputs, and the proof must show
@@ -687,7 +689,7 @@ single induction instead of a case split.
 - **A match on `U32{WCon{b0, …}}` is exhaustive by type.** `Word(n)` reduces
   to exactly one constructor at each width, so no fallback case is needed.
 - **Bundle a value with its erased validity proof** when the pair is passed
-  around. *Example:* `type HexDigitChar is Data: HexDigitChar{char: Char,
+  around. *Example:* `type ValidByte is Data: ValidByte{value: U32,
   -valid: {…}}`. Functions taking it then need no separate proof argument.
 - **Use `Maybe` for "may not exist", in reference definitions.** In
   implementations, prefer a precondition proof over returning `Maybe`.
@@ -783,7 +785,7 @@ As of Bend 2.0.40:
   other direction, `scalar_text` was short but imprecise, since it didn't
   say that it takes a code point. `code_point_to_string` says so.
 - **Helpers belonging to a function** are named `fn.helper`
-  (`hex_u32.combine`, `two_byte_shape.bits`, `str_bit8.if`).
+  (`decode_buffer.step`, `two_byte_shape.bits`, `str_bit8.if`).
 - **Proof argument names say what they prove** (`valid`, `valid_shape`,
   `accepted`, `checked`).
 - **Follow the domain's vocabulary**, as its standard does. *Example:*

@@ -2,14 +2,29 @@ import Base
 import ./defs.bend as Defs
 import ./LAWS.bend as Laws
 import ./binary_LAWS.bend as BinaryLaws
-import ./hexdigits_LAWS.bend as HexLaws
-import ./hexdigits.bend as H
 import ./binary.bend as B
 import ./utf8.bend as UTF8
 
-# State the membership specification as a type for the bit-level lemma.
-def HexDigitSpec(+c: Char) -> Type:
-  {H.is_hex_digit(c) == List.contains(~Char, ~Char.is_eq, HexLaws.hex_digits(), c) : Bool}
+# Project the head and tail validity proofs from List.all's conjunction.
+def list_all_head_true(
+  hit: Bool, -rest: Bool,
+  e: {List.all.if(u => rest, hit) == True{} : Bool}
+) -> {hit == True{} : Bool}:
+  match hit:
+    case False{}:
+      e
+    case True{}:
+      {==}
+
+def list_all_tail_true(
+  hit: Bool, -rest: Bool,
+  e: {List.all.if(u => rest, hit) == True{} : Bool}
+) -> {rest == True{} : Bool}:
+  match hit:
+    case False{}:
+      Empty.absurd({rest == True{} : Bool}, UTF8.false_true(e))
+    case True{}:
+      e
 
 # Most-significant bits come first, matching Bend's binder order.
 def char_from_bits(
@@ -113,349 +128,6 @@ def Laws.utf8_can_encode_as_one_byte(cp):
       utf8_proof.one_capacity_model_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
 
 
-law hex_digit_bits:
-  for +b31: Bool
-  for +b30: Bool
-  for +b29: Bool
-  for +b28: Bool
-  for +b27: Bool
-  for +b26: Bool
-  for +b25: Bool
-  for +b24: Bool
-  for +b23: Bool
-  for +b22: Bool
-  for +b21: Bool
-  for +b20: Bool
-  for +b19: Bool
-  for +b18: Bool
-  for +b17: Bool
-  for +b16: Bool
-  for +b15: Bool
-  for +b14: Bool
-  for +b13: Bool
-  for +b12: Bool
-  for +b11: Bool
-  for +b10: Bool
-  for +b9: Bool
-  for +b8: Bool
-  for +b7: Bool
-  for +b6: Bool
-  for +b5: Bool
-  for +b4: Bool
-  for +b3: Bool
-  for +b2: Bool
-  for +b1: Bool
-  for +b0: Bool
-  HexDigitSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))
-
-def hex_digit_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
-  # Any nonzero bit above bit 6 puts the code outside both ASCII ranges.
-  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8 b7:
-    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      {==}
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
-      match b6 b5 b4 b3 b2 b1 b0:
-        case False{} False{} _ _ _ _ _:
-          {==}
-        case False{} True{} False{} _ _ _ _:
-          {==}
-        case False{} True{} True{} False{} False{} False{} False{}:
-          {==}
-        case False{} True{} True{} False{} False{} False{} True{}:
-          {==}
-        case False{} True{} True{} False{} False{} True{} False{}:
-          {==}
-        case False{} True{} True{} False{} False{} True{} True{}:
-          {==}
-        case False{} True{} True{} False{} True{} False{} False{}:
-          {==}
-        case False{} True{} True{} False{} True{} False{} True{}:
-          {==}
-        case False{} True{} True{} False{} True{} True{} False{}:
-          {==}
-        case False{} True{} True{} False{} True{} True{} True{}:
-          {==}
-        case False{} True{} True{} True{} False{} False{} False{}:
-          {==}
-        case False{} True{} True{} True{} False{} False{} True{}:
-          {==}
-        case False{} True{} True{} True{} False{} True{} _:
-          {==}
-        case False{} True{} True{} True{} True{} _ _:
-          {==}
-        case True{} False{} False{} False{} False{} False{} False{}:
-          {==}
-        case True{} False{} False{} False{} False{} False{} True{}:
-          {==}
-        case True{} False{} False{} False{} False{} True{} False{}:
-          {==}
-        case True{} False{} False{} False{} False{} True{} True{}:
-          {==}
-        case True{} False{} False{} False{} True{} False{} False{}:
-          {==}
-        case True{} False{} False{} False{} True{} False{} True{}:
-          {==}
-        case True{} False{} False{} False{} True{} True{} False{}:
-          {==}
-        case True{} False{} False{} False{} True{} True{} True{}:
-          {==}
-        case True{} False{} False{} True{} _ _ _:
-          {==}
-        case True{} False{} True{} _ _ _ _:
-          {==}
-        case True{} True{} _ _ _ _ _:
-          {==}
-
-def HexLaws.is_hex_digit(c):
-  match c:
-    case Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
-      hex_digit_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
-
-# Compare every implemented digit conversion with the independent table.
-def DecodeSpec(+c: Char, -valid: {H.is_hex_digit(c) == True{} : Bool}) -> Type:
-  {Some{H.decode(H.HexDigitChar{c, valid})} == HexLaws.decode_spec(c) : Maybe<&2, HexLaws.Nibble()>}
-
-law decode_bits:
-  for +b31: Bool
-  for +b30: Bool
-  for +b29: Bool
-  for +b28: Bool
-  for +b27: Bool
-  for +b26: Bool
-  for +b25: Bool
-  for +b24: Bool
-  for +b23: Bool
-  for +b22: Bool
-  for +b21: Bool
-  for +b20: Bool
-  for +b19: Bool
-  for +b18: Bool
-  for +b17: Bool
-  for +b16: Bool
-  for +b15: Bool
-  for +b14: Bool
-  for +b13: Bool
-  for +b12: Bool
-  for +b11: Bool
-  for +b10: Bool
-  for +b9: Bool
-  for +b8: Bool
-  for +b7: Bool
-  for +b6: Bool
-  for +b5: Bool
-  for +b4: Bool
-  for +b3: Bool
-  for +b2: Bool
-  for +b1: Bool
-  for +b0: Bool
-  for valid: {H.is_hex_digit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)) == True{} : Bool}
-  DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid)
-
-def decode_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid):
-  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8 b7:
-    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
-      match b6 b5 b4 b3 b2 b1 b0:
-        case False{} False{} _ _ _ _ _:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case False{} True{} False{} _ _ _ _:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case False{} True{} True{} False{} False{} False{} False{}:
-          {==}
-        case False{} True{} True{} False{} False{} False{} True{}:
-          {==}
-        case False{} True{} True{} False{} False{} True{} False{}:
-          {==}
-        case False{} True{} True{} False{} False{} True{} True{}:
-          {==}
-        case False{} True{} True{} False{} True{} False{} False{}:
-          {==}
-        case False{} True{} True{} False{} True{} False{} True{}:
-          {==}
-        case False{} True{} True{} False{} True{} True{} False{}:
-          {==}
-        case False{} True{} True{} False{} True{} True{} True{}:
-          {==}
-        case False{} True{} True{} True{} False{} False{} False{}:
-          {==}
-        case False{} True{} True{} True{} False{} False{} True{}:
-          {==}
-        case False{} True{} True{} True{} False{} True{} _:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case False{} True{} True{} True{} True{} _ _:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case True{} False{} False{} False{} False{} False{} False{}:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case True{} False{} False{} False{} False{} False{} True{}:
-          {==}
-        case True{} False{} False{} False{} False{} True{} False{}:
-          {==}
-        case True{} False{} False{} False{} False{} True{} True{}:
-          {==}
-        case True{} False{} False{} False{} True{} False{} False{}:
-          {==}
-        case True{} False{} False{} False{} True{} False{} True{}:
-          {==}
-        case True{} False{} False{} False{} True{} True{} False{}:
-          {==}
-        case True{} False{} False{} False{} True{} True{} True{}:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case True{} False{} False{} True{} _ _ _:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case True{} False{} True{} _ _ _ _:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-        case True{} True{} _ _ _ _ _:
-          Empty.absurd(DecodeSpec(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0), valid), H.hex_u32.false_true(valid))
-
-def decode_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) -> DecodeSpec(c, valid):
-  match c:
-    case Chr{U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
-      decode_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
-
-def HexLaws.decode(c, valid):
-  +accepted = valid
-  (accepted, decode_agrees(c, accepted))
-
-def decode_value_agrees(+c: Char, +valid: {H.is_hex_digit(c) == True{} : Bool}) ->
-  {H.decode(H.HexDigitChar{c, valid}) == HexLaws.decode_value_spec(c) : HexLaws.Nibble()}:
-  Equal.cong(Maybe<&2, HexLaws.Nibble()>, HexLaws.Nibble(),
-    result => Maybe.default(&2, HexLaws.Nibble(), result, Word.zero(4n)),
-    Some{H.decode(H.HexDigitChar{c, valid})}, HexLaws.decode_spec(c), decode_agrees(c, valid))
-
-def HexLaws.is_valid_hex_u32_input(s):
-  {==}
-
-def HexLaws.is_valid_hex_u32_examples():
-  ({==}, {==}, {==}, {==}, {==})
-
-def HexU32Spec(+s: String, -valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> Type:
-  {H.hex_u32(s, valid) == HexLaws.hex_u32_spec(s) : U32}
-
-# combine folds the reference nibbles of s onto any accumulator.
-def hex_u32.combine_agrees(
-  +s: String,
-  +valid: {List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(s)) == True{} : Bool},
-  +acc: U32
-) -> {H.hex_u32.combine(s, valid, acc) ==
-  List.foldl(~&2, ~HexLaws.Nibble, ~U32, ~(total => n => (total * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)), HexLaws.hex_nibbles_spec(s), acc) : U32}:
-  match s:
-    case SNil{}:
-      {==}
-    case SCon{c, rest}:
-      -rest_ok = List.all(~&2, ~Char, ~(c => H.is_hex_digit(c)), String.to_list(rest))
-      +digit_ok = H.hex_u32.head_true(H.is_hex_digit(c), rest_ok, valid)
-      +step = (acc * 16 + H.word4_to_u32(H.decode(H.HexDigitChar{c, digit_ok})) : U32)
-      %decode_value_agrees(c, digit_ok) : {H.hex_u32.combine(SCon{c, rest}, valid, acc) ==
-        List.foldl(~&2, ~HexLaws.Nibble, ~U32, ~(total => n => (total * 16 + U32.from_nat(Word.to_nat(4n, n)) : U32)), HexLaws.hex_nibbles_spec(rest),
-          (acc * 16 + U32.from_nat(Word.to_nat(4n, _)) : U32)) : U32}
-      hex_u32.combine_agrees(rest, H.hex_u32.tail_true(H.is_hex_digit(c), rest_ok, valid), step)
-
-def hex_u32_agrees(+s: String, valid: {H.is_valid_hex_u32(s) == True{} : Bool}) -> HexU32Spec(s, valid):
-  hex_u32.combine_agrees(s, H.hex_u32.all_digits(s, valid), 0)
-
-def HexLaws.example_zero():
-  {==}
-
-def HexLaws.hex_u32_padding_examples():
-  ({==}, {==}, {==}, {==})
-
 # Binary input validation and byte conversion.
 def BinaryLaws.is_binary_digit(c):
   {==}
@@ -476,25 +148,25 @@ def ByteMaskSpec(+mask: String, +byte: U32,
 def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> ByteMaskSpec(mask, byte, valid):
   match mask:
     case SNil{}:
-      Empty.absurd(ByteMaskSpec(SNil{}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SNil{}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SNil{}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SNil{}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SNil{}}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SNil{}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SNil{}}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SNil{}}}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SNil{}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}, byte, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       {==}
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, byte, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, byte, valid), UTF8.false_true(valid))
 
 def BinaryLaws.byte_mask_examples():
   ({==}, {==}, {==}, {==}, {==}, {==}, {==})
@@ -508,55 +180,55 @@ def utf8_proof.encode_as_one_byte_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28:
 ) -> Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8 b7:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}: {==}
 
 def Laws.utf8_encode_as_one_byte(cp, valid):
@@ -615,55 +287,55 @@ def utf8_proof.valid_one_byte_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Boo
   valid: {UTF8.has_one_byte_shape(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}) -> Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8 b7:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8ValidOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       match b6 b5 b4 b3 b2 b1 b0:
         case True{} _ _ _ _ _ _: valid
@@ -1204,53 +876,53 @@ def bit8_value_roundtrip_bits(
 ) -> Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Bit8ValueRoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       bit8_low_roundtrip(b7, b6, b5, b4, b3, b2, b1, b0, valid)
 
@@ -1268,37 +940,37 @@ def byte2_roundtrip_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: B
   valid: {U32.is_le(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), 65535) == True{} : Bool}) -> Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Byte2RoundtripSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}: {==}
 
 def BinaryLaws.u32_byte2_roundtrip(value, valid):
@@ -1330,47 +1002,47 @@ def utf8_proof.encode_as_two_bytes_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28
   valid: {UTF8.can_encode_as_two_bytes(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}) -> Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), H.hex_u32.false_true(valid))
+      Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       Equal.cong(U32 & U32, Maybe<&1, U32 & U32>, bytes => Some{bytes},
         UTF8.encode_as_two_bytes(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}), utf8_proof.capacity_bits(b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)),
@@ -1391,7 +1063,7 @@ def bool_and_left_true(+left: Bool, -right: Bool, valid: {Bool.and(left, right) 
 def bool_and_right_true(left: Bool, -right: Bool, valid: {Bool.and(left, right) == True{} : Bool}) ->
   {right == True{} : Bool}:
   match left:
-    case False{}: Empty.absurd({right == True{} : Bool}, H.hex_u32.false_true(valid))
+    case False{}: Empty.absurd({right == True{} : Bool}, UTF8.false_true(valid))
     case True{}: valid
 
 # Clear an arbitrary low field without enumerating its possible values.
@@ -1454,21 +1126,21 @@ def utf8_proof.first_prefix_payload(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: B
   Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}):
   match p7 p6 p5:
     case False{} False{} False{}:
-      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} True{}:
-      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} False{}:
-      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} True{}:
-      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} False{}:
-      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} True{}:
-      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} False{}:
       (low, {==})
     case True{} True{} True{}:
-      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}), UTF8.false_true(valid))
 
 def utf8_proof.first_payload_bits(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: Bool,
   valid: {B.byte_mask("110xxxxx", utf8_proof.first_prefix(low, p7, p6, p5), {==}) == True{} : Bool}) -> Exists(Word(5n), payload => {utf8_proof.first_prefix(low, p7, p6, p5) == utf8_proof.first_byte(payload) : U32}):
@@ -1537,13 +1209,13 @@ def utf8_proof.second_prefix_payload(+low: Word(6n), +p7: Bool, +p6: Bool, valid
   Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}):
   match p7 p6:
     case False{} False{}:
-      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), UTF8.false_true(valid))
     case False{} True{}:
-      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), UTF8.false_true(valid))
     case True{} False{}:
       (low, {==})
     case True{} True{}:
-      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}), UTF8.false_true(valid))
 
 def utf8_proof.second_payload_bits(+low: Word(6n), +p7: Bool, +p6: Bool,
   valid: {B.byte_mask("10xxxxxx", utf8_proof.second_prefix(low, p7, p6), {==}) == True{} : Bool}) -> Exists(Word(6n), payload => {utf8_proof.second_prefix(low, p7, p6) == utf8_proof.second_byte(payload) : U32}):
@@ -1696,47 +1368,47 @@ def utf8_proof.decode_model_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool,
   accepted: {UTF8.can_encode_as_two_bytes(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}) -> Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), H.hex_u32.false_true(accepted))
+      Empty.absurd(Utf8ModelDecodeSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))), UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       utf8_proof.decode_fields(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}})
 
@@ -1830,47 +1502,47 @@ def utf8_proof.two_capacity_scalar_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28
   {Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}:
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, H.hex_u32.false_true(accepted))
+      Empty.absurd({Laws.is_unicode_scalar(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}, UTF8.false_true(accepted))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       match b10 b9 b8 b7 b6 b5 b4 b3 b2 b1 b0:
         case True{} _ _ _ _ _ _ _ _ _ _: {==}
@@ -1937,10 +1609,6 @@ def Laws.utf8_valid_two_bytes(b1, b2):
 
 def BinaryLaws.u32_byte4(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
   {==}
-
-def HexLaws.hex_u32(s, valid):
-  +accepted = valid
-  (accepted, hex_u32_agrees(s, accepted))
 
 def BinaryLaws.byte_mask(mask, byte, valid):
   +accepted = valid
@@ -2245,28 +1913,28 @@ def strbyte_injective.fold_bits(+b1: Bool, +b2: Bool, +b3: Bool, +b4: Bool, +b5:
 def BinaryLaws.strbyte(s, valid):
   match s:
     case SNil{}:
-      Empty.absurd(StrbyteSpec(SNil{}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SNil{}), UTF8.false_true(valid))
     case SCon{c1, SNil{}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SNil{}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SNil{}}), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SNil{}}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SNil{}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SNil{}}}), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SNil{}}}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
       +v = valid
       accepted = v
       (accepted, ((Char.is_eq(c1, '1'), Char.is_eq(c2, '1'), Char.is_eq(c3, '1'), Char.is_eq(c4, '1'), Char.is_eq(c5, '1'), Char.is_eq(c6, '1'), Char.is_eq(c7, '1'), Char.is_eq(c8, '1')) : Defs.Bit8()), strbyte.parsed(B.valid_byte_string(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}), ((Char.is_eq(c1, '1'), Char.is_eq(c2, '1'), Char.is_eq(c3, '1'), Char.is_eq(c4, '1'), Char.is_eq(c5, '1'), Char.is_eq(c6, '1'), Char.is_eq(c7, '1'), Char.is_eq(c8, '1')) : Defs.Bit8()), v),
         strbyte_injective.fold_bits(Char.is_eq(c1, '1'), Char.is_eq(c2, '1'), Char.is_eq(c3, '1'), Char.is_eq(c4, '1'), Char.is_eq(c5, '1'), Char.is_eq(c6, '1'), Char.is_eq(c7, '1'), Char.is_eq(c8, '1')))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
-      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}), UTF8.false_true(valid))
 
 def strbyte_lt_256.parsed_value(m: Maybe<&1, Defs.Bit8()>) -> U32:
   match m:
@@ -2333,67 +2001,67 @@ def strbyte_injective.char_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, 
   {strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}:
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8 b7 b6 b5 b4 b3 b2 b1 b0:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} _ _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} False{} _ _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} True{} _ _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} True{} _ _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} True{} _:
-      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, H.hex_u32.false_true(valid))
+      Empty.absurd({strbyte_injective.bit_char(B.char_to_bit(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0) : Char}, UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} False{} False{}: {==}
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} True{} False{} False{} False{} True{}: {==}
 
@@ -2418,37 +2086,37 @@ def strbyte_injective.inverse(s: String,
   +valid: {B.valid_byte_string(s) == True{} : Bool}) -> StrbyteInverseSpec(s, valid):
   match s:
     case SNil{}:
-      Empty.absurd(StrbyteInverseSpec(SNil{}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SNil{}, valid), UTF8.false_true(valid))
     case SCon{c1, SNil{}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SNil{}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SNil{}}, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SNil{}}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SNil{}}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SNil{}}}, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SNil{}}}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}, valid), UTF8.false_true(valid))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}, valid), UTF8.false_true(valid))
     case SCon{+c1, SCon{+c2, SCon{+c3, SCon{+c4, SCon{+c5, SCon{+c6, SCon{+c7, SCon{+c8, SNil{}}}}}}}}}:
-      p1 = H.hex_u32.head_true(B.is_binary_digit(c1), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
-      +e1 = H.hex_u32.tail_true(B.is_binary_digit(c1), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
-      p2 = H.hex_u32.head_true(B.is_binary_digit(c2), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
-      +e2 = H.hex_u32.tail_true(B.is_binary_digit(c2), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
-      p3 = H.hex_u32.head_true(B.is_binary_digit(c3), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c4, c5, c6, c7, c8]), e2)
-      +e3 = H.hex_u32.tail_true(B.is_binary_digit(c3), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c4, c5, c6, c7, c8]), e2)
-      p4 = H.hex_u32.head_true(B.is_binary_digit(c4), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c5, c6, c7, c8]), e3)
-      +e4 = H.hex_u32.tail_true(B.is_binary_digit(c4), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c5, c6, c7, c8]), e3)
-      p5 = H.hex_u32.head_true(B.is_binary_digit(c5), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c6, c7, c8]), e4)
-      +e5 = H.hex_u32.tail_true(B.is_binary_digit(c5), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c6, c7, c8]), e4)
-      p6 = H.hex_u32.head_true(B.is_binary_digit(c6), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c7, c8]), e5)
-      +e6 = H.hex_u32.tail_true(B.is_binary_digit(c6), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c7, c8]), e5)
-      p7 = H.hex_u32.head_true(B.is_binary_digit(c7), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c8]), e6)
-      +e7 = H.hex_u32.tail_true(B.is_binary_digit(c7), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c8]), e6)
-      p8 = H.hex_u32.head_true(B.is_binary_digit(c8), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), []), e7)
+      p1 = list_all_head_true(B.is_binary_digit(c1), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
+      +e1 = list_all_tail_true(B.is_binary_digit(c1), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c2, c3, c4, c5, c6, c7, c8]), valid)
+      p2 = list_all_head_true(B.is_binary_digit(c2), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
+      +e2 = list_all_tail_true(B.is_binary_digit(c2), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c3, c4, c5, c6, c7, c8]), e1)
+      p3 = list_all_head_true(B.is_binary_digit(c3), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c4, c5, c6, c7, c8]), e2)
+      +e3 = list_all_tail_true(B.is_binary_digit(c3), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c4, c5, c6, c7, c8]), e2)
+      p4 = list_all_head_true(B.is_binary_digit(c4), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c5, c6, c7, c8]), e3)
+      +e4 = list_all_tail_true(B.is_binary_digit(c4), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c5, c6, c7, c8]), e3)
+      p5 = list_all_head_true(B.is_binary_digit(c5), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c6, c7, c8]), e4)
+      +e5 = list_all_tail_true(B.is_binary_digit(c5), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c6, c7, c8]), e4)
+      p6 = list_all_head_true(B.is_binary_digit(c6), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c7, c8]), e5)
+      +e6 = list_all_tail_true(B.is_binary_digit(c6), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c7, c8]), e5)
+      p7 = list_all_head_true(B.is_binary_digit(c7), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c8]), e6)
+      +e7 = list_all_tail_true(B.is_binary_digit(c7), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), [c8]), e6)
+      p8 = list_all_head_true(B.is_binary_digit(c8), List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), []), e7)
       %strbyte_injective.char(c1, p1) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{_, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       %strbyte_injective.char(c2, p2) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{_, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
       %strbyte_injective.char(c3, p3) : {strbyte_injective.render(B.strbyte(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}, valid)) == SCon{strbyte_injective.bit_char(B.char_to_bit(c1)), SCon{strbyte_injective.bit_char(B.char_to_bit(c2)), SCon{_, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}} : String}
@@ -2461,7 +2129,7 @@ def strbyte_injective.inverse(s: String,
         B.strbyte.fold_bits([B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)], 0), B.bit8_value((B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8))),
         strbyte_injective.fold_bits(B.char_to_bit(c1), B.char_to_bit(c2), B.char_to_bit(c3), B.char_to_bit(c4), B.char_to_bit(c5), B.char_to_bit(c6), B.char_to_bit(c7), B.char_to_bit(c8)))
     case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
-      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), H.hex_u32.false_true(valid))
+      Empty.absurd(StrbyteInverseSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, valid), UTF8.false_true(valid))
 
 def BinaryLaws.strbyte_injective(s1, s2, valid1, valid2, equal):
   +v1 = valid1
@@ -2484,7 +2152,7 @@ def utf8_proof.valid_one_byte_has_shape.if(+byte: U32, shape: Bool,
   match shape:
     case False{}:
       Empty.absurd({UTF8.has_one_byte_shape(byte) == True{} : Bool},
-        H.hex_u32.false_true(valid))
+        UTF8.false_true(valid))
     case True{}:
       checked
 
@@ -2507,7 +2175,7 @@ def utf8_proof.valid_two_bytes_has_shape.if(+b1: U32, +b2: U32, shape: Bool,
   match shape:
     case False{}:
       Empty.absurd({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
-        H.hex_u32.false_true(valid))
+        UTF8.false_true(valid))
     case True{}:
       checked
 
@@ -2723,37 +2391,37 @@ def utf8_proof.lead3_prefix_payload(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: B
   Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}):
   match p7 p6 p5 p4:
     case False{} False{} False{} False{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} False{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} True{} False{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} True{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} False{} False{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} False{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} True{} False{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} True{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} False{} False{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} False{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} True{} False{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} True{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} False{} False{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} False{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} True{} False{}:
       (low, {==})
     case True{} True{} True{} True{}:
-      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), UTF8.false_true(valid))
 
 def utf8_proof.lead3_payload_bits(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool,
   valid: {B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}) == True{} : Bool}) -> Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}):
@@ -2835,37 +2503,37 @@ def utf8_proof.view3_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: 
   valid: {UTF8.can_encode_as_three_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == True{} : Bool}) -> utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16:
     case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       (WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, (WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WNil{}}}}}}}, (WCon{b12, WCon{b13, WCon{b14, WCon{b15, WNil{}}}}}, {==})))
 
@@ -3094,7 +2762,7 @@ def utf8_proof.valid3_if(+b1: U32, +b2: U32, +b3: U32, shape: Bool,
   {UTF8.valid_three_bytes.if(b1, b2, b3, shape, checked) == utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)) : Bool}:
   match shape:
     case False{}:
-      Empty.absurd({False{} == utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)) : Bool}, H.hex_u32.false_true(is_true))
+      Empty.absurd({False{} == utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)) : Bool}, UTF8.false_true(is_true))
     case True{}: {==}
 
 def utf8_proof.valid3_value(+b1: U32, +b2: U32, +b3: U32, +accepted: {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool}) ->
@@ -3203,69 +2871,69 @@ def utf8_proof.lead4_prefix_payload(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: B
   Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}):
   match p7 p6 p5 p4 p3:
     case False{} False{} False{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} False{} True{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} False{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} True{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} True{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} True{} True{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} False{} True{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} False{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} False{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} False{} True{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} False{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} True{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} True{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} True{} True{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case False{} True{} True{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} False{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} False{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} False{} True{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} False{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} True{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} True{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} True{} True{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} False{} True{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} False{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} False{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} False{} True{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} False{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} True{} False{} False{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} True{} False{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
     case True{} True{} True{} True{} False{}:
       (low, {==})
     case True{} True{} True{} True{} True{}:
-      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), UTF8.false_true(valid))
 
 def utf8_proof.lead4_payload_bits(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool, +p3: Bool,
   valid: {B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}) == True{} : Bool}) -> Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}):
@@ -3351,27 +3019,27 @@ def utf8_proof.view4_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: 
   valid: {UTF8.can_encode_as_four_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == True{} : Bool}) -> utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21:
     case True{} _ _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} True{} _ _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} True{} _ _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} True{} _ _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} True{} _ _ _ _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} True{} _ _ _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
-      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       (WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, (WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WNil{}}}}}}}, (WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WNil{}}}}}}}, (WCon{b18, WCon{b19, WCon{b20, WNil{}}}}, {==}))))
 
@@ -3605,7 +3273,7 @@ def utf8_proof.valid4_if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, shape: Bool,
   {UTF8.valid_four_bytes.if(b1, b2, b3, b4, shape, checked) == utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)) : Bool}:
   match shape:
     case False{}:
-      Empty.absurd({False{} == utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)) : Bool}, H.hex_u32.false_true(is_true))
+      Empty.absurd({False{} == utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)) : Bool}, UTF8.false_true(is_true))
     case True{}: {==}
 
 def utf8_proof.valid4_value(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +accepted: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}) ->
@@ -3830,38 +3498,38 @@ def utf8_proof.any4_mid.Or(+t: Word(3n)) -> Type:
 def utf8_proof.any4_mid.rows(+x4: Bool, +x5: Bool, +t0: Bool, +t1: Bool, +t2: Bool,
   v: {utf8_proof.model4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}) == True{} : Bool}) -> utf8_proof.any4_mid.Or(WCon{t0, WCon{t1, WCon{t2, WNil{}}}}):
   match x4 x5 t0 t1 t2:
-    case False{} False{} False{} False{} False{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}), UTF8.false_true(v))
     case False{} False{} False{} False{} True{}: Inl{{==}}
     case False{} False{} False{} True{} False{}: Inl{{==}}
-    case False{} False{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} False{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case False{} False{} True{} False{} False{}: Inl{{==}}
-    case False{} False{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} False{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case False{} False{} True{} True{} False{}: Inl{{==}}
-    case False{} False{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} False{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case False{} True{} False{} False{} False{}: Inr{{==}}
-    case False{} True{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case False{} True{} False{} True{} False{}: Inl{{==}}
-    case False{} True{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case False{} True{} True{} False{} False{}: Inl{{==}}
-    case False{} True{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case False{} True{} True{} True{} False{}: Inl{{==}}
-    case False{} True{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} False{} False{} False{} False{}: Inr{{==}}
-    case True{} False{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} False{} False{} True{} False{}: Inl{{==}}
-    case True{} False{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} False{} True{} False{} False{}: Inl{{==}}
-    case True{} False{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} False{} True{} True{} False{}: Inl{{==}}
-    case True{} False{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} True{} False{} False{} False{}: Inr{{==}}
-    case True{} True{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} True{} False{} True{} False{}: Inl{{==}}
-    case True{} True{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} True{} True{} False{} False{}: Inl{{==}}
-    case True{} True{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
     case True{} True{} True{} True{} False{}: Inl{{==}}
-    case True{} True{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), UTF8.false_true(v))
 
 def utf8_proof.any4_mid.split(+x: Word(6n), +t: Word(3n), v: {utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t) == True{} : Bool}) -> utf8_proof.any4_mid.Or(t):
   match x t:
@@ -3902,27 +3570,27 @@ def utf8_proof.any4_mid(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +valid: {UTF8.va
 
 def utf8_proof.mono12_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool, v: {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 127) == True{} : Bool}) -> {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}:
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
-    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, UTF8.false_true(v))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       utf8_proof.word_le_ones(11n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}, 21n, Word.zero(21n), Word.zero(21n))
 
@@ -3933,22 +3601,22 @@ def utf8_proof.mono12(+cp: U32, v: {U32.is_le(cp, 127) == True{} : Bool}) -> {U3
 
 def utf8_proof.mono23_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool, v: {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}) -> {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}:
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16:
-    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
-    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, UTF8.false_true(v))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       utf8_proof.word_le_ones(16n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WNil{}}}}}}}}}}}}}}}}}, 16n, Word.zero(16n), Word.zero(16n))
 
@@ -4141,7 +3809,7 @@ def utf8_proof.valid_if_true(+b1: U32, +b2: U32, +shape: Bool,
     case False{}:
       Empty.absurd({False{} == Bool.not(UTF8.overlong_two_bytes(b1, b2,
         Equal.trans(Bool, UTF8.has_two_byte_shape(b1, b2), False{}, True{}, checked, valid))) : Bool},
-        H.hex_u32.false_true(valid))
+        UTF8.false_true(valid))
     case True{}: {==}
 
 def utf8_proof.overlong_from_facts(+cp: U32, +b1: U32, +b2: U32,
@@ -4261,7 +3929,7 @@ def utf8_proof.or_split6(+a0: Bool, +a1: Bool, +a2: Bool, +a3: Bool, +a4: Bool, 
     case False{} False{} False{} True{} _ _: Inr{Inr{Inr{Inl{{==}}}}}
     case False{} False{} False{} False{} True{} _: Inr{Inr{Inr{Inr{Inl{{==}}}}}}
     case False{} False{} False{} False{} False{} True{}: Inr{Inr{Inr{Inr{Inr{{==}}}}}}
-    case False{} False{} False{} False{} False{} False{}: Empty.absurd(utf8_proof.OrT6(False{}, False{}, False{}, False{}, False{}, False{}), H.hex_u32.false_true(e))
+    case False{} False{} False{} False{} False{} False{}: Empty.absurd(utf8_proof.OrT6(False{}, False{}, False{}, False{}, False{}, False{}), UTF8.false_true(e))
 
 def utf8_proof.OrT3(+a0: Bool, +a1: Bool, +a2: Bool) -> Type:
   Or({a0 == True{} : Bool}, Or({a1 == True{} : Bool}, {a2 == True{} : Bool}))
@@ -4271,7 +3939,7 @@ def utf8_proof.or_split3(+a0: Bool, +a1: Bool, +a2: Bool, e: {Bool.or(Bool.or(a0
     case True{} _ _: Inl{{==}}
     case False{} True{} _: Inr{Inl{{==}}}
     case False{} False{} True{}: Inr{Inr{{==}}}
-    case False{} False{} False{}: Empty.absurd(utf8_proof.OrT3(False{}, False{}, False{}), H.hex_u32.false_true(e))
+    case False{} False{} False{}: Empty.absurd(utf8_proof.OrT3(False{}, False{}, False{}), UTF8.false_true(e))
 
 def utf8_proof.OrT2(+a0: Bool, +a1: Bool) -> Type:
   Or({a0 == True{} : Bool}, {a1 == True{} : Bool})
@@ -4280,7 +3948,7 @@ def utf8_proof.or_split2(+a0: Bool, +a1: Bool, e: {Bool.or(a0, a1) == True{} : B
   match a0 a1:
     case True{} _: Inl{{==}}
     case False{} True{}: Inr{{==}}
-    case False{} False{}: Empty.absurd(utf8_proof.OrT2(False{}, False{}), H.hex_u32.false_true(e))
+    case False{} False{}: Empty.absurd(utf8_proof.OrT2(False{}, False{}), UTF8.false_true(e))
 
 def utf8_proof.prefix.of1(+b1: U32, o: utf8_proof.OrT6(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128), UTF8.valid_three_bytes(b1, 128, 128), UTF8.valid_three_bytes(b1, 191, 128), UTF8.valid_four_bytes(b1, 128, 128, 128), UTF8.valid_four_bytes(b1, 191, 128, 128))) -> PrefixCompletion([b1]):
   match o:
@@ -4307,7 +3975,7 @@ def utf8_proof.prefix_completion(+seq: List<&2, U32>,
   begins: {UTF8.is_valid_sequence_prefix(seq) == True{} : Bool}) -> PrefixCompletion(seq):
   match seq:
     case Nil{}:
-      Empty.absurd(PrefixCompletion(Nil{}), H.hex_u32.false_true(begins))
+      Empty.absurd(PrefixCompletion(Nil{}), UTF8.false_true(begins))
     case +b1 <> Nil{}:
       utf8_proof.prefix.of1(b1, utf8_proof.or_split6(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128), UTF8.valid_three_bytes(b1, 128, 128), UTF8.valid_three_bytes(b1, 191, 128), UTF8.valid_four_bytes(b1, 128, 128, 128), UTF8.valid_four_bytes(b1, 191, 128, 128), begins))
     case +b1 <> +b2 <> Nil{}:
@@ -4317,7 +3985,7 @@ def utf8_proof.prefix_completion(+seq: List<&2, U32>,
     case +b1 <> +b2 <> +b3 <> +b4 <> Nil{}:
       (Nil{}, begins)
     case b1 <> b2 <> b3 <> b4 <> b5 <> rest:
-      Empty.absurd(PrefixCompletion(b1 <> b2 <> b3 <> b4 <> b5 <> rest), H.hex_u32.false_true(begins))
+      Empty.absurd(PrefixCompletion(b1 <> b2 <> b3 <> b4 <> b5 <> rest), UTF8.false_true(begins))
 
 def utf8_proof.prefix.mid3(+b1: U32, o: Or({UTF8.valid_three_bytes(b1, 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(b1, 191, 128) == True{} : Bool})) -> {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool}:
   match o:
@@ -4342,7 +4010,7 @@ def utf8_proof.prefix_from_valid(+b1: U32, +more: List<&2, U32>, +rest: List<&2,
     case Nil{} +b2 <> +b3 <> +b4 <> Nil{}:
       utf8_proof.prefix.mid4(b1, utf8_proof.any4_mid(b1, b2, b3, b4, valid))
     case Nil{} b2 <> b3 <> b4 <> b5 <> after:
-      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> Nil{}) == True{} : Bool}, H.hex_u32.false_true(valid))
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> Nil{}) == True{} : Bool}, UTF8.false_true(valid))
     case +b2 <> Nil{} Nil{}:
       utf8_proof.or_left(Bool.or(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128)), UTF8.valid_four_bytes(b1, b2, 128, 128), utf8_proof.or_left(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128), valid))
     case +b2 <> Nil{} +b3 <> Nil{}:
@@ -4350,19 +4018,19 @@ def utf8_proof.prefix_from_valid(+b1: U32, +more: List<&2, U32>, +rest: List<&2,
     case +b2 <> Nil{} +b3 <> +b4 <> Nil{}:
       utf8_proof.or_right(Bool.or(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128)), UTF8.valid_four_bytes(b1, b2, 128, 128), utf8_proof.any4_third(b1, b2, b3, b4, valid))
     case +b2 <> Nil{} b3 <> b4 <> b5 <> after:
-      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2]) == True{} : Bool}, H.hex_u32.false_true(valid))
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2]) == True{} : Bool}, UTF8.false_true(valid))
     case +b2 <> +b3 <> Nil{} Nil{}:
       utf8_proof.or_left(UTF8.valid_three_bytes(b1, b2, b3), UTF8.valid_four_bytes(b1, b2, b3, 128), valid)
     case +b2 <> +b3 <> Nil{} +b4 <> Nil{}:
       utf8_proof.or_right(UTF8.valid_three_bytes(b1, b2, b3), UTF8.valid_four_bytes(b1, b2, b3, 128), utf8_proof.any4_last(b1, b2, b3, b4, valid))
     case +b2 <> +b3 <> Nil{} b4 <> b5 <> after:
-      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2, b3]) == True{} : Bool}, H.hex_u32.false_true(valid))
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2, b3]) == True{} : Bool}, UTF8.false_true(valid))
     case +b2 <> +b3 <> +b4 <> Nil{} Nil{}:
       valid
     case +b2 <> +b3 <> +b4 <> Nil{} b5 <> after:
-      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2, b3, b4]) == True{} : Bool}, H.hex_u32.false_true(valid))
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2, b3, b4]) == True{} : Bool}, UTF8.false_true(valid))
     case b2 <> b3 <> b4 <> b5 <> after _:
-      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> (b2 <> b3 <> b4 <> b5 <> after)) == True{} : Bool}, H.hex_u32.false_true(valid))
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> (b2 <> b3 <> b4 <> b5 <> after)) == True{} : Bool}, UTF8.false_true(valid))
 
 def utf8_proof.prefix_from_completion(+b1: U32, +more: List<&2, U32>,
   completion: PrefixCompletion(b1 <> more)) ->
@@ -4410,7 +4078,7 @@ def utf8_proof.two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
 # -------------------------------------------------------
 
 def utf8_proof.true_false(e: {True{} == False{} : Bool}) -> Empty:
-  H.hex_u32.false_true(Equal.sym(Bool, True{}, False{}, e))
+  UTF8.false_true(Equal.sym(Bool, True{}, False{}, e))
 
 # Both scalar functions branch on validity tests that the validity laws
 # make equal, and decoding does not depend on its proof argument.
@@ -4425,7 +4093,7 @@ def utf8_proof.one_scalar_agrees(+byte: U32, impl: Bool,
     case True{} True{}: {==}
     case False{} True{}:
       Empty.absurd({None{} == Some{UTF8.decode_one_byte(byte, utf8_proof.valid_one_byte_has_shape(byte, spec_checked))} : Maybe<&2, U32>},
-        H.hex_u32.false_true(same))
+        UTF8.false_true(same))
     case True{} False{}:
       Empty.absurd({Some{UTF8.decode_one_byte(byte, impl_checked)} == None{} : Maybe<&2, U32>},
         utf8_proof.true_false(same))
@@ -4441,7 +4109,7 @@ def utf8_proof.two_scalar_agrees(+b1: U32, +b2: U32, impl: Bool,
     case True{} True{}: {==}
     case False{} True{}:
       Empty.absurd({None{} == Some{UTF8.decode_two_bytes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, spec_checked))} : Maybe<&2, U32>},
-        H.hex_u32.false_true(same))
+        UTF8.false_true(same))
     case True{} False{}:
       Empty.absurd({Some{UTF8.decode_two_bytes(b1, b2, UTF8.valid_two_bytes.has_shape(b1, b2, impl_checked))} == None{} : Maybe<&2, U32>},
         utf8_proof.true_false(same))
@@ -5083,7 +4751,7 @@ def utf8_proof.some_rest(+c1: U32, +c2: U32, +r1: List<&2, U32>, +r2: List<&2, U
 
 def utf8_proof.none_some(+c: U32, +r: List<&2, U32>,
   e: {None{} == Some{(c, r)} : Maybe<&1, U32 & List<&2, U32>>}) -> Empty:
-  H.hex_u32.false_true(Equal.cong(Maybe<&1, U32 & List<&2, U32>>, Bool,
+  UTF8.false_true(Equal.cong(Maybe<&1, U32 & List<&2, U32>>, Bool,
     m => Maybe.is_some(&1, U32 & List<&2, U32>, m), None{}, Some{(c, r)}, e))
 
 def utf8_proof.next_one(+b: U32, +rest: List<&2, U32>, +cp: U32,
@@ -5139,7 +4807,7 @@ def utf8_proof.two_scalar_valid(+b1: U32, +b2: U32, +cp: U32, valid: Bool,
   match valid:
     case False{}:
       Empty.absurd({UTF8.valid_two_bytes(b1, b2) == True{} : Bool},
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
           None{}, Some{cp}, e)))
     case True{}:
       checked
@@ -5167,7 +4835,7 @@ def utf8_proof.three_scalar_valid(+b1: U32, +b2: U32, +b3: U32, +cp: U32, valid:
   match valid:
     case False{}:
       Empty.absurd({UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool},
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
     case True{}:
       checked
 
@@ -5186,7 +4854,7 @@ def utf8_proof.four_scalar_valid(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +cp: U3
   match valid:
     case False{}:
       Empty.absurd({UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool},
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
     case True{}:
       checked
 
@@ -5198,19 +4866,19 @@ def utf8_proof.next_two_valid(+b1: U32, +b2: U32, +rest: List<&2, U32>, +cp: U32
   +two: {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}) ->
   {utf8_proof.next_scalar(b1 <> b2 <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
   +k = utf8_proof.valid_kind2(b1, b2, utf8_proof.two_scalar_any_valid(b1, b2, cp, two))
-  utf8_proof.next_two(b1, b2, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 2n), 1n, 2n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 2n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), two)
+  utf8_proof.next_two(b1, b2, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 2n), 1n, 2n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 2n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), two)
 
 def utf8_proof.next_three_valid(+b1: U32, +b2: U32, +b3: U32, +rest: List<&2, U32>, +cp: U32,
   +three: {UTF8.three_byte_scalar(b1, b2, b3) == Some{cp} : Maybe<&2, U32>}) ->
   {utf8_proof.next_scalar(b1 <> b2 <> b3 <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
   +k = utf8_proof.valid_kind3(b1, b2, b3, utf8_proof.three_scalar_valid(b1, b2, b3, cp, UTF8.valid_three_bytes(b1, b2, b3), {==}, three))
-  utf8_proof.next_three(b1, b2, b3, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 1n, 3n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), utf8_proof.two_scalar_none(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 2n, 3n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v)), k)))), three)
+  utf8_proof.next_three(b1, b2, b3, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 1n, 3n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), utf8_proof.two_scalar_none(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, v => UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 2n, 3n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v)), k)))), three)
 
 def utf8_proof.next_four_valid(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +rest: List<&2, U32>, +cp: U32,
   +four: {UTF8.four_byte_scalar(b1, b2, b3, b4) == Some{cp} : Maybe<&2, U32>}) ->
   {utf8_proof.next_scalar(b1 <> b2 <> b3 <> b4 <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
   +k = utf8_proof.valid_kind4(b1, b2, b3, b4, utf8_proof.four_scalar_valid(b1, b2, b3, b4, cp, UTF8.valid_four_bytes(b1, b2, b3, b4), {==}, four))
-  utf8_proof.next_four(b1, b2, b3, b4, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 1n, 4n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), utf8_proof.two_scalar_none(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 2n, 4n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v)), k)))), utf8_proof.three_scalar_none(b1, b2, b3, UTF8.valid_three_bytes(b1, b2, b3), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 3n, 4n, Equal.trans(Nat, 3n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 3n, utf8_proof.valid_kind3(b1, b2, b3, v)), k)))), four)
+  utf8_proof.next_four(b1, b2, b3, b4, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 1n, 4n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), utf8_proof.two_scalar_none(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, v => UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 2n, 4n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v)), k)))), utf8_proof.three_scalar_none(b1, b2, b3, UTF8.valid_three_bytes(b1, b2, b3), {==}, v => UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 3n, 4n, Equal.trans(Nat, 3n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 3n, utf8_proof.valid_kind3(b1, b2, b3, v)), k)))), four)
 
 # The two directions of `Laws.encodes`
 # -------------------------------------
@@ -5247,7 +4915,7 @@ def utf8_proof.not_true(+x: Bool, e: {Bool.not(x) == True{} : Bool}) -> {x == Fa
     case False{}:
       {==}
     case True{}:
-      Empty.absurd({True{} == False{} : Bool}, H.hex_u32.false_true(e))
+      Empty.absurd({True{} == False{} : Bool}, UTF8.false_true(e))
 
 def utf8_proof.none_from_is_some(m: Maybe<&2, U32>,
   e: {Maybe.is_some(&2, U32, m) == False{} : Bool}) -> {m == None{} : Maybe<&2, U32>}:
@@ -5279,7 +4947,7 @@ def utf8_proof.one_encodes.if(+b: U32, valid: Bool, +checked: {UTF8.valid_one_by
   match valid:
     case False{}:
       Empty.absurd(Laws.encodes([b], cp),
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
           None{}, Some{cp}, e)))
     case True{}:
       %utf8_proof.some_value(b, cp, e) : Laws.encodes([b], _)
@@ -5374,7 +5042,7 @@ def utf8_proof.two_encodes.if(+b1: U32, +b2: U32, valid: Bool,
   match valid:
     case False{}:
       Empty.absurd(Laws.encodes([b1, b2], cp),
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
           None{}, Some{cp}, e)))
     case True{}:
       %utf8_proof.some_value(UTF8.decode_two_bytes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked)), cp, e) :
@@ -5399,7 +5067,7 @@ def utf8_proof.three_encodes.if(+b1: U32, +b2: U32, +b3: U32, valid: Bool,
   match valid:
     case False{}:
       Empty.absurd(Laws.encodes([b1, b2, b3], cp),
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
     case True{}:
       %utf8_proof.some_value(UTF8.decode_three_bytes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked)), cp, e) : Laws.encodes([b1, b2, b3], _)
       utf8_proof.three_encodes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked), checked)
@@ -5423,7 +5091,7 @@ def utf8_proof.four_encodes.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, valid: Bo
   match valid:
     case False{}:
       Empty.absurd(Laws.encodes([b1, b2, b3, b4], cp),
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
     case True{}:
       %utf8_proof.some_value(UTF8.decode_four_bytes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked)), cp, e) : Laws.encodes([b1, b2, b3, b4], _)
       utf8_proof.four_encodes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked), checked)
@@ -5453,7 +5121,7 @@ def utf8_proof.one_scalar_some(+b: U32, valid: Bool,
   {utf8_proof.one_byte_scalar.if(b, valid, checked) == Some{b} : Maybe<&2, U32>}:
   match valid:
     case False{}:
-      Empty.absurd({None{} == Some{b} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+      Empty.absurd({None{} == Some{b} : Maybe<&2, U32>}, UTF8.false_true(is_true))
     case True{}:
       {==}
 
@@ -5475,7 +5143,7 @@ def utf8_proof.two_scalar_some(+b1: U32, +b2: U32, +cp: U32, valid: Bool,
   {utf8_proof.two_byte_scalar.if(b1, b2, valid, checked) == Some{cp} : Maybe<&2, U32>}:
   match valid:
     case False{}:
-      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, UTF8.false_true(is_true))
     case True{}:
       Equal.cong(U32, Maybe<&2, U32>, x => Some{x},
         UTF8.decode_two_bytes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked)), cp,
@@ -5505,7 +5173,7 @@ def utf8_proof.three_scalar_some(+b1: U32, +b2: U32, +b3: U32, +cp: U32, valid: 
   {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == Some{cp} : Maybe<&2, U32>}:
   match valid:
     case False{}:
-      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, UTF8.false_true(is_true))
     case True{}:
       Equal.cong(U32, Maybe<&2, U32>, x => Some{x}, UTF8.decode_three_bytes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked)), cp, dec)
 
@@ -5544,7 +5212,7 @@ def utf8_proof.four_scalar_some(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +cp: U32
   {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == Some{cp} : Maybe<&2, U32>}:
   match valid:
     case False{}:
-      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, UTF8.false_true(is_true))
     case True{}:
       Equal.cong(U32, Maybe<&2, U32>, x => Some{x}, UTF8.decode_four_bytes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked)), cp, dec)
 
@@ -5599,7 +5267,7 @@ def utf8_proof.to_old.four(+seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_
   e: {Laws.encoding.four(four) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
   match four:
     case None{}:
-      Empty.absurd(utf8_proof.Decodes(seq, cp), H.hex_u32.false_true(Equal.cong(Maybe<&1, List<&2, U32>>, Bool, m => Maybe.is_some(&1, List<&2, U32>, m), None{}, Some{seq}, e)))
+      Empty.absurd(utf8_proof.Decodes(seq, cp), UTF8.false_true(Equal.cong(Maybe<&1, List<&2, U32>>, Bool, m => Maybe.is_some(&1, List<&2, U32>, m), None{}, Some{seq}, e)))
     case Some{p}:
       utf8_proof.to_old.four.l0(p, seq, cp, sc, no3, checked, e)
 
@@ -5659,7 +5327,7 @@ def utf8_proof.one_scalar_valid(+b: U32, +cp: U32, valid: Bool,
   match valid:
     case False{}:
       Empty.absurd({UTF8.valid_one_byte(b) == True{} : Bool},
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
           None{}, Some{cp}, e)))
     case True{}:
       checked
@@ -5699,7 +5367,7 @@ def utf8_proof.valid_encodes(+seq: List<&2, U32>, valid: {Laws.is_valid_sequence
   Exists(U32, cp => Laws.encodes(seq, cp)):
   match seq:
     case Nil{}:
-      Empty.absurd(Exists(U32, cp => Laws.encodes(Nil{}, cp)), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(U32, cp => Laws.encodes(Nil{}, cp)), UTF8.false_true(valid))
     case +x <> Nil{}:
       (x, utf8_proof.one_encodes(x, valid))
     case +x <> +y <> Nil{}:
@@ -5709,7 +5377,7 @@ def utf8_proof.valid_encodes(+seq: List<&2, U32>, valid: {Laws.is_valid_sequence
     case +x <> +y <> +z <> +w <> Nil{}:
       utf8_proof.four_valid_encodes(x, y, z, w, valid)
     case x <> y <> z <> w <> v <> rest:
-      Empty.absurd(Exists(U32, cp => Laws.encodes(x <> y <> z <> w <> v <> rest, cp)), H.hex_u32.false_true(valid))
+      Empty.absurd(Exists(U32, cp => Laws.encodes(x <> y <> z <> w <> v <> rest, cp)), UTF8.false_true(valid))
 
 def utf8_proof.encodes_valid(+seq: List<&2, U32>, some: Exists(U32, cp => Laws.encodes(seq, cp))) ->
   {Laws.is_valid_sequence(seq) == True{} : Bool}:
@@ -6441,7 +6109,7 @@ def utf8_proof.scalar_to_decodes(+seq: List<&2, U32>, +cp: U32, e: {UTF8.sequenc
   match seq:
     case Nil{}:
       Empty.absurd(utf8_proof.Decodes(Nil{}, cp),
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
     case +x <> Nil{}:
       utf8_proof.one_scalar_is(x, Some{cp}, e)
     case +x <> +y <> Nil{}:
@@ -6452,7 +6120,7 @@ def utf8_proof.scalar_to_decodes(+seq: List<&2, U32>, +cp: U32, e: {UTF8.sequenc
       e
     case x <> y <> z <> w <> v <> rest:
       Empty.absurd(utf8_proof.Decodes(x <> y <> z <> w <> v <> rest, cp),
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+        UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
 
 def utf8_proof.decodes_to_scalar(+seq: List<&2, U32>, +cp: U32, d: utf8_proof.Decodes(seq, cp)) -> {UTF8.sequence_scalar(seq) == Some{cp} : Maybe<&2, U32>}:
   match seq:
@@ -6506,27 +6174,27 @@ def utf8_proof.valid_prefix_free(+b1: U32, +more: List<&2, U32>, +c: U32, +extra
   v2: {Laws.is_valid_sequence(List.append(&2, U32, b1 <> more, c <> extra)) == True{} : Bool}) -> Empty:
   match more extra:
     case Nil{} Nil{}:
-      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 2n), 1n, 2n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 2n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind2(b1, c, v2))))
+      UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 2n), 1n, 2n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 2n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind2(b1, c, v2))))
     case Nil{} +e2 <> Nil{}:
-      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 1n, 3n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind3(b1, c, e2, v2))))
+      UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 1n, 3n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind3(b1, c, e2, v2))))
     case Nil{} +e2 <> +e3 <> Nil{}:
-      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 1n, 4n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind4(b1, c, e2, e3, v2))))
+      UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 1n, 4n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind4(b1, c, e2, e3, v2))))
     case Nil{} e2 <> e3 <> e4 <> after:
-      H.hex_u32.false_true(v2)
+      UTF8.false_true(v2)
     case +b2 <> Nil{} Nil{}:
-      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 2n, 3n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v1)), utf8_proof.valid_kind3(b1, b2, c, v2))))
+      UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 2n, 3n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v1)), utf8_proof.valid_kind3(b1, b2, c, v2))))
     case +b2 <> Nil{} +e2 <> Nil{}:
-      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 2n, 4n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v1)), utf8_proof.valid_kind4(b1, b2, c, e2, v2))))
+      UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 2n, 4n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v1)), utf8_proof.valid_kind4(b1, b2, c, e2, v2))))
     case +b2 <> Nil{} e2 <> e3 <> after:
-      H.hex_u32.false_true(v2)
+      UTF8.false_true(v2)
     case +b2 <> +b3 <> Nil{} Nil{}:
-      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 3n, 4n, Equal.trans(Nat, 3n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 3n, utf8_proof.valid_kind3(b1, b2, b3, v1)), utf8_proof.valid_kind4(b1, b2, b3, c, v2))))
+      UTF8.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 3n, 4n, Equal.trans(Nat, 3n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 3n, utf8_proof.valid_kind3(b1, b2, b3, v1)), utf8_proof.valid_kind4(b1, b2, b3, c, v2))))
     case +b2 <> +b3 <> Nil{} e2 <> after:
-      H.hex_u32.false_true(v2)
+      UTF8.false_true(v2)
     case +b2 <> +b3 <> +b4 <> Nil{} _:
-      H.hex_u32.false_true(v2)
+      UTF8.false_true(v2)
     case b2 <> b3 <> b4 <> b5 <> after _:
-      H.hex_u32.false_true(v2)
+      UTF8.false_true(v2)
 
 def utf8_proof.valid_is_prefix(+h: U32, +t: List<&2, U32>, v: {Laws.is_valid_sequence(h <> t) == True{} : Bool}) -> {UTF8.is_valid_sequence_prefix(h <> t) == True{} : Bool}:
   utf8_proof.prefix_from_completion(h, t, (Nil{},
@@ -6557,7 +6225,7 @@ def utf8_proof.next_none(+bytes: List<&2, U32>, none: Laws.no_valid_sequence(byt
 def utf8_proof.no_begin_not_prefix.seq(+b: U32, +rest: List<&2, U32>, +seq: List<&2, U32>, +r: List<&2, U32>, +split: {List.append(&2, U32, seq, r) == b <> rest : List<&2, U32>},
   valid: {Laws.is_valid_sequence(seq) == True{} : Bool}, not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) -> Empty:
   match seq:
-    case Nil{}: H.hex_u32.false_true(valid)
+    case Nil{}: UTF8.false_true(valid)
     case +h <> +t:
       +same = utf8_proof.cons_head(h, b, List.append(&2, U32, t, r), rest, split)
       +closed = utf8_proof.prefix_closed(h, Nil{}, t, utf8_proof.valid_is_prefix(h, t, valid))
@@ -6587,12 +6255,12 @@ def utf8_proof.no_begin.shorter(+seq: List<&2, U32>, +q: List<&2, U32>, +c: U32,
   +eq: {q == List.append(&2, U32, seq, c <> extra) : List<&2, U32>},
   completion: PrefixCompletion(q)) -> Empty:
   match seq:
-    case Nil{}: H.hex_u32.false_true(v1)
+    case Nil{}: UTF8.false_true(v1)
     case +h <> +t: utf8_proof.no_begin.shorter_seq(h, t, q, c, extra, v1, eq, completion)
 
 def utf8_proof.valid_head_prefix(+seq: List<&2, U32>, v: {Laws.is_valid_sequence(seq) == True{} : Bool}) -> {UTF8.is_valid_sequence_prefix(seq) == True{} : Bool}:
   match seq:
-    case Nil{}: Empty.absurd({UTF8.is_valid_sequence_prefix(Nil{}) == True{} : Bool}, H.hex_u32.false_true(v))
+    case Nil{}: Empty.absurd({UTF8.is_valid_sequence_prefix(Nil{}) == True{} : Bool}, UTF8.false_true(v))
     case +h <> +t: utf8_proof.valid_is_prefix(h, t, v)
 
 def utf8_proof.no_begin.shorter_unpack(+seq: List<&2, U32>, +q: List<&2, U32>, +bytes: List<&2, U32>,
@@ -6628,7 +6296,7 @@ def utf8_proof.no_begin.compared(+q: List<&2, U32>, +seq: List<&2, U32>, +bytes:
   compared: utf8_proof.Compared(seq, q, bytes)) -> Empty:
   match compared:
     case Inl{same}:
-      H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp},
+      UTF8.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp},
         Equal.trans(Maybe<&2, U32>, None{}, UTF8.sequence_scalar(q), Some{cp}, Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar(q), None{}, none_q),
           Equal.trans(Maybe<&2, U32>, UTF8.sequence_scalar(q), UTF8.sequence_scalar(seq), Some{cp}, Equal.cong(List<&2, U32>, Maybe<&2, U32>, x => UTF8.sequence_scalar(x), q, seq, Equal.sym(List<&2, U32>, seq, q, same)),
             utf8_proof.decodes_to_scalar(seq, cp, utf8_proof.to_old(seq, cp, enc))))))
@@ -7011,7 +6679,7 @@ def utf8_proof.low6_at(+x: U32, +y: U32, +e: {x == y : U32}, v: {U32.is_eq(U32.a
 def utf8_proof.not_replacement(+c: U32, +more: String,
   small: {U32.is_eq(U32.and(c, 63), 0) == True{} : Bool},
   e: {SCon{Chr{c}, more} == SCon{Chr{65533}, SNil{}} : String}) -> Empty:
-  H.hex_u32.false_true(utf8_proof.low6_at(c, 65533, utf8_proof.head_eq(c, 65533, more, SNil{}, e), small))
+  UTF8.false_true(utf8_proof.low6_at(c, 65533, utf8_proof.head_eq(c, 65533, more, SNil{}, e), small))
 
 def utf8_proof.differs(+c: U32, +cp: U32, +more: String, +rest: String,
   large: {U32.is_eq(U32.and(c, 63), 0) == False{} : Bool},
@@ -7038,13 +6706,13 @@ def utf8_proof.some2.if(+b1: U32, +b2: U32, valid: Bool, +checked: {UTF8.valid_t
   is_true: {valid == True{} : Bool}) ->
   Exists(U32, cp => {UTF8.two_byte_scalar.if(b1, b2, valid, checked) == Some{cp} : Maybe<&2, U32>} & {cp == (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32}):
   match valid:
-    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32}), H.hex_u32.false_true(is_true))
+    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32}), UTF8.false_true(is_true))
     case True{}: (UTF8.decode_two_bytes(b1, b2, UTF8.valid_two_bytes.has_shape(b1, b2, checked)), ({==}, {==}))
 
 def utf8_proof.none2.contra(+b1: U32, +b2: U32, valid: Bool, -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
   none: {UTF8.two_byte_scalar.if(b1, b2, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
   match valid:
-    case False{}: H.hex_u32.false_true(is_true)
+    case False{}: UTF8.false_true(is_true)
     case True{}:
       utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.two_byte_scalar.if(b1, b2, True{}, checked), None{}, none))
 
@@ -7052,13 +6720,13 @@ def utf8_proof.some3.if(+b1: U32, +b2: U32, +b3: U32, valid: Bool, +checked: {UT
   is_true: {valid == True{} : Bool}) ->
   Exists(U32, cp => {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec3(b1, b2, b3) : U32}):
   match valid:
-    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec3(b1, b2, b3) : U32}), H.hex_u32.false_true(is_true))
+    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec3(b1, b2, b3) : U32}), UTF8.false_true(is_true))
     case True{}: (UTF8.decode_three_bytes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked)), ({==}, {==}))
 
 def utf8_proof.none3.contra(+b1: U32, +b2: U32, +b3: U32, valid: Bool, -checked: {UTF8.valid_three_bytes(b1, b2, b3) == valid : Bool},
   none: {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
   match valid:
-    case False{}: H.hex_u32.false_true(is_true)
+    case False{}: UTF8.false_true(is_true)
     case True{}:
       utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.three_byte_scalar.if(b1, b2, b3, True{}, checked), None{}, none))
 
@@ -7066,20 +6734,20 @@ def utf8_proof.some4.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, valid: Bool, +ch
   is_true: {valid == True{} : Bool}) ->
   Exists(U32, cp => {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec4(b1, b2, b3, b4) : U32}):
   match valid:
-    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec4(b1, b2, b3, b4) : U32}), H.hex_u32.false_true(is_true))
+    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec4(b1, b2, b3, b4) : U32}), UTF8.false_true(is_true))
     case True{}: (UTF8.decode_four_bytes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked)), ({==}, {==}))
 
 def utf8_proof.none4.contra(+b1: U32, +b2: U32, +b3: U32, +b4: U32, valid: Bool, -checked: {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid : Bool},
   none: {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
   match valid:
-    case False{}: H.hex_u32.false_true(is_true)
+    case False{}: UTF8.false_true(is_true)
     case True{}:
       utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.four_byte_scalar.if(b1, b2, b3, b4, True{}, checked), None{}, none))
 
 def utf8_proof.none1.contra(+b1: U32, valid: Bool, -checked: {UTF8.valid_one_byte(b1) == valid : Bool},
   none: {UTF8.one_byte_scalar.if(b1, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
   match valid:
-    case False{}: H.hex_u32.false_true(is_true)
+    case False{}: UTF8.false_true(is_true)
     case True{}:
       utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.one_byte_scalar.if(b1, True{}, checked), None{}, none))
 
@@ -7156,7 +6824,7 @@ def utf8_proof.complete(+p: U32, +ps: List<&2, U32>, begins: {UTF8.is_valid_sequ
     case +b2 <> +b3 <> +b4 <> Nil{}:
       Empty.absurd(utf8_proof.Completion(p, [b2, b3, b4]), utf8_proof.none4.contra(p, b2, b3, b4, UTF8.valid_four_bytes(p, b2, b3, b4), {==}, none, begins))
     case b2 <> b3 <> b4 <> b5 <> after:
-      Empty.absurd(utf8_proof.Completion(p, b2 <> b3 <> b4 <> b5 <> after), H.hex_u32.false_true(begins))
+      Empty.absurd(utf8_proof.Completion(p, b2 <> b3 <> b4 <> b5 <> after), UTF8.false_true(begins))
 
 def utf8_proof.run.regroup(+p: U32, +ps: List<&2, U32>, +c0: U32, +c1: U32, +cs: List<&2, U32>, +cp: U32,
   e: {UTF8.sequence_scalar(List.append(&2, U32, p <> ps, c0 <> c1 <> cs)) == Some{cp} : Maybe<&2, U32>}) ->

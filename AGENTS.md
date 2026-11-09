@@ -36,9 +36,9 @@ agents have written proofs quickly and easily.
 Verify by running `bend PROOF.bend`; it must print "ALL PROOFS CHECK".
 "N TODOs found" means some laws don't have proofs yet.
 
-`bend PROOF.bend --verdict` isn't needed. It currently fails in
-`hex_u32_agrees` because of a Bend bug: a mismatch between its
-TypeScript checker and its kernel.
+`bend PROOF.bend --verdict` isn't needed. It currently fails because
+of a Bend bug: a mismatch between its TypeScript checker and its
+kernel.
 
 Tips and suggestions are available in `BEND_LAWS_GUIDE.md` in this
 directory. These are not requirements; use your own judgment about
