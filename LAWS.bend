@@ -86,6 +86,14 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
 def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
   two_byte_shape.bits(B.u32_byte4(cp))
 
+# UTF-8 three-byte shape
+#
+# 00000000 00000000 wwwwxxxx yyyyzzzz -> 1110wwww 10xxxxyy 10yyzzzz
+
+# UTF-8 four-byte shape
+#
+# 00000000 000uvvvv wwwwxxxx yyyyzzzz -> 11110uvv 10vvwwww 10xxxxyy 10yyzzzz
+
 
 ## Can encode
 
