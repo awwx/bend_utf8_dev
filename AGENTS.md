@@ -1,3 +1,8 @@
+This VM is a sandbox dedicated to your use.  You may install any
+software that would be useful for your task, but leave the installed
+`bend` as it is.  In your final message for the turn, say what you
+installed.
+
 The user makes commits; don't commit unless asked.
 
 In this shell, `cp`, `mv` and `rm` are aliased to their `-i`
