@@ -684,6 +684,13 @@ law decodes_examples:
 def all_bytes(bytes: List<&2, U32>) -> Bool:
   List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
 
+# `UTF8.decode_buffer` requires an erased proof that its buffer passes
+# `UTF8.decode_buffer.all_bytes`, which is the same test as `all_bytes`.
+
+law utf8_decode_buffer_all_bytes:
+  for +bytes: List<&2, U32>
+  {UTF8.decode_buffer.all_bytes(bytes) == all_bytes(bytes) : Bool}
+
 
 ## Running the decoder
 
@@ -696,20 +703,21 @@ def all_bytes(bytes: List<&2, U32>) -> Bool:
 # returns the output text, the concatenation of the text returned by
 # the calls to `decode_buffer` and the final call to `decode_done`.
 
-# Every buffer holds only bytes.
+# Every buffer holds only bytes, stated as the proofs that
+# `UTF8.decode_buffer` requires.
 
 def all_buffers_bytes(buffers: List<&2, List<&2, U32>>) -> Type:
   match buffers:
     case Nil{}:
       Unit
     case buffer <> rest:
-      {all_bytes(buffer) == True{} : Bool} & all_buffers_bytes(rest)
+      {UTF8.decode_buffer.all_bytes(buffer) == True{} : Bool} & all_buffers_bytes(rest)
 
 # `feed` can't match on its erased proof, so it takes the proof apart
 # with these.
 
 def all_buffers_bytes.head(+buffer: List<&2, U32>, +rest: List<&2, List<&2, U32>>,
-  valid: all_buffers_bytes(buffer <> rest)) -> {all_bytes(buffer) == True{} : Bool}:
+  valid: all_buffers_bytes(buffer <> rest)) -> {UTF8.decode_buffer.all_bytes(buffer) == True{} : Bool}:
   (head, tail) = valid
   head
 

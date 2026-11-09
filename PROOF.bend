@@ -2864,6 +2864,9 @@ def utf8_proof.fed_prepend(+text: String, step: UTF8.decode_buffer.Step()) ->
   (more, pending) = step
   {==}
 
+def Laws.utf8_decode_buffer_all_bytes(bytes):
+  {==}
+
 def utf8_proof.feed_step(+rest: List<&2, List<&2, U32>>, -valid: Laws.all_buffers_bytes(rest),
   stepped: UTF8.decode_buffer.Step(),
   same: @q: List<&2, U32> ->
