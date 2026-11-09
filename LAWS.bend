@@ -532,18 +532,18 @@ def decodes_first(bytes: List<&2, U32>,
 
 # Now we add some checks for our definition.
 
-# Now we check that for any buffer, decodes_first implies that a
-# result exists. (That is, we haven't created a definition for which
-# there is some buffer that no `result` value at all satisfies the
-# definition.)  The result itself can be None or Some, we just require
-# that there is one.
+# We check that for any buffer, decodes_first implies that a result
+# exists. (That is, we haven't created a definition for which there is
+# some buffer that no `result` value at all satisfies the definition.)
+# The result itself can be None or Some, we just require that there is
+# one.
 
 law decodes_first_exists:
   for +bytes: List<&2, U32>
   Exists(Maybe<&1, U32 & List<&2, U32>>, result => decodes_first(bytes, result))
 
-# Check for uniqueness: for any buffer, there is only one `result`
-# value which satisfies our definition.
+# We also check for uniqueness: for any buffer, there is only one
+# `result` value which satisfies our definition.
 
 law decodes_first_unique:
   for +bytes: List<&2, U32>
