@@ -756,12 +756,11 @@ def decoded(+buffers: List<&2, List<&2, U32>>,
   decoded.text(feed(buffers, valid, UTF8.decode_start()))
 
 
-# Running the decoder satisfies `decodes`
-# ---------------------------------------
+## Running the decoder satisfies `decodes`
 
-# However the input is split into buffers, giving them in order to
-# `UTF8.decode_buffer` and then calling `UTF8.decode_done` gives what
-# their concatenation decodes to.
+# In whatever way the input is split into buffers, giving them in
+# order to `UTF8.decode_buffer` and then calling `UTF8.decode_done`
+# gives what their concatenation decodes to.
 
 law utf8_decodes:
   for +buffers: List<&2, List<&2, U32>>
