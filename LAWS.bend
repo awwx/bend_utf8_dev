@@ -737,7 +737,7 @@ def feed(+buffers: List<&2, List<&2, U32>>, -valid: all_buffers_bytes(buffers),
       feed.then(UTF8.decode_buffer(state, buffer, all_buffers_bytes.head(buffer, rest, valid)),
         s => feed(rest, all_buffers_bytes.tail(buffer, rest, valid), s))
 
-# The text returned for `buffers`, without and with `UTF8.decode_done`.
+# The text returned for `buffers`, without calling `UTF8.decode_done`.
 
 def decoded_so_far.text(fed: UTF8.DecodeState() & String) -> String:
   (state, text) = fed
@@ -746,6 +746,8 @@ def decoded_so_far.text(fed: UTF8.DecodeState() & String) -> String:
 def decoded_so_far(+buffers: List<&2, List<&2, U32>>,
   -valid: all_buffers_bytes(buffers)) -> String:
   decoded_so_far.text(feed(buffers, valid, UTF8.decode_start_state()))
+
+# The text returned for `buffers`, including calling `UTF8.decode_done`.
 
 def decoded.text(fed: UTF8.DecodeState() & String) -> String:
   (state, text) = fed
