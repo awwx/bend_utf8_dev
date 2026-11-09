@@ -7,8 +7,8 @@ as such.
 
 The examples come from a UTF-8 encoding project. That project has two
 implementation modules, `binary.bend` and `utf8.bend`, imported as `B`
-and `UTF8`. The examples are illustrations; the
-practices themselves are general.
+and `UTF8`. The examples are illustrations; the practices themselves are
+general.
 
 The goal: the laws are a specification that a reader can trust. They state
 what the code must do, clearly enough for a person to check against an
@@ -59,15 +59,6 @@ ask:
 
 If no law covers the behavior, either add one, or state the behavior
 independently.
-
-**Examples of the distinction:**
-
-| Use in a law | Why it's acceptable or not |
-|---|---|
-| `B.first(UTF8.encode_as_two_bytes(cp, valid))` | OK: `law first` fixes `B.first` completely. |
-| `B.strbyte("01000001", {==})` used as a constant | OK: `law strbyte` fixes the value of every valid input. |
-| A reference definition that used `B.bit32` to split a code point into bits | Violation: no law fixed `bit32`'s bit positions. |
-| A reference definition that used `B.bit_to_char` to define a binary string | Violation: nothing fixed `False → '0'`, `True → '1'`. |
 
 "Merely having laws for `foo`" is not enough: the *particular* properties
 being used must be covered.
@@ -129,8 +120,6 @@ Examples:
 
 - A UTF-8 shape spec splits a `U32` into 32 booleans and pattern-matches
   them against the encoding table. The implementation uses shifts and masks.
-- A binary-string spec parses the string into eight bits and adds up their
-  weights. The implementation folds the bits into an accumulator.
 - "Decode is the code point whose encoding is these bytes" would, as an
   algorithm, search all 2³² code points. As a spec it's a single inverse
   law.
@@ -238,8 +227,7 @@ the laws file, and write a law equating the implementation to it.
 Keep a reference definition when it states something independently that is
 clearer than the implementation. Delete it, and call the implementation
 function instead, once the implementation is pinned down by a law that is
-just as clear. For example, a duplicate `is_binary_digit_spec` is unnecessary
-once `law is_binary_digit` defines `B.is_binary_digit` exactly.
+just as clear.
 
 ### 4.3 Prefer stating a layout over computing it
 
@@ -283,33 +271,13 @@ what each layer deliberately includes or excludes.
 ### 5.1 Exact equation
 
 The most direct form: for every input, the function equals a stated
-expression.
-
-```bend
-law is_binary_digit:
-  for +c: Char
-  {B.is_binary_digit(c) == (Char.is_eq('0', c) || Char.is_eq('1', c)) : Bool}
-```
-
-Validators are specified the same way, as a formula over `String.length`,
-`List.all`, and so on:
-
-```bend
-law valid_byte_string:
-  for +s: String
-  {B.valid_byte_string(s) ==
-    (Nat.is_eq(String.length(s), 8n) &&
-     List.all(~&2, ~Char, ~(c => B.is_binary_digit(c)), String.to_list(s))) : Bool}
-```
+expression. Validators are specified the same way, as a formula over
+`String.length`, `List.all`, and so on.
 
 ### 5.2 Functions with preconditions take a proof
 
 A function with a precondition takes a proof of it as its **last** argument,
-**erased** with `-` so that it costs nothing at runtime:
-
-```bend
-def strbyte(+s: String, -valid: {valid_byte_string(s) == True{} : Bool}) -> U32
-```
+**erased** with `-` so that it costs nothing at runtime.
 
 Callers with literal input pass `{==}`, so the precondition is checked when
 the proofs are checked: `B.byte_mask("01xxxxxx", byte, {==})`. Name the proof
@@ -421,17 +389,9 @@ the law.
 ### 5.7 An existential witness for a reference parse
 
 To use an intermediate structure in a law without an extractor, state that it
-exists and pin it down:
-
-```bend
-law strbyte:
-  for +s: String
-  for +valid: {B.valid_byte_string(s) == True{} : Bool}
-  exs accepted: {B.valid_byte_string(s) == True{} : Bool}
-  exs bits: Defs.Bit8()
-  {Some{bits} == str_bit8(s) : Maybe<&1, Defs.Bit8()>} &
-  {B.strbyte(s, accepted) == B.bit8_value(bits) : U32}
-```
+exists and pin it down: `exs w: T`, then one clause that fixes `w`
+(`{Some{w} == parse(s) : Maybe<&1, T>}`) and one that uses it
+(`{f(s) == g(w) : U}`).
 
 ### 5.8 Choose `v = …`, `exs`, or `Exists(…)`
 
@@ -528,16 +488,8 @@ def decodes.go(text: String, bytes: List<&2, U32>) -> Type:
 
 A law of the form "if the implementation returns `Some{x}`, then `x` is
 correct" holds for an implementation that always returns None. Say what
-happens in both cases, either with a second law or in one definition:
-
-```bend
-def decodes_result.if(ok: Bool, +bytes: List<&2, U32>, result: Maybe<&2, String>) -> Type:
-  match ok:
-    case False{}:
-      {result == None{} : Maybe<&2, String>}
-    case True{}:
-      Exists(String, text => {result == Some{text} : Maybe<&2, String>} & decodes(bytes, text))
-```
+happens in both cases, either with a second law or in one definition that
+branches on whether a result was returned.
 
 More generally, for each hypothesis of a law, ask whether some
 implementation could make it impossible to satisfy, so that the law says
@@ -586,7 +538,7 @@ proved with `{==}`.
   that *every* literal in it can lose: `"000000"` and `"10FFFF"`, not `"0"`
   and `"10FFFF"`.
 - **Keep an example that demonstrates a property**, even if it looks
-  redundant. For example, `"0000000A"` next to `"A"` shows left-padding.
+  redundant.
 
 ### 6.2 Redundant checks are labeled
 
@@ -689,8 +641,7 @@ single induction instead of a case split.
 - **A match on `U32{WCon{b0, …}}` is exhaustive by type.** `Word(n)` reduces
   to exactly one constructor at each width, so no fallback case is needed.
 - **Bundle a value with its erased validity proof** when the pair is passed
-  around. *Example:* `type ValidByte is Data: ValidByte{value: U32,
-  -valid: {…}}`. Functions taking it then need no separate proof argument.
+  around. Functions taking it then need no separate proof argument.
 - **Use `Maybe` for "may not exist", in reference definitions.** In
   implementations, prefer a precondition proof over returning `Maybe`.
 
@@ -758,9 +709,8 @@ As of Bend 2.0.40:
 
 ## 9. Naming
 
-- **A law that specifies a function is named after it**: `law strbyte`,
-  `law is_binary_digit`. When one laws file covers functions from several
-  modules, prefix the law with the module (`law utf8_encode_as_two_bytes`).
+- **A law that specifies a function is named after it.** When one laws file
+  covers functions from several modules, prefix the law with the module (`law utf8_encode_as_two_bytes`).
 - **Use these suffixes:** `_examples`, `_roundtrip`, `_injective`, and
   `_spec` (for reference definitions that would otherwise clash with an
   implementation name).
@@ -785,7 +735,7 @@ As of Bend 2.0.40:
   other direction, `scalar_text` was short but imprecise, since it didn't
   say that it takes a code point. `code_point_to_string` says so.
 - **Helpers belonging to a function** are named `fn.helper`
-  (`decode_buffer.step`, `two_byte_shape.bits`, `str_bit8.if`).
+  (`decode_buffer.step`, `two_byte_shape.bits`).
 - **Proof argument names say what they prove** (`valid`, `valid_shape`,
   `accepted`, `checked`).
 - **Follow the domain's vocabulary**, as its standard does. *Example:*
