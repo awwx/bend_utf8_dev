@@ -8,6 +8,12 @@ def can_encode_as_one_byte(+cp: U32) -> Bool:
 def can_encode_as_two_bytes(+cp: U32) -> Bool:
   U32.is_le(cp, 2047)
 
+def can_encode_as_three_bytes(+cp: U32) -> Bool:
+  U32.is_le(cp, 65535)
+
+def can_encode_as_four_bytes(+cp: U32) -> Bool:
+  U32.is_le(cp, 2097151)
+
 def encode_as_one_byte(+cp: U32,
   -valid: {can_encode_as_one_byte(cp) == True{} : Bool}) -> U32:
   cp
@@ -53,6 +59,85 @@ def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
 
 def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
   valid_two_bytes.if(b1, b2, has_two_byte_shape(b1, b2), {==})
+
+# Deliberately permits overlong encodings and surrogate code points.
+def encode_as_three_bytes(+cp: U32,
+  -valid: {can_encode_as_three_bytes(cp) == True{} : Bool}) -> U32 & U32 & U32:
+  ((224 + U32.shrn(cp, 12n) : U32),
+   (128 + U32.and(U32.shrn(cp, 6n), 63) : U32),
+   (128 + U32.and(cp, 63) : U32))
+
+# Deliberately permits overlong encodings and values above U+10FFFF.
+def encode_as_four_bytes(+cp: U32,
+  -valid: {can_encode_as_four_bytes(cp) == True{} : Bool}) -> U32 & U32 & U32 & U32:
+  ((240 + U32.shrn(cp, 18n) : U32),
+   (128 + U32.and(U32.shrn(cp, 12n), 63) : U32),
+   (128 + U32.and(U32.shrn(cp, 6n), 63) : U32),
+   (128 + U32.and(cp, 63) : U32))
+
+def has_three_byte_shape(b1: U32, b2: U32, b3: U32) -> Bool:
+  B.byte_mask("1110xxxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==}) &&
+  B.byte_mask("10xxxxxx", b3, {==})
+
+def has_four_byte_shape(b1: U32, b2: U32, b3: U32, b4: U32) -> Bool:
+  B.byte_mask("11110xxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==}) &&
+  B.byte_mask("10xxxxxx", b3, {==}) && B.byte_mask("10xxxxxx", b4, {==})
+
+# Shift in the six payload bits of a continuation byte.
+def append_continuation(+acc: U32, +b: U32) -> U32:
+  (U32.shln(acc, 6n) + U32.and(b, 63) : U32)
+
+# Decode only triples with the three-byte shape, including invalid encodings.
+def decode_three_bytes(+b1: U32, +b2: U32, +b3: U32,
+  -valid_shape: {has_three_byte_shape(b1, b2, b3) == True{} : Bool}) -> U32:
+  append_continuation(append_continuation(U32.and(b1, 15), b2), b3)
+
+# Decode only sequences with the four-byte shape, including invalid encodings.
+def decode_four_bytes(+b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  -valid_shape: {has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}) -> U32:
+  append_continuation(append_continuation(append_continuation(U32.and(b1, 7), b2), b3), b4)
+
+# The decoded code point also has a one- or two-byte representation.
+# Two-byte capacity includes everything that fits in one byte.
+def overlong_three_bytes(+b1: U32, +b2: U32, +b3: U32,
+  -valid_shape: {has_three_byte_shape(b1, b2, b3) == True{} : Bool}) -> Bool:
+  can_encode_as_two_bytes(decode_three_bytes(b1, b2, b3, valid_shape))
+
+# The decoded code point also has a representation of three bytes or fewer.
+# Three-byte capacity includes everything that fits in fewer bytes.
+def overlong_four_bytes(+b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  -valid_shape: {has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}) -> Bool:
+  can_encode_as_three_bytes(decode_four_bytes(b1, b2, b3, b4, valid_shape))
+
+# Unicode scalars: at most U+10FFFF, excluding the surrogates
+# U+D800..U+DFFF.
+def is_surrogate(+cp: U32) -> Bool:
+  U32.is_ge(cp, 55296) && U32.is_le(cp, 57343)
+
+def is_scalar(+cp: U32) -> Bool:
+  U32.is_le(cp, 1114111) && Bool.not(is_surrogate(cp))
+
+def valid_three_bytes.if(+b1: U32, +b2: U32, +b3: U32, shape: Bool,
+  -checked: {has_three_byte_shape(b1, b2, b3) == shape : Bool}) -> Bool:
+  match shape:
+    case False{}: False{}
+    case True{}:
+      Bool.not(overlong_three_bytes(b1, b2, b3, checked)) &&
+      is_scalar(decode_three_bytes(b1, b2, b3, checked))
+
+def valid_three_bytes(+b1: U32, +b2: U32, +b3: U32) -> Bool:
+  valid_three_bytes.if(b1, b2, b3, has_three_byte_shape(b1, b2, b3), {==})
+
+def valid_four_bytes.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, shape: Bool,
+  -checked: {has_four_byte_shape(b1, b2, b3, b4) == shape : Bool}) -> Bool:
+  match shape:
+    case False{}: False{}
+    case True{}:
+      Bool.not(overlong_four_bytes(b1, b2, b3, b4, checked)) &&
+      is_scalar(decode_four_bytes(b1, b2, b3, b4, checked))
+
+def valid_four_bytes(+b1: U32, +b2: U32, +b3: U32, +b4: U32) -> Bool:
+  valid_four_bytes.if(b1, b2, b3, b4, has_four_byte_shape(b1, b2, b3, b4), {==})
 
 # Streaming decoder
 # -----------------
@@ -125,6 +210,62 @@ def two_byte_scalar.if(+b1: U32, +b2: U32, valid: Bool,
 def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
   two_byte_scalar.if(b1, b2, valid_two_bytes(b1, b2), {==})
 
+# A valid three-byte sequence has the three-byte shape, which decoding needs.
+def valid_three_bytes.has_shape.if(+b1: U32, +b2: U32, +b3: U32, shape: Bool,
+  checked: {has_three_byte_shape(b1, b2, b3) == shape : Bool},
+  valid: {valid_three_bytes.if(b1, b2, b3, shape, checked) == True{} : Bool}) ->
+  {has_three_byte_shape(b1, b2, b3) == True{} : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({has_three_byte_shape(b1, b2, b3) == True{} : Bool}, false_true(valid))
+    case True{}:
+      checked
+
+def valid_three_bytes.has_shape(+b1: U32, +b2: U32, +b3: U32,
+  valid: {valid_three_bytes(b1, b2, b3) == True{} : Bool}) ->
+  {has_three_byte_shape(b1, b2, b3) == True{} : Bool}:
+  valid_three_bytes.has_shape.if(b1, b2, b3, has_three_byte_shape(b1, b2, b3), {==}, valid)
+
+# A valid four-byte sequence has the four-byte shape, which decoding needs.
+def valid_four_bytes.has_shape.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, shape: Bool,
+  checked: {has_four_byte_shape(b1, b2, b3, b4) == shape : Bool},
+  valid: {valid_four_bytes.if(b1, b2, b3, b4, shape, checked) == True{} : Bool}) ->
+  {has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}, false_true(valid))
+    case True{}:
+      checked
+
+def valid_four_bytes.has_shape(+b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  valid: {valid_four_bytes(b1, b2, b3, b4) == True{} : Bool}) ->
+  {has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}:
+  valid_four_bytes.has_shape.if(b1, b2, b3, b4, has_four_byte_shape(b1, b2, b3, b4), {==}, valid)
+
+# The scalar that a valid three-byte sequence encodes, or None.
+def three_byte_scalar.if(+b1: U32, +b2: U32, +b3: U32, valid: Bool,
+  -checked: {valid_three_bytes(b1, b2, b3) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{decode_three_bytes(b1, b2, b3, valid_three_bytes.has_shape(b1, b2, b3, checked))}
+
+def three_byte_scalar(+b1: U32, +b2: U32, +b3: U32) -> Maybe<&2, U32>:
+  three_byte_scalar.if(b1, b2, b3, valid_three_bytes(b1, b2, b3), {==})
+
+# The scalar that a valid four-byte sequence encodes, or None.
+def four_byte_scalar.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, valid: Bool,
+  -checked: {valid_four_bytes(b1, b2, b3, b4) == valid : Bool}) -> Maybe<&2, U32>:
+  match valid:
+    case False{}:
+      None{}
+    case True{}:
+      Some{decode_four_bytes(b1, b2, b3, b4, valid_four_bytes.has_shape(b1, b2, b3, b4, checked))}
+
+def four_byte_scalar(+b1: U32, +b2: U32, +b3: U32, +b4: U32) -> Maybe<&2, U32>:
+  four_byte_scalar.if(b1, b2, b3, b4, valid_four_bytes(b1, b2, b3, b4), {==})
+
 # The scalar that `seq` encodes when `seq` is exactly one valid sequence,
 # otherwise None.
 def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
@@ -133,21 +274,36 @@ def sequence_scalar(seq: List<&2, U32>) -> Maybe<&2, U32>:
       one_byte_scalar(b1)
     case +b1 <> +b2 <> Nil{}:
       two_byte_scalar(b1, b2)
+    case +b1 <> +b2 <> +b3 <> Nil{}:
+      three_byte_scalar(b1, b2, b3)
+    case +b1 <> +b2 <> +b3 <> +b4 <> Nil{}:
+      four_byte_scalar(b1, b2, b3, b4)
     case _:
       None{}
 
 # Whether `seq` is a valid sequence prefix: one or more bytes that
 # some bytes, possibly none, can follow to make a valid sequence.
-# Whether a lead byte can begin a two-byte sequence does not depend on
-# which continuation byte follows, so 0x80 stands for them all.
+#
+# Validity depends on the final continuation bytes only through their
+# shape, so 0x80 stands for them all.  The byte after a three- or
+# four-byte lead byte also limits the code point, and only through its
+# high bits.  Some lead bytes need that byte to be low (ED, F4) and some
+# high (E0, F0), so testing both 0x80 and 0xBF covers every lead byte.
 def is_valid_sequence_prefix(seq: List<&2, U32>) -> Bool:
   match seq:
     case Nil{}:
       False{}
     case +b1 <> Nil{}:
-      valid_one_byte(b1) || valid_two_bytes(b1, 128)
+      valid_one_byte(b1) || valid_two_bytes(b1, 128) ||
+      valid_three_bytes(b1, 128, 128) || valid_three_bytes(b1, 191, 128) ||
+      valid_four_bytes(b1, 128, 128, 128) || valid_four_bytes(b1, 191, 128, 128)
     case +b1 <> +b2 <> Nil{}:
-      valid_two_bytes(b1, b2)
+      valid_two_bytes(b1, b2) || valid_three_bytes(b1, b2, 128) ||
+      valid_four_bytes(b1, b2, 128, 128)
+    case +b1 <> +b2 <> +b3 <> Nil{}:
+      valid_three_bytes(b1, b2, b3) || valid_four_bytes(b1, b2, b3, 128)
+    case +b1 <> +b2 <> +b3 <> +b4 <> Nil{}:
+      valid_four_bytes(b1, b2, b3, b4)
     case _:
       False{}
 

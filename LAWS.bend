@@ -6,10 +6,6 @@ import ./func_LAWS.bend as Func
 
 ### UTF-8 encoding specification
 
-# Only one- and two-byte sequences are covered so far.  Until three-
-# and four-byte sequences are added, the bytes of a longer sequence
-# are treated as ill-formed: E2 82 AC (U+20AC) decodes to three U+FFFD.
-
 ## Surrogate code points
 
 # Surrogate code points are U+D800..U+DFFF.
@@ -92,10 +88,53 @@ def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
 # UTF-8 three-byte shape
 #
 # 00000000 00000000 wwwwxxxx yyyyzzzz -> 1110wwww 10xxxxyy 10yyzzzz
+#
+# Returns three U32 representing the three bytes if the shape matches,
+# or None if the shape doesn't match.
+#
+# Capacity includes overlong encodings of 0..2047 and encodings of
+# surrogate code points; validity is separate.
+
+def three_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32>:
+  match bits:
+    case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (w1, w2, w3, w4, x1, x2, x3, x4),
+          (y1, y2, y3, y4, z1, z2, z3, z4)):
+      Some{(B.bit8_value((True{}, True{}, True{}, False{}, w1, w2, w3, w4)),
+            B.bit8_value((True{}, False{}, x1, x2, x3, x4, y1, y2)),
+            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+    case _:
+      None{}
+
+def three_byte_shape(cp: U32) -> Maybe<&1, U32 & U32 & U32>:
+  three_byte_shape.bits(B.u32_byte4(cp))
 
 # UTF-8 four-byte shape
 #
 # 00000000 000uvvvv wwwwxxxx yyyyzzzz -> 11110uvv 10vvwwww 10xxxxyy 10yyzzzz
+#
+# Returns four U32 representing the four bytes if the shape matches,
+# or None if the shape doesn't match.
+#
+# Capacity includes overlong encodings of 0..65535 and encodings of
+# code point values above U+10FFFF; validity is separate.
+
+def four_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32 & U32>:
+  match bits:
+    case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
+          (False{}, False{}, False{}, u, v1, v2, v3, v4),
+          (w1, w2, w3, w4, x1, x2, x3, x4),
+          (y1, y2, y3, y4, z1, z2, z3, z4)):
+      Some{(B.bit8_value((True{}, True{}, True{}, True{}, False{}, u, v1, v2)),
+            B.bit8_value((True{}, False{}, v3, v4, w1, w2, w3, w4)),
+            B.bit8_value((True{}, False{}, x1, x2, x3, x4, y1, y2)),
+            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+    case _:
+      None{}
+
+def four_byte_shape(cp: U32) -> Maybe<&1, U32 & U32 & U32 & U32>:
+  four_byte_shape.bits(B.u32_byte4(cp))
 
 
 ## Can encode
@@ -110,6 +149,14 @@ law utf8_can_encode_as_one_byte:
 law utf8_can_encode_as_two_bytes:
   for +cp: U32
   {UTF8.can_encode_as_two_bytes(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
+
+law utf8_can_encode_as_three_bytes:
+  for +cp: U32
+  {UTF8.can_encode_as_three_bytes(cp) == Maybe.is_some(&1, U32 & U32 & U32, three_byte_shape(cp)) : Bool}
+
+law utf8_can_encode_as_four_bytes:
+  for +cp: U32
+  {UTF8.can_encode_as_four_bytes(cp) == Maybe.is_some(&1, U32 & U32 & U32 & U32, four_byte_shape(cp)) : Bool}
 
 
 ## Encode as
@@ -127,6 +174,16 @@ law utf8_encode_as_two_bytes:
   for +cp: U32
   for valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
   {Some{UTF8.encode_as_two_bytes(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
+
+law utf8_encode_as_three_bytes:
+  for +cp: U32
+  for valid: {UTF8.can_encode_as_three_bytes(cp) == True{} : Bool}
+  {Some{UTF8.encode_as_three_bytes(cp, valid)} == three_byte_shape(cp) : Maybe<&1, U32 & U32 & U32>}
+
+law utf8_encode_as_four_bytes:
+  for +cp: U32
+  for valid: {UTF8.can_encode_as_four_bytes(cp) == True{} : Bool}
+  {Some{UTF8.encode_as_four_bytes(cp, valid)} == four_byte_shape(cp) : Maybe<&1, U32 & U32 & U32 & U32>}
 
 
 ## has_N_byte_shape(bytes) -> Bool
@@ -149,6 +206,25 @@ law utf8_has_two_byte_shape:
     {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>})
   ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
   (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
+
+law utf8_has_three_byte_shape:
+  for +b1: U32
+  for +b2: U32
+  for +b3: U32
+  representation = Exists(U32, cp =>
+    {three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>})
+  ({UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool} -> representation) &
+  (representation -> {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool})
+
+law utf8_has_four_byte_shape:
+  for +b1: U32
+  for +b2: U32
+  for +b3: U32
+  for +b4: U32
+  representation = Exists(U32, cp =>
+    {four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>})
+  ({UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool} -> representation) &
+  (representation -> {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool})
 
 
 ## Encoding is bijective
@@ -173,6 +249,50 @@ law utf8_two_byte_inverse:
     cp => valid => UTF8.encode_as_two_bytes(cp, valid),
     p => valid => UTF8.decode_two_bytes(B.first(p), B.second(p), valid))
 
+# The bytes of a three-byte or four-byte encoding.
+
+def three_bytes.first(p: U32 & U32 & U32) -> U32:
+  (a, b, c) = p
+  a
+
+def three_bytes.second(p: U32 & U32 & U32) -> U32:
+  (a, b, c) = p
+  b
+
+def three_bytes.third(p: U32 & U32 & U32) -> U32:
+  (a, b, c) = p
+  c
+
+def four_bytes.first(p: U32 & U32 & U32 & U32) -> U32:
+  (a, b, c, d) = p
+  a
+
+def four_bytes.second(p: U32 & U32 & U32 & U32) -> U32:
+  (a, b, c, d) = p
+  b
+
+def four_bytes.third(p: U32 & U32 & U32 & U32) -> U32:
+  (a, b, c, d) = p
+  c
+
+def four_bytes.fourth(p: U32 & U32 & U32 & U32) -> U32:
+  (a, b, c, d) = p
+  d
+
+law utf8_three_byte_inverse:
+  Func.Bijection(U32, U32 & U32 & U32,
+    cp => UTF8.can_encode_as_three_bytes(cp),
+    p => UTF8.has_three_byte_shape(three_bytes.first(p), three_bytes.second(p), three_bytes.third(p)),
+    cp => valid => UTF8.encode_as_three_bytes(cp, valid),
+    p => valid => UTF8.decode_three_bytes(three_bytes.first(p), three_bytes.second(p), three_bytes.third(p), valid))
+
+law utf8_four_byte_inverse:
+  Func.Bijection(U32, U32 & U32 & U32 & U32,
+    cp => UTF8.can_encode_as_four_bytes(cp),
+    p => UTF8.has_four_byte_shape(four_bytes.first(p), four_bytes.second(p), four_bytes.third(p), four_bytes.fourth(p)),
+    cp => valid => UTF8.encode_as_four_bytes(cp, valid),
+    p => valid => UTF8.decode_four_bytes(four_bytes.first(p), four_bytes.second(p), four_bytes.third(p), four_bytes.fourth(p), valid))
+
 
 ## Overlong encodings
 
@@ -194,6 +314,32 @@ law utf8_overlong_two_bytes:
   for -valid_shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
   {UTF8.overlong_two_bytes(b1, b2, valid_shape) ==
     UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid_shape)) : Bool}
+
+# A three-byte encoding is overlong if the code point it encodes could
+# be encoded in one or two bytes.
+
+law utf8_overlong_three_bytes:
+  for +b1: U32
+  for +b2: U32
+  for +b3: U32
+  for -valid_shape: {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool}
+  {UTF8.overlong_three_bytes(b1, b2, b3, valid_shape) ==
+    (UTF8.can_encode_as_one_byte(UTF8.decode_three_bytes(b1, b2, b3, valid_shape)) ||
+     UTF8.can_encode_as_two_bytes(UTF8.decode_three_bytes(b1, b2, b3, valid_shape))) : Bool}
+
+# A four-byte encoding is overlong if the code point it encodes could
+# be encoded in one, two or three bytes.
+
+law utf8_overlong_four_bytes:
+  for +b1: U32
+  for +b2: U32
+  for +b3: U32
+  for +b4: U32
+  for -valid_shape: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}
+  {UTF8.overlong_four_bytes(b1, b2, b3, b4, valid_shape) ==
+    (UTF8.can_encode_as_one_byte(UTF8.decode_four_bytes(b1, b2, b3, b4, valid_shape)) ||
+     UTF8.can_encode_as_two_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid_shape)) ||
+     UTF8.can_encode_as_three_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid_shape))) : Bool}
 
 
 ## Valid sequences
@@ -236,6 +382,37 @@ law utf8_valid_two_bytes:
   for +b2: U32
   {UTF8.valid_two_bytes(b1, b2) == valid_two_bytes.if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}) : Bool}
 
+def valid_three_bytes.if(+b1: U32, +b2: U32, +b3: U32, shape: Bool,
+  -checked: {UTF8.has_three_byte_shape(b1, b2, b3) == shape : Bool}) -> Bool:
+  match shape:
+    case False{}:
+      False{}
+    case True{}:
+      Bool.not(UTF8.overlong_three_bytes(b1, b2, b3, checked)) &&
+      is_unicode_scalar(UTF8.decode_three_bytes(b1, b2, b3, checked))
+
+law utf8_valid_three_bytes:
+  for +b1: U32
+  for +b2: U32
+  for +b3: U32
+  {UTF8.valid_three_bytes(b1, b2, b3) == valid_three_bytes.if(b1, b2, b3, UTF8.has_three_byte_shape(b1, b2, b3), {==}) : Bool}
+
+def valid_four_bytes.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, shape: Bool,
+  -checked: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == shape : Bool}) -> Bool:
+  match shape:
+    case False{}:
+      False{}
+    case True{}:
+      Bool.not(UTF8.overlong_four_bytes(b1, b2, b3, b4, checked)) &&
+      is_unicode_scalar(UTF8.decode_four_bytes(b1, b2, b3, b4, checked))
+
+law utf8_valid_four_bytes:
+  for +b1: U32
+  for +b2: U32
+  for +b3: U32
+  for +b4: U32
+  {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid_four_bytes.if(b1, b2, b3, b4, UTF8.has_four_byte_shape(b1, b2, b3, b4), {==}) : Bool}
+
 
 ## is_valid_sequence
 
@@ -247,6 +424,10 @@ def is_valid_sequence(seq: List<&2, U32>) -> Bool:
       UTF8.valid_one_byte(b1)
     case +b1 <> +b2 <> Nil{}:
       UTF8.valid_two_bytes(b1, b2)
+    case +b1 <> +b2 <> +b3 <> Nil{}:
+      UTF8.valid_three_bytes(b1, b2, b3)
+    case +b1 <> +b2 <> +b3 <> +b4 <> Nil{}:
+      UTF8.valid_four_bytes(b1, b2, b3, b4)
     case _:
       False{}
 
@@ -254,24 +435,37 @@ def is_valid_sequence(seq: List<&2, U32>) -> Bool:
 ## Encoding
 
 # The UTF-8 encoding of `cp` is its shortest byte shape: one byte when
-# `cp` has a one-byte shape, otherwise two.  (A two-byte encoding of a
-# code point that has a one-byte shape would be overlong.)  Only one-
-# and two-byte encodings are covered so far, so code points above 2047
-# have no encoding here.
+# `cp` has a one-byte shape, otherwise two, three or four.  (A longer
+# encoding of a code point that has a shorter shape would be overlong.)
+# Code points above U+1FFFFF have no encoding.
 
-def encoding.two(shape: Maybe<&1, U32 & U32>) -> Maybe<&1, List<&2, U32>>:
+def encoding.four(shape: Maybe<&1, U32 & U32 & U32 & U32>) -> Maybe<&1, List<&2, U32>>:
   match shape:
     case None{}:
       None{}
+    case Some{(b1, b2, b3, b4)}:
+      Some{[b1, b2, b3, b4]}
+
+def encoding.three(+cp: U32, shape: Maybe<&1, U32 & U32 & U32>) -> Maybe<&1, List<&2, U32>>:
+  match shape:
+    case None{}:
+      encoding.four(four_byte_shape(cp))
+    case Some{(b1, b2, b3)}:
+      Some{[b1, b2, b3]}
+
+def encoding.two(+cp: U32, shape: Maybe<&1, U32 & U32>) -> Maybe<&1, List<&2, U32>>:
+  match shape:
+    case None{}:
+      encoding.three(cp, three_byte_shape(cp))
     case Some{(b1, b2)}:
       Some{[b1, b2]}
 
-def encoding.if(cp: U32, one: Maybe<&2, U32>) -> Maybe<&1, List<&2, U32>>:
+def encoding.if(+cp: U32, one: Maybe<&2, U32>) -> Maybe<&1, List<&2, U32>>:
   match one:
     case Some{b1}:
       Some{[b1]}
     case None{}:
-      encoding.two(two_byte_shape(cp))
+      encoding.two(cp, two_byte_shape(cp))
 
 def encoding(+cp: U32) -> Maybe<&1, List<&2, U32>>:
   encoding.if(cp, one_byte_shape(cp))
@@ -622,7 +816,10 @@ law decodes_unique:
   {t1 == t2 : String}
 
 # Bytes in hex: 65 = 0x41 "A", 66 = 0x42 "B", 72 = 0x48 "H",
-# 128 = 0x80, 169 = 0xA9, 192 = 0xC0, 194 = 0xC2, 255 = 0xFF.
+# 128 = 0x80, 130 = 0x82, 144 = 0x90, 152 = 0x98, 159 = 0x9F,
+# 160 = 0xA0, 169 = 0xA9, 172 = 0xAC, 192 = 0xC0, 194 = 0xC2,
+# 224 = 0xE0, 226 = 0xE2, 237 = 0xED, 240 = 0xF0, 244 = 0xF4,
+# 255 = 0xFF.
 
 law decodes_examples:
   # Nothing to decode.
@@ -643,7 +840,29 @@ law decodes_examples:
   decodes([194, 194, 169], replacement_char_string() ++ code_point_to_string(169)) &
   # Valid sequences around a byte that never appears in UTF-8.
   decodes([72, 194, 169, 255],
-    "H" ++ code_point_to_string(169) ++ replacement_char_string())
+    "H" ++ code_point_to_string(169) ++ replacement_char_string()) &
+  # A three-byte sequence: E2 82 AC is U+20AC.
+  decodes([226, 130, 172], code_point_to_string(8364)) &
+  # A four-byte sequence: F0 9F 98 80 is U+1F600.
+  decodes([240, 159, 152, 128], code_point_to_string(128512)) &
+  # The two bytes of an unfinished three-byte sequence are one maximal
+  # subpart, so they give one replacement character.
+  decodes([226, 130], replacement_char_string()) &
+  # The same subpart when the next byte cannot continue it.
+  decodes([226, 130, 65], replacement_char_string() ++ "A") &
+  # Three bytes of an unfinished four-byte sequence are also one
+  # maximal subpart.
+  decodes([240, 159, 152], replacement_char_string()) &
+  # E0 80 would be overlong: E0 must be followed by A0..BF.
+  decodes([224, 128, 128],
+    replacement_char_string() ++ replacement_char_string() ++ replacement_char_string()) &
+  # ED A0 would begin a surrogate: ED must be followed by 80..9F.
+  decodes([237, 160, 128],
+    replacement_char_string() ++ replacement_char_string() ++ replacement_char_string()) &
+  # F4 90 would exceed U+10FFFF: F4 must be followed by 80..8F.
+  decodes([244, 144, 128, 128],
+    replacement_char_string() ++ replacement_char_string() ++
+    replacement_char_string() ++ replacement_char_string())
 
 
 ### Stream decoding

@@ -2522,6 +2522,1579 @@ def utf8_proof.valid_two_bytes_has_shape(+b1: U32, +b2: U32,
         Laws.utf8_valid_two_bytes(b1, b2)),
       valid))
 
+# Three-byte and four-byte sequences
+# ==================================
+#
+# These proofs work with symbolic payload fields rather than enumerating
+# code points.  Comparisons against a constant whose low bits are all ones
+# or all zeros depend only on the high bits, whatever the low bits are.
+
+def utf8_proof.fin_le_ones(+ab: Bool, t: Cmp) ->
+  {Cmp.is_le(Word.cmp.fin(ab, True{}, t)) == Cmp.is_le(t) : Bool}:
+  match ab t:
+    case False{} LT{}: {==}
+    case False{} EQ{}: {==}
+    case False{} GT{}: {==}
+    case True{} LT{}: {==}
+    case True{} EQ{}: {==}
+    case True{} GT{}: {==}
+
+def utf8_proof.fin_ge_zero(+ab: Bool, t: Cmp) ->
+  {Cmp.is_ge(Word.cmp.fin(ab, False{}, t)) == Cmp.is_ge(t) : Bool}:
+  match ab t:
+    case False{} LT{}: {==}
+    case False{} EQ{}: {==}
+    case False{} GT{}: {==}
+    case True{} LT{}: {==}
+    case True{} EQ{}: {==}
+    case True{} GT{}: {==}
+
+def utf8_proof.word_le_ones(+n: Nat, +low: Word(n), +m: Nat, +high: Word(m), +other: Word(m)) ->
+  {Cmp.is_le(Word.cmp(Nat.add(n, m), word_join(n, low, m, high), word_join(n, word_ones(n), m, other))) ==
+    Cmp.is_le(Word.cmp(m, high, other)) : Bool}:
+  match n:
+    case 0n: {==}
+    case 1n+p:
+      match low:
+        case WCon{+b, +rest}:
+          Equal.trans(Bool,
+            Cmp.is_le(Word.cmp.fin(b, True{}, Word.cmp(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, word_ones(p), m, other)))),
+            Cmp.is_le(Word.cmp(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, word_ones(p), m, other))),
+            Cmp.is_le(Word.cmp(m, high, other)),
+            utf8_proof.fin_le_ones(b, Word.cmp(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, word_ones(p), m, other))),
+            utf8_proof.word_le_ones(p, rest, m, high, other))
+
+def utf8_proof.word_ge_zeros(+n: Nat, +low: Word(n), +m: Nat, +high: Word(m), +other: Word(m)) ->
+  {Cmp.is_ge(Word.cmp(Nat.add(n, m), word_join(n, low, m, high), word_join(n, Word.zero(n), m, other))) ==
+    Cmp.is_ge(Word.cmp(m, high, other)) : Bool}:
+  match n:
+    case 0n: {==}
+    case 1n+p:
+      match low:
+        case WCon{+b, +rest}:
+          Equal.trans(Bool,
+            Cmp.is_ge(Word.cmp.fin(b, False{}, Word.cmp(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, Word.zero(p), m, other)))),
+            Cmp.is_ge(Word.cmp(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, Word.zero(p), m, other))),
+            Cmp.is_ge(Word.cmp(m, high, other)),
+            utf8_proof.fin_ge_zero(b, Word.cmp(Nat.add(p, m), word_join(p, rest, m, high), word_join(p, Word.zero(p), m, other))),
+            utf8_proof.word_ge_zeros(p, rest, m, high, other))
+
+def utf8_proof.word_ge_zero(+n: Nat, +w: Word(n)) ->
+  {Cmp.is_ge(Word.cmp(n, w, Word.zero(n))) == True{} : Bool}:
+  match n:
+    case 0n: {==}
+    case 1n+p:
+      match w:
+        case WCon{+b, +rest}:
+          Equal.trans(Bool,
+            Cmp.is_ge(Word.cmp.fin(b, False{}, Word.cmp(p, rest, Word.zero(p)))),
+            Cmp.is_ge(Word.cmp(p, rest, Word.zero(p))), True{},
+            utf8_proof.fin_ge_zero(b, Word.cmp(p, rest, Word.zero(p))),
+            utf8_proof.word_ge_zero(p, rest))
+
+def utf8_proof.u32_ge_zero(+cp: U32) -> {U32.is_ge(cp, 0) == True{} : Bool}:
+  match cp:
+    case U32{+w}: utf8_proof.word_ge_zero(32n, w)
+
+# The implementation's scalar test is the specification's.
+def utf8_proof.scalar_agrees(+cp: U32) -> {UTF8.is_scalar(cp) == Laws.is_unicode_scalar(cp) : Bool}:
+  %Equal.sym(Bool, U32.is_ge(cp, 0), True{}, utf8_proof.u32_ge_zero(cp)) :
+    {UTF8.is_scalar(cp) == Bool.and(Bool.and(_, U32.is_le(cp, 1114111)), Bool.not(Laws.is_surrogate_code_point(cp))) : Bool}
+  {==}
+
+# A continuation byte built from the low six bits of a word.
+def utf8_proof.cont_of(+y: Word(6n), +hi: Word(26n)) ->
+  {(128 + U32.and(U32{word_join(6n, y, 26n, hi)}, 63) : U32) == utf8_proof.second_byte(y) : U32}:
+  Equal.trans(U32, (128 + U32.and(U32{word_join(6n, y, 26n, hi)}, 63) : U32),
+    (128 + U32{word_join(6n, y, 26n, Word.zero(26n))} : U32), utf8_proof.second_byte(y),
+    Equal.cong(U32, U32, x => (128 + x : U32), U32.and(U32{word_join(6n, y, 26n, hi)}, 63), U32{word_join(6n, y, 26n, Word.zero(26n))},
+      Equal.cong(Word(32n), U32, x => U32{x},
+        Word.and(32n, word_join(6n, y, 26n, hi), word_join(6n, word_ones(6n), 26n, Word.zero(26n))),
+        word_join(6n, y, 26n, Word.zero(26n)), word_mask_fields(6n, y, 26n, hi))),
+    Equal.cong(Word(32n), U32, x => U32{x},
+      Word.add(32n, word_join(6n, Word.zero(6n), 26n, WCon{False{}, WCon{True{}, Word.zero(24n)}}), word_join(6n, y, 26n, Word.zero(26n))),
+      word_join(6n, y, 26n, WCon{False{}, WCon{True{}, Word.zero(24n)}}),
+      word_add_fields(6n, y, 26n, WCon{False{}, WCon{True{}, Word.zero(24n)}})))
+
+# Shifting in a continuation byte.
+def utf8_proof.append_eq(+acc: U32, +y: Word(6n), +hi: Word(26n),
+  e: {U32.shln(acc, 6n) == U32{word_join(6n, Word.zero(6n), 26n, hi)} : U32}) ->
+  {UTF8.append_continuation(acc, utf8_proof.second_byte(y)) == U32{word_join(6n, y, 26n, hi)} : U32}:
+  %Equal.sym(U32, U32.shln(acc, 6n), U32{word_join(6n, Word.zero(6n), 26n, hi)}, e) :
+    {(_ + U32.and(utf8_proof.second_byte(y), 63) : U32) == U32{word_join(6n, y, 26n, hi)} : U32}
+  %Equal.sym(U32, U32.and(utf8_proof.second_byte(y), 63), U32{word_join(6n, y, 26n, Word.zero(26n))}, utf8_proof.mask_second(y)) :
+    {(U32{word_join(6n, Word.zero(6n), 26n, hi)} + _ : U32) == U32{word_join(6n, y, 26n, hi)} : U32}
+  Equal.cong(Word(32n), U32, x => U32{x},
+    Word.add(32n, word_join(6n, Word.zero(6n), 26n, hi), word_join(6n, y, 26n, Word.zero(26n))),
+    word_join(6n, y, 26n, hi), word_add_fields(6n, y, 26n, hi))
+
+def utf8_proof.cont_mask.first(+c: U32,
+  facts: {B.byte_mask("10xxxxxx", c, {==}) == True{} : Bool} &
+    {(U32.is_ge(c, 128) && U32.is_le(c, 191)) == True{} : Bool}) ->
+  {B.byte_mask("10xxxxxx", c, {==}) == True{} : Bool}:
+  (m, r) = facts
+  m
+
+def utf8_proof.cont_mask(+y: Word(6n)) ->
+  {B.byte_mask("10xxxxxx", utf8_proof.second_byte(y), {==}) == True{} : Bool}:
+  utf8_proof.cont_mask.first(utf8_proof.second_byte(y), utf8_proof.second_byte_facts(y))
+
+def utf8_proof.bit4(y: Word(6n)) -> Bool:
+  match y:
+    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}: b4
+
+def utf8_proof.bit5(y: Word(6n)) -> Bool:
+  match y:
+    case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}: b5
+
+def utf8_proof.tuple3_eq(+a0: U32, +a1: U32, +a2: U32, +b0: U32, +b1: U32, +b2: U32, e0: {a0 == b0 : U32}, e1: {a1 == b1 : U32}, e2: {a2 == b2 : U32}) -> {(a0, a1, a2) == (b0, b1, b2) : U32 & U32 & U32}:
+  %e0 : {(a0, a1, a2) == (_, b1, b2) : U32 & U32 & U32}
+  %e1 : {(a0, a1, a2) == (a0, _, b2) : U32 & U32 & U32}
+  %e2 : {(a0, a1, a2) == (a0, a1, _) : U32 & U32 & U32}
+  {==}
+
+def utf8_proof.tuple4_eq(+a0: U32, +a1: U32, +a2: U32, +a3: U32, +b0: U32, +b1: U32, +b2: U32, +b3: U32, e0: {a0 == b0 : U32}, e1: {a1 == b1 : U32}, e2: {a2 == b2 : U32}, e3: {a3 == b3 : U32}) -> {(a0, a1, a2, a3) == (b0, b1, b2, b3) : U32 & U32 & U32 & U32}:
+  %e0 : {(a0, a1, a2, a3) == (_, b1, b2, b3) : U32 & U32 & U32 & U32}
+  %e1 : {(a0, a1, a2, a3) == (a0, _, b2, b3) : U32 & U32 & U32 & U32}
+  %e2 : {(a0, a1, a2, a3) == (a0, a1, _, b3) : U32 & U32 & U32 & U32}
+  %e3 : {(a0, a1, a2, a3) == (a0, a1, a2, _) : U32 & U32 & U32 & U32}
+  {==}
+
+# Three-byte sequences
+# ------------------
+
+def utf8_proof.cp3(+z: Word(6n), +y: Word(6n), +t: Word(4n)) -> U32:
+  U32{word_join(6n, z, 26n, word_join(6n, y, 20n, word_join(4n, t, 16n, Word.zero(16n))))}
+
+def utf8_proof.lead3(t: Word(4n)) -> U32:
+  U32{word_join(4n, t, 28n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}})}
+
+def utf8_proof.lead3_prefix(low: Word(4n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool) -> U32:
+  U32{word_join(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}})}
+
+def utf8_proof.lead3_mask_parts(+byte: U32, m128: U32, m64: U32, m32: U32, m16: U32) -> Bool:
+  Bool.and(U32.is_le(byte, 255), Bool.and(U32.is_eq(m128, 128), Bool.and(U32.is_eq(m64, 64), Bool.and(U32.is_eq(m32, 32), Bool.and(Bool.or(U32.is_eq(m16, 0), False{}), True{})))))
+
+def utf8_proof.lead3_prefix_checks(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool) ->
+  {utf8_proof.lead3_mask_parts(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}))}, U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}))}, U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}))}, U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}))}) == Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))) : Bool}:
+  match p7 p6 p5 p4:
+    case False{} False{} False{} False{}: {==}
+    case False{} False{} False{} True{}: {==}
+    case False{} False{} True{} False{}: {==}
+    case False{} False{} True{} True{}: {==}
+    case False{} True{} False{} False{}: {==}
+    case False{} True{} False{} True{}: {==}
+    case False{} True{} True{} False{}: {==}
+    case False{} True{} True{} True{}: {==}
+    case True{} False{} False{} False{}: {==}
+    case True{} False{} False{} True{}: {==}
+    case True{} False{} True{} False{}: {==}
+    case True{} False{} True{} True{}: {==}
+    case True{} True{} False{} False{}: {==}
+    case True{} True{} False{} True{}: {==}
+    case True{} True{} True{} False{}: {==}
+    case True{} True{} True{} True{}: {==}
+
+def utf8_proof.lead3_prefix_mask(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool) ->
+  {B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}) == Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))) : Bool}:
+  %Equal.sym(U32, U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 128), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}), word_join(4n, Word.zero(4n), 28n, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}})),
+      word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}})),
+      word_mask_high(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}))) : {utf8_proof.lead3_mask_parts(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), _, U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 64), U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 32), U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 16)) == Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 64), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}), word_join(4n, Word.zero(4n), 28n, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}})),
+      word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}})),
+      word_mask_high(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}))) : {utf8_proof.lead3_mask_parts(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}))}, _, U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 32), U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 16)) == Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 32), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}), word_join(4n, Word.zero(4n), 28n, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}})),
+      word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}})),
+      word_mask_high(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}))) : {utf8_proof.lead3_mask_parts(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}))}, U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}))}, _, U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 16)) == Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 16), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}), word_join(4n, Word.zero(4n), 28n, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}})),
+      word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}})),
+      word_mask_high(4n, low, 28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}))) : {utf8_proof.lead3_mask_parts(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}))}, U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}))}, U32{word_join(4n, Word.zero(4n), 28n, Word.and(28n, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}))}, _) == Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))) : Bool}
+  utf8_proof.lead3_prefix_checks(low, p7, p6, p5, p4)
+
+def utf8_proof.lead3_prefix_payload(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool, valid: {Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4)))) == True{} : Bool}) ->
+  Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}):
+  match p7 p6 p5 p4:
+    case False{} False{} False{} False{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} False{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} False{} False{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} False{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} True{} False{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} True{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} False{} False{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} False{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} True{} False{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} True{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} False{} False{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} False{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} True{} False{}:
+      (low, {==})
+    case True{} True{} True{} True{}:
+      Empty.absurd(Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}), H.hex_u32.false_true(valid))
+
+def utf8_proof.lead3_payload_bits(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool,
+  valid: {B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}) == True{} : Bool}) -> Exists(Word(4n), payload => {utf8_proof.lead3_prefix(low, p7, p6, p5, p4) == utf8_proof.lead3(payload) : U32}):
+  utf8_proof.lead3_prefix_payload(low, p7, p6, p5, p4,
+    bool_and_right_true(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4)))),
+      Equal.trans(Bool, Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))), B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}), True{},
+        Equal.sym(Bool, B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}), Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))), utf8_proof.lead3_prefix_mask(low, p7, p6, p5, p4)), valid)))
+
+def utf8_proof.lead3_payload_tuple(bits: Defs.Bit8(),
+  valid: {B.byte_mask("1110xxxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(4n), payload => {B.bit8_value(bits) == utf8_proof.lead3(payload) : U32}):
+  match bits:
+    case (b7, b6, b5, b4, b3, b2, b1, b0):
+      utf8_proof.lead3_payload_bits(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WNil{}}}}}, b7, b6, b5, b4, valid)
+
+def utf8_proof.lead3_payload_finish(+byte: U32, -converted: U32,
+  equal: {converted == byte : U32},
+  result: Exists(Word(4n), payload => {converted == utf8_proof.lead3(payload) : U32})) ->
+  Exists(Word(4n), payload => {byte == utf8_proof.lead3(payload) : U32}):
+  (payload, matches) = result
+  (payload, Equal.trans(U32, byte, converted, utf8_proof.lead3(payload),
+    Equal.sym(U32, converted, byte, equal), matches))
+
+def utf8_proof.lead3_payload(+byte: U32,
+  +valid: {B.byte_mask("1110xxxx", byte, {==}) == True{} : Bool}) ->
+  Exists(Word(4n), payload => {byte == utf8_proof.lead3(payload) : U32}):
+  +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('1', byte, 64), Bool.and(B.byte_mask.bit('1', byte, 32), Bool.and(B.byte_mask.bit('0', byte, 16), True{})))), valid)
+  +equal = BinaryLaws.bit8_value_bit8_roundtrip(byte, bounded)
+  result = utf8_proof.lead3_payload_tuple(B.bit8(byte, bounded),
+    Equal.trans(Bool, B.byte_mask("1110xxxx", B.bit8_value(B.bit8(byte, bounded)), {==}),
+      B.byte_mask("1110xxxx", byte, {==}), True{},
+      Equal.cong(U32, Bool, x => B.byte_mask("1110xxxx", x, {==}),
+        B.bit8_value(B.bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.lead3_payload_finish(byte, B.bit8_value(B.bit8(byte, bounded)), equal, result)
+
+def utf8_proof.raw3(+cp: U32) -> U32 & U32 & U32:
+  ((224 + U32.shrn(cp, 12n) : U32), (128 + U32.and(U32.shrn(cp, 6n), 63) : U32), (128 + U32.and(cp, 63) : U32))
+
+def utf8_proof.encode3_fields(+z: Word(6n), +y: Word(6n), +t: Word(4n)) ->
+  {utf8_proof.raw3(utf8_proof.cp3(z, y, t)) == (utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) : U32 & U32 & U32}:
+  match z y t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WCon{t3, WNil{}}}}}:
+      utf8_proof.tuple3_eq((224 + U32.shrn(utf8_proof.cp3(z, y, t), 12n) : U32), (128 + U32.and(U32.shrn(utf8_proof.cp3(z, y, t), 6n), 63) : U32), (128 + U32.and(utf8_proof.cp3(z, y, t), 63) : U32), utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z),
+        Equal.cong(Word(32n), U32, w => U32{w},
+        Word.add(32n, word_join(4n, Word.zero(4n), 28n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}), word_join(4n, t, 28n, Word.zero(28n))),
+        word_join(4n, t, 28n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}), word_add_fields(4n, t, 28n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}})),
+        utf8_proof.cont_of(y, word_join(4n, t, 22n, Word.zero(22n))),
+        utf8_proof.cont_of(z, word_join(6n, y, 20n, word_join(4n, t, 16n, Word.zero(16n)))))
+
+def utf8_proof.dec3(+b1: U32, +b2: U32, +b3: U32) -> U32:
+  UTF8.append_continuation(UTF8.append_continuation(U32.and(b1, 15), b2), b3)
+
+def utf8_proof.mask_lead3(+t: Word(4n)) ->
+  {U32.and(utf8_proof.lead3(t), 15) == U32{word_join(4n, t, 28n, Word.zero(28n))} : U32}:
+  Equal.cong(Word(32n), U32, x => U32{x},
+    Word.and(32n, word_join(4n, t, 28n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}), word_join(4n, word_ones(4n), 28n, Word.zero(28n))),
+    word_join(4n, t, 28n, Word.zero(28n)), word_mask_fields(4n, t, 28n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}))
+
+def utf8_proof.dec3_fields(+z: Word(6n), +y: Word(6n), +t: Word(4n)) ->
+  {utf8_proof.dec3(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.cp3(z, y, t) : U32}:
+  match z y t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WCon{t3, WNil{}}}}}:
+      %Equal.sym(U32, U32.and(utf8_proof.lead3(t), 15), U32{word_join(4n, t, 28n, Word.zero(28n))}, utf8_proof.mask_lead3(t)) :
+        {UTF8.append_continuation(UTF8.append_continuation(_, utf8_proof.second_byte(y)), utf8_proof.second_byte(z)) == utf8_proof.cp3(z, y, t) : U32}
+      %Equal.sym(U32, UTF8.append_continuation(U32{word_join(4n, t, 28n, Word.zero(28n))}, utf8_proof.second_byte(y)), U32{word_join(6n, y, 26n, word_join(4n, t, 22n, Word.zero(22n)))},
+          utf8_proof.append_eq(U32{word_join(4n, t, 28n, Word.zero(28n))}, y, word_join(4n, t, 22n, Word.zero(22n)), {==})) :
+        {UTF8.append_continuation(_, utf8_proof.second_byte(z)) == utf8_proof.cp3(z, y, t) : U32}
+      utf8_proof.append_eq(U32{word_join(6n, y, 26n, word_join(4n, t, 22n, Word.zero(22n)))}, z, word_join(6n, y, 20n, word_join(4n, t, 16n, Word.zero(16n))), {==})
+
+def utf8_proof.table3(+z: Word(6n), +y: Word(6n), +t: Word(4n)) ->
+  {Laws.three_byte_shape(utf8_proof.cp3(z, y, t)) == Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))} : Maybe<&1, U32 & U32 & U32>}:
+  match z y t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WCon{t3, WNil{}}}}}: {==}
+
+def utf8_proof.View3(+cp: U32) -> Type:
+  Exists(Word(6n), z => Exists(Word(6n), y => Exists(Word(4n), t => {cp == utf8_proof.cp3(z, y, t) : U32})))
+
+def utf8_proof.view3_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
+  valid: {UTF8.can_encode_as_three_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == True{} : Bool}) -> utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}):
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
+      Empty.absurd(utf8_proof.View3(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      (WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, (WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WNil{}}}}}}}, (WCon{b12, WCon{b13, WCon{b14, WCon{b15, WNil{}}}}}, {==})))
+
+def utf8_proof.view3(+cp: U32, valid: {UTF8.can_encode_as_three_bytes(cp) == True{} : Bool}) -> utf8_proof.View3(cp):
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.view3_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
+
+def utf8_proof.can3_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) ->
+  {UTF8.can_encode_as_three_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == Maybe.is_some(&1, U32 & U32 & U32, Laws.three_byte_shape(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}})) : Bool}:
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      utf8_proof.word_le_ones(16n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WNil{}}}}}}}}}}}}}}}}}, 16n, Word.zero(16n), Word.zero(16n))
+
+def Laws.utf8_can_encode_as_three_bytes(cp):
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.can3_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
+
+def utf8_proof.encode3_view(+cp: U32, v: utf8_proof.View3(cp)) ->
+  {Some{utf8_proof.raw3(cp)} == Laws.three_byte_shape(cp) : Maybe<&1, U32 & U32 & U32>}:
+  (+z, r0) = v
+  (+y, r1) = r0
+  (+t, e) = r1
+  %Equal.sym(U32, cp, utf8_proof.cp3(z, y, t), e) : {Some{utf8_proof.raw3(_)} == Laws.three_byte_shape(_) : Maybe<&1, U32 & U32 & U32>}
+  Equal.trans(Maybe<&1, U32 & U32 & U32>, Some{utf8_proof.raw3(utf8_proof.cp3(z, y, t))}, Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Laws.three_byte_shape(utf8_proof.cp3(z, y, t)),
+    Equal.cong(U32 & U32 & U32, Maybe<&1, U32 & U32 & U32>, v => Some{v}, utf8_proof.raw3(utf8_proof.cp3(z, y, t)), (utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.encode3_fields(z, y, t)),
+    Equal.sym(Maybe<&1, U32 & U32 & U32>, Laws.three_byte_shape(utf8_proof.cp3(z, y, t)), Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, utf8_proof.table3(z, y, t)))
+
+def Laws.utf8_encode_as_three_bytes(cp, valid):
+  utf8_proof.encode3_view(cp, utf8_proof.view3(cp, valid))
+
+def utf8_proof.lead3_mask(+t: Word(4n)) ->
+  {B.byte_mask("1110xxxx", utf8_proof.lead3(t), {==}) == True{} : Bool}:
+  match t:
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+
+def utf8_proof.has3_fields(+z: Word(6n), +y: Word(6n), +t: Word(4n)) ->
+  {UTF8.has_three_byte_shape(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == True{} : Bool}:
+  %Equal.sym(Bool, B.byte_mask("1110xxxx", utf8_proof.lead3(t), {==}), True{}, utf8_proof.lead3_mask(t)) :
+    {Bool.and(Bool.and(_, B.byte_mask("10xxxxxx", utf8_proof.second_byte(y), {==})), B.byte_mask("10xxxxxx", utf8_proof.second_byte(z), {==})) == True{} : Bool}
+  %Equal.sym(Bool, B.byte_mask("10xxxxxx", utf8_proof.second_byte(y), {==}), True{}, utf8_proof.cont_mask(y)) :
+    {Bool.and(Bool.and(True{}, _), B.byte_mask("10xxxxxx", utf8_proof.second_byte(z), {==})) == True{} : Bool}
+  %Equal.sym(Bool, B.byte_mask("10xxxxxx", utf8_proof.second_byte(z), {==}), True{}, utf8_proof.cont_mask(z)) :
+    {Bool.and(Bool.and(True{}, True{}), _) == True{} : Bool}
+  {==}
+
+def utf8_proof.Fields3(+b1: U32, +b2: U32, +b3: U32) -> Type:
+  Exists(Word(6n), z => Exists(Word(6n), y => Exists(Word(4n), t => {b1 == utf8_proof.lead3(t) : U32} & {b2 == utf8_proof.second_byte(y) : U32} & {b3 == utf8_proof.second_byte(z) : U32})))
+
+def utf8_proof.fields3.of(+b1: U32, +b2: U32, +b3: U32, pt: Exists(Word(4n), t => {b1 == utf8_proof.lead3(t) : U32}), py: Exists(Word(6n), y => {b2 == utf8_proof.second_byte(y) : U32}), pz: Exists(Word(6n), z => {b3 == utf8_proof.second_byte(z) : U32})) -> utf8_proof.Fields3(b1, b2, b3):
+  (+t, et) = pt
+  (+y, ey) = py
+  (+z, ez) = pz
+  (z, (y, (t, (et, (ey, ez)))))
+
+def utf8_proof.fields3(+b1: U32, +b2: U32, +b3: U32, +accepted: {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool}) -> utf8_proof.Fields3(b1, b2, b3):
+  utf8_proof.fields3.of(b1, b2, b3, utf8_proof.lead3_payload(b1, bool_and_left_true(B.byte_mask("1110xxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), bool_and_left_true(Bool.and(B.byte_mask("1110xxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==}), accepted))), utf8_proof.second_payload(b2, bool_and_right_true(B.byte_mask("1110xxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), bool_and_left_true(Bool.and(B.byte_mask("1110xxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==}), accepted))), utf8_proof.second_payload(b3, bool_and_right_true(Bool.and(B.byte_mask("1110xxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==}), accepted)))
+
+def utf8_proof.produced3_at(+z: Word(6n), +y: Word(6n), +t: Word(4n), +b1: U32, +b2: U32, +b3: U32, et: {b1 == utf8_proof.lead3(t) : U32}, ey: {b2 == utf8_proof.second_byte(y) : U32}, ez: {b3 == utf8_proof.second_byte(z) : U32}) ->
+  {Laws.three_byte_shape(utf8_proof.cp3(z, y, t)) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}:
+  %Equal.sym(U32, b1, utf8_proof.lead3(t), et) : {Laws.three_byte_shape(utf8_proof.cp3(z, y, t)) == Some{(_, b2, b3)} : Maybe<&1, U32 & U32 & U32>}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(y), ey) : {Laws.three_byte_shape(utf8_proof.cp3(z, y, t)) == Some{(utf8_proof.lead3(t), _, b3)} : Maybe<&1, U32 & U32 & U32>}
+  %Equal.sym(U32, b3, utf8_proof.second_byte(z), ez) : {Laws.three_byte_shape(utf8_proof.cp3(z, y, t)) == Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), _)} : Maybe<&1, U32 & U32 & U32>}
+  utf8_proof.table3(z, y, t)
+
+def utf8_proof.dec3_at(+z: Word(6n), +y: Word(6n), +t: Word(4n), +b1: U32, +b2: U32, +b3: U32, et: {b1 == utf8_proof.lead3(t) : U32}, ey: {b2 == utf8_proof.second_byte(y) : U32}, ez: {b3 == utf8_proof.second_byte(z) : U32}) ->
+  {utf8_proof.dec3(b1, b2, b3) == utf8_proof.cp3(z, y, t) : U32}:
+  %Equal.sym(U32, b1, utf8_proof.lead3(t), et) : {utf8_proof.dec3(_, b2, b3) == utf8_proof.cp3(z, y, t) : U32}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(y), ey) : {utf8_proof.dec3(utf8_proof.lead3(t), _, b3) == utf8_proof.cp3(z, y, t) : U32}
+  %Equal.sym(U32, b3, utf8_proof.second_byte(z), ez) : {utf8_proof.dec3(utf8_proof.lead3(t), utf8_proof.second_byte(y), _) == utf8_proof.cp3(z, y, t) : U32}
+  utf8_proof.dec3_fields(z, y, t)
+
+def utf8_proof.accepted3(m: Maybe<&1, U32 & U32 & U32>) -> Bool:
+  match m:
+    case None{}: False{}
+    case Some{(x0, x1, x2)}: UTF8.has_three_byte_shape(x0, x1, x2)
+
+def utf8_proof.dec_of3(m: Maybe<&1, U32 & U32 & U32>) -> U32:
+  match m:
+    case None{}: 0
+    case Some{(x0, x1, x2)}: utf8_proof.dec3(x0, x1, x2)
+
+def utf8_proof.Produced3(+cp: U32, +b1: U32, +b2: U32, +b3: U32) -> Type:
+  {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool} & {utf8_proof.dec3(b1, b2, b3) == cp : U32}
+
+def utf8_proof.produced3.at(+z: Word(6n), +y: Word(6n), +t: Word(4n), +cp: U32, +b1: U32, +b2: U32, +b3: U32, +e: {cp == utf8_proof.cp3(z, y, t) : U32},
+  +produced: {Laws.three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}) -> utf8_proof.Produced3(cp, b1, b2, b3):
+  +same = Equal.trans(Maybe<&1, U32 & U32 & U32>, Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Laws.three_byte_shape(utf8_proof.cp3(z, y, t)), Some{(b1, b2, b3)},
+    Equal.sym(Maybe<&1, U32 & U32 & U32>, Laws.three_byte_shape(utf8_proof.cp3(z, y, t)), Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, utf8_proof.table3(z, y, t)),
+    Equal.trans(Maybe<&1, U32 & U32 & U32>, Laws.three_byte_shape(utf8_proof.cp3(z, y, t)), Laws.three_byte_shape(cp), Some{(b1, b2, b3)},
+      Equal.cong(U32, Maybe<&1, U32 & U32 & U32>, v => Laws.three_byte_shape(v), utf8_proof.cp3(z, y, t), cp, Equal.sym(U32, cp, utf8_proof.cp3(z, y, t), e)), produced))
+  (Equal.trans(Bool, utf8_proof.accepted3(Some{(b1, b2, b3)}), utf8_proof.accepted3(Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}), True{},
+     Equal.cong(Maybe<&1, U32 & U32 & U32>, Bool, m => utf8_proof.accepted3(m), Some{(b1, b2, b3)}, Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Equal.sym(Maybe<&1, U32 & U32 & U32>, Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Some{(b1, b2, b3)}, same)),
+     utf8_proof.has3_fields(z, y, t)),
+   Equal.trans(U32, utf8_proof.dec_of3(Some{(b1, b2, b3)}), utf8_proof.dec_of3(Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}), cp,
+     Equal.cong(Maybe<&1, U32 & U32 & U32>, U32, m => utf8_proof.dec_of3(m), Some{(b1, b2, b3)}, Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Equal.sym(Maybe<&1, U32 & U32 & U32>, Some{(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Some{(b1, b2, b3)}, same)),
+     Equal.trans(U32, utf8_proof.dec3(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.cp3(z, y, t), cp, utf8_proof.dec3_fields(z, y, t), Equal.sym(U32, cp, utf8_proof.cp3(z, y, t), e))))
+
+def utf8_proof.produced3.view(+cp: U32, +b1: U32, +b2: U32, +b3: U32,
+  +produced: {Laws.three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}, v: utf8_proof.View3(cp)) -> utf8_proof.Produced3(cp, b1, b2, b3):
+  (+z, r0) = v
+  (+y, r1) = r0
+  (+t, e) = r1
+  utf8_proof.produced3.at(z, y, t, cp, b1, b2, b3, e, produced)
+
+def utf8_proof.produced3(+cp: U32, +b1: U32, +b2: U32, +b3: U32,
+  +produced: {Laws.three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}) -> utf8_proof.Produced3(cp, b1, b2, b3):
+  +accepted = Equal.trans(Bool, UTF8.can_encode_as_three_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32, Laws.three_byte_shape(cp)), True{},
+    Laws.utf8_can_encode_as_three_bytes(cp),
+    Equal.cong(Maybe<&1, U32 & U32 & U32>, Bool, m => Maybe.is_some(&1, U32 & U32 & U32, m), Laws.three_byte_shape(cp), Some{(b1, b2, b3)}, produced))
+  utf8_proof.produced3.view(cp, b1, b2, b3, produced, utf8_proof.view3(cp, accepted))
+
+def utf8_proof.Produced3.shape(+cp: U32, +b1: U32, +b2: U32, +b3: U32, p: utf8_proof.Produced3(cp, b1, b2, b3)) ->
+  {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool}:
+  (shape, decoded) = p
+  shape
+
+def utf8_proof.witness3(+b1: U32, +b2: U32, +b3: U32, f: utf8_proof.Fields3(b1, b2, b3)) ->
+  Exists(U32, cp => {Laws.three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}):
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+t, f2) = f1
+  (et, g0) = f2
+  (ey, g1) = g0
+  (utf8_proof.cp3(z, y, t), utf8_proof.produced3_at(z, y, t, b1, b2, b3, et, ey, g1))
+
+def utf8_proof.from_rep3(+b1: U32, +b2: U32, +b3: U32, rep: Exists(U32, cp => {Laws.three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>})) ->
+  {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool}:
+  (+cp, produced) = rep
+  utf8_proof.Produced3.shape(cp, b1, b2, b3, utf8_proof.produced3(cp, b1, b2, b3, produced))
+
+def Laws.utf8_has_three_byte_shape(b1, b2, b3):
+  (accepted => utf8_proof.witness3(b1, b2, b3, utf8_proof.fields3(b1, b2, b3, accepted)),
+   rep => utf8_proof.from_rep3(b1, b2, b3, rep))
+
+def utf8_proof.left3(+cp: U32, +valid: {UTF8.can_encode_as_three_bytes(cp) == True{} : Bool}) ->
+  Exists({UTF8.has_three_byte_shape(Laws.three_bytes.first(UTF8.encode_as_three_bytes(cp, valid)), Laws.three_bytes.second(UTF8.encode_as_three_bytes(cp, valid)), Laws.three_bytes.third(UTF8.encode_as_three_bytes(cp, valid))) == True{} : Bool}, shape =>
+    {UTF8.decode_three_bytes(Laws.three_bytes.first(UTF8.encode_as_three_bytes(cp, valid)), Laws.three_bytes.second(UTF8.encode_as_three_bytes(cp, valid)), Laws.three_bytes.third(UTF8.encode_as_three_bytes(cp, valid)), shape) == cp : U32}):
+  utf8_proof.produced3(cp, Laws.three_bytes.first(UTF8.encode_as_three_bytes(cp, valid)), Laws.three_bytes.second(UTF8.encode_as_three_bytes(cp, valid)), Laws.three_bytes.third(UTF8.encode_as_three_bytes(cp, valid)),
+    Equal.sym(Maybe<&1, U32 & U32 & U32>, Some{UTF8.encode_as_three_bytes(cp, valid)}, Laws.three_byte_shape(cp), Laws.utf8_encode_as_three_bytes(cp, valid)))
+
+def utf8_proof.dec_produces3.eqs(+z: Word(6n), +y: Word(6n), +t: Word(4n), +b1: U32, +b2: U32, +b3: U32, +et: {b1 == utf8_proof.lead3(t) : U32}, +ey: {b2 == utf8_proof.second_byte(y) : U32}, +ez: {b3 == utf8_proof.second_byte(z) : U32}) ->
+  {Laws.three_byte_shape(utf8_proof.dec3(b1, b2, b3)) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}:
+  Equal.trans(Maybe<&1, U32 & U32 & U32>, Laws.three_byte_shape(utf8_proof.dec3(b1, b2, b3)), Laws.three_byte_shape(utf8_proof.cp3(z, y, t)), Some{(b1, b2, b3)},
+    Equal.cong(U32, Maybe<&1, U32 & U32 & U32>, v => Laws.three_byte_shape(v), utf8_proof.dec3(b1, b2, b3), utf8_proof.cp3(z, y, t), utf8_proof.dec3_at(z, y, t, b1, b2, b3, et, ey, ez)),
+    utf8_proof.produced3_at(z, y, t, b1, b2, b3, et, ey, ez))
+
+def utf8_proof.dec_produces3(+b1: U32, +b2: U32, +b3: U32, f: utf8_proof.Fields3(b1, b2, b3)) ->
+  {Laws.three_byte_shape(utf8_proof.dec3(b1, b2, b3)) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}:
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+t, f2) = f1
+  (et, g0) = f2
+  (ey, g1) = g0
+  utf8_proof.dec_produces3.eqs(z, y, t, b1, b2, b3, et, ey, g1)
+
+def utf8_proof.encode_decoded3(+b1: U32, +b2: U32, +b3: U32, -valid: {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool},
+  +produced: {Laws.three_byte_shape(UTF8.decode_three_bytes(b1, b2, b3, valid)) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}) ->
+  Exists({UTF8.can_encode_as_three_bytes(UTF8.decode_three_bytes(b1, b2, b3, valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_three_bytes(UTF8.decode_three_bytes(b1, b2, b3, valid), accepted) == (b1, b2, b3) : U32 & U32 & U32}):
+  +cp = UTF8.decode_three_bytes(b1, b2, b3, valid)
+  +accepted = Equal.trans(Bool, UTF8.can_encode_as_three_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32, Laws.three_byte_shape(cp)), True{},
+    Laws.utf8_can_encode_as_three_bytes(cp),
+    Equal.cong(Maybe<&1, U32 & U32 & U32>, Bool, m => Maybe.is_some(&1, U32 & U32 & U32, m), Laws.three_byte_shape(cp), Some{(b1, b2, b3)}, produced))
+  (accepted, Equal.cong(Maybe<&1, U32 & U32 & U32>, U32 & U32 & U32, m => Maybe.default(&1, U32 & U32 & U32, m, (0, 0, 0)),
+    Some{UTF8.encode_as_three_bytes(cp, accepted)}, Some{(b1, b2, b3)},
+    Equal.trans(Maybe<&1, U32 & U32 & U32>, Some{UTF8.encode_as_three_bytes(cp, accepted)}, Laws.three_byte_shape(cp), Some{(b1, b2, b3)},
+      Laws.utf8_encode_as_three_bytes(cp, accepted), produced)))
+
+def utf8_proof.right3.l1(+b1: U32, r: U32 & U32, +valid: {UTF8.has_three_byte_shape(Laws.three_bytes.first((b1, r)), Laws.three_bytes.second((b1, r)), Laws.three_bytes.third((b1, r))) == True{} : Bool}) ->
+  Exists({UTF8.can_encode_as_three_bytes(UTF8.decode_three_bytes(Laws.three_bytes.first((b1, r)), Laws.three_bytes.second((b1, r)), Laws.three_bytes.third((b1, r)), valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_three_bytes(UTF8.decode_three_bytes(Laws.three_bytes.first((b1, r)), Laws.three_bytes.second((b1, r)), Laws.three_bytes.third((b1, r)), valid), accepted) == (b1, r) : U32 & U32 & U32}):
+  match r:
+    case (+b2, +b3):
+      utf8_proof.encode_decoded3(b1, b2, b3, valid, utf8_proof.dec_produces3(b1, b2, b3, utf8_proof.fields3(b1, b2, b3, valid)))
+
+def utf8_proof.right3.l0(r: U32 & U32 & U32, +valid: {UTF8.has_three_byte_shape(Laws.three_bytes.first(r), Laws.three_bytes.second(r), Laws.three_bytes.third(r)) == True{} : Bool}) ->
+  Exists({UTF8.can_encode_as_three_bytes(UTF8.decode_three_bytes(Laws.three_bytes.first(r), Laws.three_bytes.second(r), Laws.three_bytes.third(r), valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_three_bytes(UTF8.decode_three_bytes(Laws.three_bytes.first(r), Laws.three_bytes.second(r), Laws.three_bytes.third(r), valid), accepted) == r : U32 & U32 & U32}):
+  match r:
+    case (+b1, r2):
+      utf8_proof.right3.l1(b1, r2, valid)
+
+
+def Laws.utf8_three_byte_inverse():
+  (cp => +valid => utf8_proof.left3(cp, valid),
+   p => +valid => utf8_proof.right3.l0(p, valid))
+
+def utf8_proof.value3(+cp: U32) -> Bool:
+  Bool.and(Bool.not(UTF8.can_encode_as_two_bytes(cp)), UTF8.is_scalar(cp))
+
+def utf8_proof.valid3_if(+b1: U32, +b2: U32, +b3: U32, shape: Bool,
+  -checked: {UTF8.has_three_byte_shape(b1, b2, b3) == shape : Bool}, is_true: {shape == True{} : Bool}) ->
+  {UTF8.valid_three_bytes.if(b1, b2, b3, shape, checked) == utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)) : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({False{} == utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)) : Bool}, H.hex_u32.false_true(is_true))
+    case True{}: {==}
+
+def utf8_proof.valid3_value(+b1: U32, +b2: U32, +b3: U32, +accepted: {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool}) ->
+  {UTF8.valid_three_bytes(b1, b2, b3) == utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)) : Bool}:
+  utf8_proof.valid3_if(b1, b2, b3, UTF8.has_three_byte_shape(b1, b2, b3), {==}, accepted)
+
+def utf8_proof.valid3_fields(+z: Word(6n), +y: Word(6n), +t: Word(4n)) ->
+  {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.value3(utf8_proof.cp3(z, y, t)) : Bool}:
+  %utf8_proof.dec3_fields(z, y, t) : {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.value3(_) : Bool}
+  utf8_proof.valid3_value(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z), utf8_proof.has3_fields(z, y, t))
+
+def utf8_proof.valid3_law_if(+b1: U32, +b2: U32, +b3: U32, shape: Bool, -checked: {UTF8.has_three_byte_shape(b1, b2, b3) == shape : Bool}) ->
+  {UTF8.valid_three_bytes.if(b1, b2, b3, shape, checked) == Laws.valid_three_bytes.if(b1, b2, b3, shape, checked) : Bool}:
+  match shape:
+    case False{}: {==}
+    case True{}:
+      Equal.cong(Bool, Bool, s => Bool.and(Bool.not(UTF8.overlong_three_bytes(b1, b2, b3, checked)), s),
+        UTF8.is_scalar(UTF8.decode_three_bytes(b1, b2, b3, checked)), Laws.is_unicode_scalar(UTF8.decode_three_bytes(b1, b2, b3, checked)),
+        utf8_proof.scalar_agrees(UTF8.decode_three_bytes(b1, b2, b3, checked)))
+
+def Laws.utf8_valid_three_bytes(b1, b2, b3):
+  utf8_proof.valid3_law_if(b1, b2, b3, UTF8.has_three_byte_shape(b1, b2, b3), {==})
+
+
+# Four-byte sequences
+# ------------------
+
+def utf8_proof.cp4(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) -> U32:
+  U32{word_join(6n, z, 26n, word_join(6n, y, 20n, word_join(6n, x, 14n, word_join(3n, t, 11n, Word.zero(11n)))))}
+
+def utf8_proof.lead4(t: Word(3n)) -> U32:
+  U32{word_join(3n, t, 29n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}})}
+
+def utf8_proof.lead4_prefix(low: Word(3n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool, +p3: Bool) -> U32:
+  U32{word_join(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}})}
+
+def utf8_proof.lead4_mask_parts(+byte: U32, m128: U32, m64: U32, m32: U32, m16: U32, m8: U32) -> Bool:
+  Bool.and(U32.is_le(byte, 255), Bool.and(U32.is_eq(m128, 128), Bool.and(U32.is_eq(m64, 64), Bool.and(U32.is_eq(m32, 32), Bool.and(U32.is_eq(m16, 16), Bool.and(Bool.or(U32.is_eq(m8, 0), False{}), True{}))))))
+
+def utf8_proof.lead4_prefix_checks(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool, +p3: Bool) ->
+  {utf8_proof.lead4_mask_parts(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))}) == Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))) : Bool}:
+  match p7 p6 p5 p4 p3:
+    case False{} False{} False{} False{} False{}: {==}
+    case False{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} True{} False{}: {==}
+    case False{} False{} False{} True{} True{}: {==}
+    case False{} False{} True{} False{} False{}: {==}
+    case False{} False{} True{} False{} True{}: {==}
+    case False{} False{} True{} True{} False{}: {==}
+    case False{} False{} True{} True{} True{}: {==}
+    case False{} True{} False{} False{} False{}: {==}
+    case False{} True{} False{} False{} True{}: {==}
+    case False{} True{} False{} True{} False{}: {==}
+    case False{} True{} False{} True{} True{}: {==}
+    case False{} True{} True{} False{} False{}: {==}
+    case False{} True{} True{} False{} True{}: {==}
+    case False{} True{} True{} True{} False{}: {==}
+    case False{} True{} True{} True{} True{}: {==}
+    case True{} False{} False{} False{} False{}: {==}
+    case True{} False{} False{} False{} True{}: {==}
+    case True{} False{} False{} True{} False{}: {==}
+    case True{} False{} False{} True{} True{}: {==}
+    case True{} False{} True{} False{} False{}: {==}
+    case True{} False{} True{} False{} True{}: {==}
+    case True{} False{} True{} True{} False{}: {==}
+    case True{} False{} True{} True{} True{}: {==}
+    case True{} True{} False{} False{} False{}: {==}
+    case True{} True{} False{} False{} True{}: {==}
+    case True{} True{} False{} True{} False{}: {==}
+    case True{} True{} False{} True{} True{}: {==}
+    case True{} True{} True{} False{} False{}: {==}
+    case True{} True{} True{} False{} True{}: {==}
+    case True{} True{} True{} True{} False{}: {==}
+    case True{} True{} True{} True{} True{}: {==}
+
+def utf8_proof.lead4_prefix_mask(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool, +p3: Bool) ->
+  {B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}) == Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))) : Bool}:
+  %Equal.sym(U32, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 128), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}), word_join(3n, Word.zero(3n), 29n, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}})),
+      word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}})),
+      word_mask_high(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}}))) : {utf8_proof.lead4_mask_parts(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), _, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 64), U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 32), U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 16), U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 8)) == Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 64), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}), word_join(3n, Word.zero(3n), 29n, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_mask_high(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}}))) : {utf8_proof.lead4_mask_parts(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}}))}, _, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 32), U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 16), U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 8)) == Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 32), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}), word_join(3n, Word.zero(3n), 29n, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_mask_high(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))) : {utf8_proof.lead4_mask_parts(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}}))}, _, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 16), U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 8)) == Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 16), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}), word_join(3n, Word.zero(3n), 29n, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_mask_high(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))) : {utf8_proof.lead4_mask_parts(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))}, _, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 8)) == Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))) : Bool}
+  %Equal.sym(U32, U32.and(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 8), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))},
+    Equal.cong(Word(32n), U32, w => U32{w},
+      Word.and(32n, word_join(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}), word_join(3n, Word.zero(3n), 29n, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}})),
+      word_mask_high(3n, low, 29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))) : {utf8_proof.lead4_mask_parts(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))}, U32{word_join(3n, Word.zero(3n), 29n, Word.and(29n, WCon{p3, WCon{p4, WCon{p5, WCon{p6, WCon{p7, Word.zero(24n)}}}}}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, Word.zero(24n)}}}}}))}, _) == Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))) : Bool}
+  utf8_proof.lead4_prefix_checks(low, p7, p6, p5, p4, p3)
+
+def utf8_proof.lead4_prefix_payload(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool, +p3: Bool, valid: {Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3))))) == True{} : Bool}) ->
+  Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}):
+  match p7 p6 p5 p4 p3:
+    case False{} False{} False{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} True{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} True{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} False{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} False{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} False{} True{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} False{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} True{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} True{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} True{} True{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case False{} True{} True{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} False{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} False{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} False{} True{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} False{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} True{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} True{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} True{} True{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} False{} True{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} False{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} False{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} False{} True{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} False{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} True{} False{} False{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} True{} False{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+    case True{} True{} True{} True{} False{}:
+      (low, {==})
+    case True{} True{} True{} True{} True{}:
+      Empty.absurd(Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}), H.hex_u32.false_true(valid))
+
+def utf8_proof.lead4_payload_bits(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: Bool, +p4: Bool, +p3: Bool,
+  valid: {B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}) == True{} : Bool}) -> Exists(Word(3n), payload => {utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3) == utf8_proof.lead4(payload) : U32}):
+  utf8_proof.lead4_prefix_payload(low, p7, p6, p5, p4, p3,
+    bool_and_right_true(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3))))),
+      Equal.trans(Bool, Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))), B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}), True{},
+        Equal.sym(Bool, B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}), Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))), utf8_proof.lead4_prefix_mask(low, p7, p6, p5, p4, p3)), valid)))
+
+def utf8_proof.lead4_payload_tuple(bits: Defs.Bit8(),
+  valid: {B.byte_mask("11110xxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(3n), payload => {B.bit8_value(bits) == utf8_proof.lead4(payload) : U32}):
+  match bits:
+    case (b7, b6, b5, b4, b3, b2, b1, b0):
+      utf8_proof.lead4_payload_bits(WCon{b0, WCon{b1, WCon{b2, WNil{}}}}, b7, b6, b5, b4, b3, valid)
+
+def utf8_proof.lead4_payload_finish(+byte: U32, -converted: U32,
+  equal: {converted == byte : U32},
+  result: Exists(Word(3n), payload => {converted == utf8_proof.lead4(payload) : U32})) ->
+  Exists(Word(3n), payload => {byte == utf8_proof.lead4(payload) : U32}):
+  (payload, matches) = result
+  (payload, Equal.trans(U32, byte, converted, utf8_proof.lead4(payload),
+    Equal.sym(U32, converted, byte, equal), matches))
+
+def utf8_proof.lead4_payload(+byte: U32,
+  +valid: {B.byte_mask("11110xxx", byte, {==}) == True{} : Bool}) ->
+  Exists(Word(3n), payload => {byte == utf8_proof.lead4(payload) : U32}):
+  +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('1', byte, 64), Bool.and(B.byte_mask.bit('1', byte, 32), Bool.and(B.byte_mask.bit('1', byte, 16), Bool.and(B.byte_mask.bit('0', byte, 8), True{}))))), valid)
+  +equal = BinaryLaws.bit8_value_bit8_roundtrip(byte, bounded)
+  result = utf8_proof.lead4_payload_tuple(B.bit8(byte, bounded),
+    Equal.trans(Bool, B.byte_mask("11110xxx", B.bit8_value(B.bit8(byte, bounded)), {==}),
+      B.byte_mask("11110xxx", byte, {==}), True{},
+      Equal.cong(U32, Bool, x => B.byte_mask("11110xxx", x, {==}),
+        B.bit8_value(B.bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.lead4_payload_finish(byte, B.bit8_value(B.bit8(byte, bounded)), equal, result)
+
+def utf8_proof.raw4(+cp: U32) -> U32 & U32 & U32 & U32:
+  ((240 + U32.shrn(cp, 18n) : U32), (128 + U32.and(U32.shrn(cp, 12n), 63) : U32), (128 + U32.and(U32.shrn(cp, 6n), 63) : U32), (128 + U32.and(cp, 63) : U32))
+
+def utf8_proof.encode4_fields(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) ->
+  {utf8_proof.raw4(utf8_proof.cp4(z, y, x, t)) == (utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) : U32 & U32 & U32 & U32}:
+  match z y x t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WNil{}}}}:
+      utf8_proof.tuple4_eq((240 + U32.shrn(utf8_proof.cp4(z, y, x, t), 18n) : U32), (128 + U32.and(U32.shrn(utf8_proof.cp4(z, y, x, t), 12n), 63) : U32), (128 + U32.and(U32.shrn(utf8_proof.cp4(z, y, x, t), 6n), 63) : U32), (128 + U32.and(utf8_proof.cp4(z, y, x, t), 63) : U32), utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z),
+        Equal.cong(Word(32n), U32, w => U32{w},
+        Word.add(32n, word_join(3n, Word.zero(3n), 29n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}}), word_join(3n, t, 29n, Word.zero(29n))),
+        word_join(3n, t, 29n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}}), word_add_fields(3n, t, 29n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}})),
+        utf8_proof.cont_of(x, word_join(3n, t, 23n, Word.zero(23n))),
+        utf8_proof.cont_of(y, word_join(6n, x, 20n, word_join(3n, t, 17n, Word.zero(17n)))),
+        utf8_proof.cont_of(z, word_join(6n, y, 20n, word_join(6n, x, 14n, word_join(3n, t, 11n, Word.zero(11n))))))
+
+def utf8_proof.dec4(+b1: U32, +b2: U32, +b3: U32, +b4: U32) -> U32:
+  UTF8.append_continuation(UTF8.append_continuation(UTF8.append_continuation(U32.and(b1, 7), b2), b3), b4)
+
+def utf8_proof.mask_lead4(+t: Word(3n)) ->
+  {U32.and(utf8_proof.lead4(t), 7) == U32{word_join(3n, t, 29n, Word.zero(29n))} : U32}:
+  Equal.cong(Word(32n), U32, x => U32{x},
+    Word.and(32n, word_join(3n, t, 29n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}}), word_join(3n, word_ones(3n), 29n, Word.zero(29n))),
+    word_join(3n, t, 29n, Word.zero(29n)), word_mask_fields(3n, t, 29n, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, Word.zero(24n)}}}}}))
+
+def utf8_proof.dec4_fields(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) ->
+  {utf8_proof.dec4(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.cp4(z, y, x, t) : U32}:
+  match z y x t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WNil{}}}}:
+      %Equal.sym(U32, U32.and(utf8_proof.lead4(t), 7), U32{word_join(3n, t, 29n, Word.zero(29n))}, utf8_proof.mask_lead4(t)) :
+        {UTF8.append_continuation(UTF8.append_continuation(UTF8.append_continuation(_, utf8_proof.second_byte(x)), utf8_proof.second_byte(y)), utf8_proof.second_byte(z)) == utf8_proof.cp4(z, y, x, t) : U32}
+      %Equal.sym(U32, UTF8.append_continuation(U32{word_join(3n, t, 29n, Word.zero(29n))}, utf8_proof.second_byte(x)), U32{word_join(6n, x, 26n, word_join(3n, t, 23n, Word.zero(23n)))},
+          utf8_proof.append_eq(U32{word_join(3n, t, 29n, Word.zero(29n))}, x, word_join(3n, t, 23n, Word.zero(23n)), {==})) :
+        {UTF8.append_continuation(UTF8.append_continuation(_, utf8_proof.second_byte(y)), utf8_proof.second_byte(z)) == utf8_proof.cp4(z, y, x, t) : U32}
+      %Equal.sym(U32, UTF8.append_continuation(U32{word_join(6n, x, 26n, word_join(3n, t, 23n, Word.zero(23n)))}, utf8_proof.second_byte(y)), U32{word_join(6n, y, 26n, word_join(6n, x, 20n, word_join(3n, t, 17n, Word.zero(17n))))},
+          utf8_proof.append_eq(U32{word_join(6n, x, 26n, word_join(3n, t, 23n, Word.zero(23n)))}, y, word_join(6n, x, 20n, word_join(3n, t, 17n, Word.zero(17n))), {==})) :
+        {UTF8.append_continuation(_, utf8_proof.second_byte(z)) == utf8_proof.cp4(z, y, x, t) : U32}
+      utf8_proof.append_eq(U32{word_join(6n, y, 26n, word_join(6n, x, 20n, word_join(3n, t, 17n, Word.zero(17n))))}, z, word_join(6n, y, 20n, word_join(6n, x, 14n, word_join(3n, t, 11n, Word.zero(11n)))), {==})
+
+def utf8_proof.table4(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) ->
+  {Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)) == Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))} : Maybe<&1, U32 & U32 & U32 & U32>}:
+  match z y x t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WNil{}}}}: {==}
+
+def utf8_proof.View4(+cp: U32) -> Type:
+  Exists(Word(6n), z => Exists(Word(6n), y => Exists(Word(6n), x => Exists(Word(3n), t => {cp == utf8_proof.cp4(z, y, x, t) : U32}))))
+
+def utf8_proof.view4_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
+  valid: {UTF8.can_encode_as_four_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == True{} : Bool}) -> utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}):
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21:
+    case True{} _ _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} True{} _ _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} True{} _ _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}:
+      Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), H.hex_u32.false_true(valid))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      (WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, (WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WNil{}}}}}}}, (WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WNil{}}}}}}}, (WCon{b18, WCon{b19, WCon{b20, WNil{}}}}, {==}))))
+
+def utf8_proof.view4(+cp: U32, valid: {UTF8.can_encode_as_four_bytes(cp) == True{} : Bool}) -> utf8_proof.View4(cp):
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.view4_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
+
+def utf8_proof.can4_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) ->
+  {UTF8.can_encode_as_four_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}})) : Bool}:
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21:
+    case True{} _ _ _ _ _ _ _ _ _ _: {==}
+    case False{} True{} _ _ _ _ _ _ _ _ _: {==}
+    case False{} False{} True{} _ _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} True{} _ _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      utf8_proof.word_le_ones(21n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WNil{}}}}}}}}}}}}}}}}}}}}}}, 11n, Word.zero(11n), Word.zero(11n))
+
+def Laws.utf8_can_encode_as_four_bytes(cp):
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.can4_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
+
+def utf8_proof.encode4_view(+cp: U32, v: utf8_proof.View4(cp)) ->
+  {Some{utf8_proof.raw4(cp)} == Laws.four_byte_shape(cp) : Maybe<&1, U32 & U32 & U32 & U32>}:
+  (+z, r0) = v
+  (+y, r1) = r0
+  (+x, r2) = r1
+  (+t, e) = r2
+  %Equal.sym(U32, cp, utf8_proof.cp4(z, y, x, t), e) : {Some{utf8_proof.raw4(_)} == Laws.four_byte_shape(_) : Maybe<&1, U32 & U32 & U32 & U32>}
+  Equal.trans(Maybe<&1, U32 & U32 & U32 & U32>, Some{utf8_proof.raw4(utf8_proof.cp4(z, y, x, t))}, Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)),
+    Equal.cong(U32 & U32 & U32 & U32, Maybe<&1, U32 & U32 & U32 & U32>, v => Some{v}, utf8_proof.raw4(utf8_proof.cp4(z, y, x, t)), (utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.encode4_fields(z, y, x, t)),
+    Equal.sym(Maybe<&1, U32 & U32 & U32 & U32>, Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)), Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, utf8_proof.table4(z, y, x, t)))
+
+def Laws.utf8_encode_as_four_bytes(cp, valid):
+  utf8_proof.encode4_view(cp, utf8_proof.view4(cp, valid))
+
+def utf8_proof.lead4_mask(+t: Word(3n)) ->
+  {B.byte_mask("11110xxx", utf8_proof.lead4(t), {==}) == True{} : Bool}:
+  match t:
+    case WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}: {==}
+
+def utf8_proof.has4_fields(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) ->
+  {UTF8.has_four_byte_shape(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == True{} : Bool}:
+  %Equal.sym(Bool, B.byte_mask("11110xxx", utf8_proof.lead4(t), {==}), True{}, utf8_proof.lead4_mask(t)) :
+    {Bool.and(Bool.and(Bool.and(_, B.byte_mask("10xxxxxx", utf8_proof.second_byte(x), {==})), B.byte_mask("10xxxxxx", utf8_proof.second_byte(y), {==})), B.byte_mask("10xxxxxx", utf8_proof.second_byte(z), {==})) == True{} : Bool}
+  %Equal.sym(Bool, B.byte_mask("10xxxxxx", utf8_proof.second_byte(x), {==}), True{}, utf8_proof.cont_mask(x)) :
+    {Bool.and(Bool.and(Bool.and(True{}, _), B.byte_mask("10xxxxxx", utf8_proof.second_byte(y), {==})), B.byte_mask("10xxxxxx", utf8_proof.second_byte(z), {==})) == True{} : Bool}
+  %Equal.sym(Bool, B.byte_mask("10xxxxxx", utf8_proof.second_byte(y), {==}), True{}, utf8_proof.cont_mask(y)) :
+    {Bool.and(Bool.and(Bool.and(True{}, True{}), _), B.byte_mask("10xxxxxx", utf8_proof.second_byte(z), {==})) == True{} : Bool}
+  %Equal.sym(Bool, B.byte_mask("10xxxxxx", utf8_proof.second_byte(z), {==}), True{}, utf8_proof.cont_mask(z)) :
+    {Bool.and(Bool.and(Bool.and(True{}, True{}), True{}), _) == True{} : Bool}
+  {==}
+
+def utf8_proof.Fields4(+b1: U32, +b2: U32, +b3: U32, +b4: U32) -> Type:
+  Exists(Word(6n), z => Exists(Word(6n), y => Exists(Word(6n), x => Exists(Word(3n), t => {b1 == utf8_proof.lead4(t) : U32} & {b2 == utf8_proof.second_byte(x) : U32} & {b3 == utf8_proof.second_byte(y) : U32} & {b4 == utf8_proof.second_byte(z) : U32}))))
+
+def utf8_proof.fields4.of(+b1: U32, +b2: U32, +b3: U32, +b4: U32, pt: Exists(Word(3n), t => {b1 == utf8_proof.lead4(t) : U32}), px: Exists(Word(6n), x => {b2 == utf8_proof.second_byte(x) : U32}), py: Exists(Word(6n), y => {b3 == utf8_proof.second_byte(y) : U32}), pz: Exists(Word(6n), z => {b4 == utf8_proof.second_byte(z) : U32})) -> utf8_proof.Fields4(b1, b2, b3, b4):
+  (+t, et) = pt
+  (+x, ex) = px
+  (+y, ey) = py
+  (+z, ez) = pz
+  (z, (y, (x, (t, (et, (ex, (ey, ez)))))))
+
+def utf8_proof.fields4(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +accepted: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}) -> utf8_proof.Fields4(b1, b2, b3, b4):
+  utf8_proof.fields4.of(b1, b2, b3, b4, utf8_proof.lead4_payload(b1, bool_and_left_true(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), bool_and_left_true(Bool.and(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==}), bool_and_left_true(Bool.and(Bool.and(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==})), B.byte_mask("10xxxxxx", b4, {==}), accepted)))), utf8_proof.second_payload(b2, bool_and_right_true(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}), bool_and_left_true(Bool.and(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==}), bool_and_left_true(Bool.and(Bool.and(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==})), B.byte_mask("10xxxxxx", b4, {==}), accepted)))), utf8_proof.second_payload(b3, bool_and_right_true(Bool.and(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==}), bool_and_left_true(Bool.and(Bool.and(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==})), B.byte_mask("10xxxxxx", b4, {==}), accepted))), utf8_proof.second_payload(b4, bool_and_right_true(Bool.and(Bool.and(B.byte_mask("11110xxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==})), B.byte_mask("10xxxxxx", b3, {==})), B.byte_mask("10xxxxxx", b4, {==}), accepted)))
+
+def utf8_proof.produced4_at(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), +b1: U32, +b2: U32, +b3: U32, +b4: U32, et: {b1 == utf8_proof.lead4(t) : U32}, ex: {b2 == utf8_proof.second_byte(x) : U32}, ey: {b3 == utf8_proof.second_byte(y) : U32}, ez: {b4 == utf8_proof.second_byte(z) : U32}) ->
+  {Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}:
+  %Equal.sym(U32, b1, utf8_proof.lead4(t), et) : {Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)) == Some{(_, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(x), ex) : {Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)) == Some{(utf8_proof.lead4(t), _, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}
+  %Equal.sym(U32, b3, utf8_proof.second_byte(y), ey) : {Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)) == Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), _, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}
+  %Equal.sym(U32, b4, utf8_proof.second_byte(z), ez) : {Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)) == Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), _)} : Maybe<&1, U32 & U32 & U32 & U32>}
+  utf8_proof.table4(z, y, x, t)
+
+def utf8_proof.dec4_at(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), +b1: U32, +b2: U32, +b3: U32, +b4: U32, et: {b1 == utf8_proof.lead4(t) : U32}, ex: {b2 == utf8_proof.second_byte(x) : U32}, ey: {b3 == utf8_proof.second_byte(y) : U32}, ez: {b4 == utf8_proof.second_byte(z) : U32}) ->
+  {utf8_proof.dec4(b1, b2, b3, b4) == utf8_proof.cp4(z, y, x, t) : U32}:
+  %Equal.sym(U32, b1, utf8_proof.lead4(t), et) : {utf8_proof.dec4(_, b2, b3, b4) == utf8_proof.cp4(z, y, x, t) : U32}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(x), ex) : {utf8_proof.dec4(utf8_proof.lead4(t), _, b3, b4) == utf8_proof.cp4(z, y, x, t) : U32}
+  %Equal.sym(U32, b3, utf8_proof.second_byte(y), ey) : {utf8_proof.dec4(utf8_proof.lead4(t), utf8_proof.second_byte(x), _, b4) == utf8_proof.cp4(z, y, x, t) : U32}
+  %Equal.sym(U32, b4, utf8_proof.second_byte(z), ez) : {utf8_proof.dec4(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), _) == utf8_proof.cp4(z, y, x, t) : U32}
+  utf8_proof.dec4_fields(z, y, x, t)
+
+def utf8_proof.accepted4(m: Maybe<&1, U32 & U32 & U32 & U32>) -> Bool:
+  match m:
+    case None{}: False{}
+    case Some{(x0, x1, x2, x3)}: UTF8.has_four_byte_shape(x0, x1, x2, x3)
+
+def utf8_proof.dec_of4(m: Maybe<&1, U32 & U32 & U32 & U32>) -> U32:
+  match m:
+    case None{}: 0
+    case Some{(x0, x1, x2, x3)}: utf8_proof.dec4(x0, x1, x2, x3)
+
+def utf8_proof.Produced4(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32) -> Type:
+  {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool} & {utf8_proof.dec4(b1, b2, b3, b4) == cp : U32}
+
+def utf8_proof.produced4.at(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), +cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32, +e: {cp == utf8_proof.cp4(z, y, x, t) : U32},
+  +produced: {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}) -> utf8_proof.Produced4(cp, b1, b2, b3, b4):
+  +same = Equal.trans(Maybe<&1, U32 & U32 & U32 & U32>, Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)), Some{(b1, b2, b3, b4)},
+    Equal.sym(Maybe<&1, U32 & U32 & U32 & U32>, Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)), Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, utf8_proof.table4(z, y, x, t)),
+    Equal.trans(Maybe<&1, U32 & U32 & U32 & U32>, Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)), Laws.four_byte_shape(cp), Some{(b1, b2, b3, b4)},
+      Equal.cong(U32, Maybe<&1, U32 & U32 & U32 & U32>, v => Laws.four_byte_shape(v), utf8_proof.cp4(z, y, x, t), cp, Equal.sym(U32, cp, utf8_proof.cp4(z, y, x, t), e)), produced))
+  (Equal.trans(Bool, utf8_proof.accepted4(Some{(b1, b2, b3, b4)}), utf8_proof.accepted4(Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}), True{},
+     Equal.cong(Maybe<&1, U32 & U32 & U32 & U32>, Bool, m => utf8_proof.accepted4(m), Some{(b1, b2, b3, b4)}, Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Equal.sym(Maybe<&1, U32 & U32 & U32 & U32>, Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Some{(b1, b2, b3, b4)}, same)),
+     utf8_proof.has4_fields(z, y, x, t)),
+   Equal.trans(U32, utf8_proof.dec_of4(Some{(b1, b2, b3, b4)}), utf8_proof.dec_of4(Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}), cp,
+     Equal.cong(Maybe<&1, U32 & U32 & U32 & U32>, U32, m => utf8_proof.dec_of4(m), Some{(b1, b2, b3, b4)}, Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Equal.sym(Maybe<&1, U32 & U32 & U32 & U32>, Some{(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z))}, Some{(b1, b2, b3, b4)}, same)),
+     Equal.trans(U32, utf8_proof.dec4(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.cp4(z, y, x, t), cp, utf8_proof.dec4_fields(z, y, x, t), Equal.sym(U32, cp, utf8_proof.cp4(z, y, x, t), e))))
+
+def utf8_proof.produced4.view(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  +produced: {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}, v: utf8_proof.View4(cp)) -> utf8_proof.Produced4(cp, b1, b2, b3, b4):
+  (+z, r0) = v
+  (+y, r1) = r0
+  (+x, r2) = r1
+  (+t, e) = r2
+  utf8_proof.produced4.at(z, y, x, t, cp, b1, b2, b3, b4, e, produced)
+
+def utf8_proof.produced4(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  +produced: {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}) -> utf8_proof.Produced4(cp, b1, b2, b3, b4):
+  +accepted = Equal.trans(Bool, UTF8.can_encode_as_four_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(cp)), True{},
+    Laws.utf8_can_encode_as_four_bytes(cp),
+    Equal.cong(Maybe<&1, U32 & U32 & U32 & U32>, Bool, m => Maybe.is_some(&1, U32 & U32 & U32 & U32, m), Laws.four_byte_shape(cp), Some{(b1, b2, b3, b4)}, produced))
+  utf8_proof.produced4.view(cp, b1, b2, b3, b4, produced, utf8_proof.view4(cp, accepted))
+
+def utf8_proof.Produced4.shape(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32, p: utf8_proof.Produced4(cp, b1, b2, b3, b4)) ->
+  {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}:
+  (shape, decoded) = p
+  shape
+
+def utf8_proof.witness4(+b1: U32, +b2: U32, +b3: U32, +b4: U32, f: utf8_proof.Fields4(b1, b2, b3, b4)) ->
+  Exists(U32, cp => {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}):
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+x, f2) = f1
+  (+t, f3) = f2
+  (et, g0) = f3
+  (ex, g1) = g0
+  (ey, g2) = g1
+  (utf8_proof.cp4(z, y, x, t), utf8_proof.produced4_at(z, y, x, t, b1, b2, b3, b4, et, ex, ey, g2))
+
+def utf8_proof.from_rep4(+b1: U32, +b2: U32, +b3: U32, +b4: U32, rep: Exists(U32, cp => {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>})) ->
+  {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}:
+  (+cp, produced) = rep
+  utf8_proof.Produced4.shape(cp, b1, b2, b3, b4, utf8_proof.produced4(cp, b1, b2, b3, b4, produced))
+
+def Laws.utf8_has_four_byte_shape(b1, b2, b3, b4):
+  (accepted => utf8_proof.witness4(b1, b2, b3, b4, utf8_proof.fields4(b1, b2, b3, b4, accepted)),
+   rep => utf8_proof.from_rep4(b1, b2, b3, b4, rep))
+
+def utf8_proof.left4(+cp: U32, +valid: {UTF8.can_encode_as_four_bytes(cp) == True{} : Bool}) ->
+  Exists({UTF8.has_four_byte_shape(Laws.four_bytes.first(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.second(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.third(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.fourth(UTF8.encode_as_four_bytes(cp, valid))) == True{} : Bool}, shape =>
+    {UTF8.decode_four_bytes(Laws.four_bytes.first(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.second(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.third(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.fourth(UTF8.encode_as_four_bytes(cp, valid)), shape) == cp : U32}):
+  utf8_proof.produced4(cp, Laws.four_bytes.first(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.second(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.third(UTF8.encode_as_four_bytes(cp, valid)), Laws.four_bytes.fourth(UTF8.encode_as_four_bytes(cp, valid)),
+    Equal.sym(Maybe<&1, U32 & U32 & U32 & U32>, Some{UTF8.encode_as_four_bytes(cp, valid)}, Laws.four_byte_shape(cp), Laws.utf8_encode_as_four_bytes(cp, valid)))
+
+def utf8_proof.dec_produces4.eqs(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), +b1: U32, +b2: U32, +b3: U32, +b4: U32, +et: {b1 == utf8_proof.lead4(t) : U32}, +ex: {b2 == utf8_proof.second_byte(x) : U32}, +ey: {b3 == utf8_proof.second_byte(y) : U32}, +ez: {b4 == utf8_proof.second_byte(z) : U32}) ->
+  {Laws.four_byte_shape(utf8_proof.dec4(b1, b2, b3, b4)) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}:
+  Equal.trans(Maybe<&1, U32 & U32 & U32 & U32>, Laws.four_byte_shape(utf8_proof.dec4(b1, b2, b3, b4)), Laws.four_byte_shape(utf8_proof.cp4(z, y, x, t)), Some{(b1, b2, b3, b4)},
+    Equal.cong(U32, Maybe<&1, U32 & U32 & U32 & U32>, v => Laws.four_byte_shape(v), utf8_proof.dec4(b1, b2, b3, b4), utf8_proof.cp4(z, y, x, t), utf8_proof.dec4_at(z, y, x, t, b1, b2, b3, b4, et, ex, ey, ez)),
+    utf8_proof.produced4_at(z, y, x, t, b1, b2, b3, b4, et, ex, ey, ez))
+
+def utf8_proof.dec_produces4(+b1: U32, +b2: U32, +b3: U32, +b4: U32, f: utf8_proof.Fields4(b1, b2, b3, b4)) ->
+  {Laws.four_byte_shape(utf8_proof.dec4(b1, b2, b3, b4)) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}:
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+x, f2) = f1
+  (+t, f3) = f2
+  (et, g0) = f3
+  (ex, g1) = g0
+  (ey, g2) = g1
+  utf8_proof.dec_produces4.eqs(z, y, x, t, b1, b2, b3, b4, et, ex, ey, g2)
+
+def utf8_proof.encode_decoded4(+b1: U32, +b2: U32, +b3: U32, +b4: U32, -valid: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool},
+  +produced: {Laws.four_byte_shape(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}) ->
+  Exists({UTF8.can_encode_as_four_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_four_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid), accepted) == (b1, b2, b3, b4) : U32 & U32 & U32 & U32}):
+  +cp = UTF8.decode_four_bytes(b1, b2, b3, b4, valid)
+  +accepted = Equal.trans(Bool, UTF8.can_encode_as_four_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(cp)), True{},
+    Laws.utf8_can_encode_as_four_bytes(cp),
+    Equal.cong(Maybe<&1, U32 & U32 & U32 & U32>, Bool, m => Maybe.is_some(&1, U32 & U32 & U32 & U32, m), Laws.four_byte_shape(cp), Some{(b1, b2, b3, b4)}, produced))
+  (accepted, Equal.cong(Maybe<&1, U32 & U32 & U32 & U32>, U32 & U32 & U32 & U32, m => Maybe.default(&1, U32 & U32 & U32 & U32, m, (0, 0, 0, 0)),
+    Some{UTF8.encode_as_four_bytes(cp, accepted)}, Some{(b1, b2, b3, b4)},
+    Equal.trans(Maybe<&1, U32 & U32 & U32 & U32>, Some{UTF8.encode_as_four_bytes(cp, accepted)}, Laws.four_byte_shape(cp), Some{(b1, b2, b3, b4)},
+      Laws.utf8_encode_as_four_bytes(cp, accepted), produced)))
+
+def utf8_proof.right4.l2(+b1: U32, +b2: U32, r: U32 & U32, +valid: {UTF8.has_four_byte_shape(Laws.four_bytes.first((b1, b2, r)), Laws.four_bytes.second((b1, b2, r)), Laws.four_bytes.third((b1, b2, r)), Laws.four_bytes.fourth((b1, b2, r))) == True{} : Bool}) ->
+  Exists({UTF8.can_encode_as_four_bytes(UTF8.decode_four_bytes(Laws.four_bytes.first((b1, b2, r)), Laws.four_bytes.second((b1, b2, r)), Laws.four_bytes.third((b1, b2, r)), Laws.four_bytes.fourth((b1, b2, r)), valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_four_bytes(UTF8.decode_four_bytes(Laws.four_bytes.first((b1, b2, r)), Laws.four_bytes.second((b1, b2, r)), Laws.four_bytes.third((b1, b2, r)), Laws.four_bytes.fourth((b1, b2, r)), valid), accepted) == (b1, b2, r) : U32 & U32 & U32 & U32}):
+  match r:
+    case (+b3, +b4):
+      utf8_proof.encode_decoded4(b1, b2, b3, b4, valid, utf8_proof.dec_produces4(b1, b2, b3, b4, utf8_proof.fields4(b1, b2, b3, b4, valid)))
+
+def utf8_proof.right4.l1(+b1: U32, r: U32 & U32 & U32, +valid: {UTF8.has_four_byte_shape(Laws.four_bytes.first((b1, r)), Laws.four_bytes.second((b1, r)), Laws.four_bytes.third((b1, r)), Laws.four_bytes.fourth((b1, r))) == True{} : Bool}) ->
+  Exists({UTF8.can_encode_as_four_bytes(UTF8.decode_four_bytes(Laws.four_bytes.first((b1, r)), Laws.four_bytes.second((b1, r)), Laws.four_bytes.third((b1, r)), Laws.four_bytes.fourth((b1, r)), valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_four_bytes(UTF8.decode_four_bytes(Laws.four_bytes.first((b1, r)), Laws.four_bytes.second((b1, r)), Laws.four_bytes.third((b1, r)), Laws.four_bytes.fourth((b1, r)), valid), accepted) == (b1, r) : U32 & U32 & U32 & U32}):
+  match r:
+    case (+b2, r2):
+      utf8_proof.right4.l2(b1, b2, r2, valid)
+
+def utf8_proof.right4.l0(r: U32 & U32 & U32 & U32, +valid: {UTF8.has_four_byte_shape(Laws.four_bytes.first(r), Laws.four_bytes.second(r), Laws.four_bytes.third(r), Laws.four_bytes.fourth(r)) == True{} : Bool}) ->
+  Exists({UTF8.can_encode_as_four_bytes(UTF8.decode_four_bytes(Laws.four_bytes.first(r), Laws.four_bytes.second(r), Laws.four_bytes.third(r), Laws.four_bytes.fourth(r), valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_four_bytes(UTF8.decode_four_bytes(Laws.four_bytes.first(r), Laws.four_bytes.second(r), Laws.four_bytes.third(r), Laws.four_bytes.fourth(r), valid), accepted) == r : U32 & U32 & U32 & U32}):
+  match r:
+    case (+b1, r2):
+      utf8_proof.right4.l1(b1, r2, valid)
+
+
+def Laws.utf8_four_byte_inverse():
+  (cp => +valid => utf8_proof.left4(cp, valid),
+   p => +valid => utf8_proof.right4.l0(p, valid))
+
+def utf8_proof.value4(+cp: U32) -> Bool:
+  Bool.and(Bool.not(UTF8.can_encode_as_three_bytes(cp)), UTF8.is_scalar(cp))
+
+def utf8_proof.valid4_if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, shape: Bool,
+  -checked: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == shape : Bool}, is_true: {shape == True{} : Bool}) ->
+  {UTF8.valid_four_bytes.if(b1, b2, b3, b4, shape, checked) == utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)) : Bool}:
+  match shape:
+    case False{}:
+      Empty.absurd({False{} == utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)) : Bool}, H.hex_u32.false_true(is_true))
+    case True{}: {==}
+
+def utf8_proof.valid4_value(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +accepted: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}) ->
+  {UTF8.valid_four_bytes(b1, b2, b3, b4) == utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)) : Bool}:
+  utf8_proof.valid4_if(b1, b2, b3, b4, UTF8.has_four_byte_shape(b1, b2, b3, b4), {==}, accepted)
+
+def utf8_proof.valid4_fields(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) ->
+  {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.value4(utf8_proof.cp4(z, y, x, t)) : Bool}:
+  %utf8_proof.dec4_fields(z, y, x, t) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.value4(_) : Bool}
+  utf8_proof.valid4_value(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z), utf8_proof.has4_fields(z, y, x, t))
+
+def utf8_proof.valid4_law_if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, shape: Bool, -checked: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == shape : Bool}) ->
+  {UTF8.valid_four_bytes.if(b1, b2, b3, b4, shape, checked) == Laws.valid_four_bytes.if(b1, b2, b3, b4, shape, checked) : Bool}:
+  match shape:
+    case False{}: {==}
+    case True{}:
+      Equal.cong(Bool, Bool, s => Bool.and(Bool.not(UTF8.overlong_four_bytes(b1, b2, b3, b4, checked)), s),
+        UTF8.is_scalar(UTF8.decode_four_bytes(b1, b2, b3, b4, checked)), Laws.is_unicode_scalar(UTF8.decode_four_bytes(b1, b2, b3, b4, checked)),
+        utf8_proof.scalar_agrees(UTF8.decode_four_bytes(b1, b2, b3, b4, checked)))
+
+def Laws.utf8_valid_four_bytes(b1, b2, b3, b4):
+  utf8_proof.valid4_law_if(b1, b2, b3, b4, UTF8.has_four_byte_shape(b1, b2, b3, b4), {==})
+
+
+# What validity depends on
+# -----------------------
+#
+# A three-byte sequence's validity depends only on the lead byte's
+# payload and the top bit of the second byte's payload.  For four bytes
+# it depends on the lead byte's payload and the second byte's top two
+# payload bits.
+
+def utf8_proof.H3(bit: Bool, t: Word(4n)) -> Word(21n):
+  WCon{bit, word_join(4n, t, 16n, Word.zero(16n))}
+
+def utf8_proof.model3(+bit: Bool, +t: Word(4n)) -> Bool:
+  Bool.and(Bool.not(Cmp.is_le(Word.cmp(21n, utf8_proof.H3(bit, t), Word.zero(21n)))),
+    Bool.not(Bool.and(Cmp.is_ge(Word.cmp(21n, utf8_proof.H3(bit, t), WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}})), Cmp.is_le(Word.cmp(21n, utf8_proof.H3(bit, t), WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}})))))
+
+def utf8_proof.H4(x4: Bool, x5: Bool, t: Word(3n)) -> Word(16n):
+  WCon{x4, WCon{x5, word_join(3n, t, 11n, Word.zero(11n))}}
+
+def utf8_proof.model4(+x4: Bool, +x5: Bool, +t: Word(3n)) -> Bool:
+  Bool.and(Bool.not(Cmp.is_le(Word.cmp(16n, utf8_proof.H4(x4, x5, t), Word.zero(16n)))),
+    Cmp.is_le(Word.cmp(16n, utf8_proof.H4(x4, x5, t), WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(11n)}}}}})))
+
+def utf8_proof.value3_model(+z: Word(6n), +y: Word(6n), +t: Word(4n)) ->
+  {utf8_proof.value3(utf8_proof.cp3(z, y, t)) == utf8_proof.model3(utf8_proof.bit5(y), t) : Bool}:
+  match z y t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WCon{t3, WNil{}}}}}:
+      %Equal.sym(Bool, Cmp.is_le(Word.cmp(32n, word_join(11n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WNil{}}}}}}}}}}}}, 21n, utf8_proof.H3(y5, t)), word_join(11n, word_ones(11n), 21n, Word.zero(21n)))), Cmp.is_le(Word.cmp(21n, utf8_proof.H3(y5, t), Word.zero(21n))), utf8_proof.word_le_ones(11n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WNil{}}}}}}}}}}}}, 21n, utf8_proof.H3(y5, t), Word.zero(21n))) :
+        {Bool.and(Bool.not(_), UTF8.is_scalar(utf8_proof.cp3(z, y, t))) == utf8_proof.model3(utf8_proof.bit5(y), t) : Bool}
+      %Equal.sym(Bool, Cmp.is_ge(Word.cmp(32n, word_join(11n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WNil{}}}}}}}}}}}}, 21n, utf8_proof.H3(y5, t)), word_join(11n, Word.zero(11n), 21n, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}}))), Cmp.is_ge(Word.cmp(21n, utf8_proof.H3(y5, t), WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}})), utf8_proof.word_ge_zeros(11n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WNil{}}}}}}}}}}}}, 21n, utf8_proof.H3(y5, t), WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}})) :
+        {Bool.and(Bool.not(Cmp.is_le(Word.cmp(21n, utf8_proof.H3(y5, t), Word.zero(21n)))), Bool.and(U32.is_le(utf8_proof.cp3(z, y, t), 1114111), Bool.not(Bool.and(_, U32.is_le(utf8_proof.cp3(z, y, t), 57343))))) == utf8_proof.model3(utf8_proof.bit5(y), t) : Bool}
+      %Equal.sym(Bool, Cmp.is_le(Word.cmp(32n, word_join(11n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WNil{}}}}}}}}}}}}, 21n, utf8_proof.H3(y5, t)), word_join(11n, word_ones(11n), 21n, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}}))), Cmp.is_le(Word.cmp(21n, utf8_proof.H3(y5, t), WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}})), utf8_proof.word_le_ones(11n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WNil{}}}}}}}}}}}}, 21n, utf8_proof.H3(y5, t), WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}})) :
+        {Bool.and(Bool.not(Cmp.is_le(Word.cmp(21n, utf8_proof.H3(y5, t), Word.zero(21n)))), Bool.and(U32.is_le(utf8_proof.cp3(z, y, t), 1114111), Bool.not(Bool.and(Cmp.is_ge(Word.cmp(21n, utf8_proof.H3(y5, t), WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, Word.zero(16n)}}}}})), _)))) == utf8_proof.model3(utf8_proof.bit5(y), t) : Bool}
+      {==}
+
+def utf8_proof.valid3_eq(+z: Word(6n), +y: Word(6n), +t: Word(4n)) ->
+  {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.model3(utf8_proof.bit5(y), t) : Bool}:
+  Equal.trans(Bool, UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.value3(utf8_proof.cp3(z, y, t)), utf8_proof.model3(utf8_proof.bit5(y), t),
+    utf8_proof.valid3_fields(z, y, t), utf8_proof.value3_model(z, y, t))
+
+def utf8_proof.value4_rows(+z0: Bool, +z1: Bool, +z2: Bool, +z3: Bool, +z4: Bool, +z5: Bool, +y0: Bool, +y1: Bool, +y2: Bool, +y3: Bool, +y4: Bool, +y5: Bool, +x0: Bool, +x1: Bool, +x2: Bool, +x3: Bool, +x4: Bool, +x5: Bool, +t0: Bool, +t1: Bool, +t2: Bool) ->
+  {Bool.and(Bool.not(Cmp.is_le(Word.cmp(16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), Word.zero(16n)))), Bool.and(Cmp.is_le(Word.cmp(16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(11n)}}}}})), Bool.not(Bool.and(U32.is_ge(utf8_proof.cp4(WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}}, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}}, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}}, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), 55296), U32.is_le(utf8_proof.cp4(WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}}, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}}, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}}, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), 57343))))) ==
+    utf8_proof.model4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}) : Bool}:
+  match x4 x5 t0 t1 t2:
+    case False{} False{} False{} False{} False{}: {==}
+    case False{} False{} False{} False{} True{}: {==}
+    case False{} False{} False{} True{} False{}: {==}
+    case False{} False{} False{} True{} True{}: {==}
+    case False{} False{} True{} False{} False{}: {==}
+    case False{} False{} True{} False{} True{}: {==}
+    case False{} False{} True{} True{} False{}: {==}
+    case False{} False{} True{} True{} True{}: {==}
+    case False{} True{} False{} False{} False{}: {==}
+    case False{} True{} False{} False{} True{}: {==}
+    case False{} True{} False{} True{} False{}: {==}
+    case False{} True{} False{} True{} True{}: {==}
+    case False{} True{} True{} False{} False{}: {==}
+    case False{} True{} True{} False{} True{}: {==}
+    case False{} True{} True{} True{} False{}: {==}
+    case False{} True{} True{} True{} True{}: {==}
+    case True{} False{} False{} False{} False{}: {==}
+    case True{} False{} False{} False{} True{}: {==}
+    case True{} False{} False{} True{} False{}: {==}
+    case True{} False{} False{} True{} True{}: {==}
+    case True{} False{} True{} False{} False{}: {==}
+    case True{} False{} True{} False{} True{}: {==}
+    case True{} False{} True{} True{} False{}: {==}
+    case True{} False{} True{} True{} True{}: {==}
+    case True{} True{} False{} False{} False{}: {==}
+    case True{} True{} False{} False{} True{}: {==}
+    case True{} True{} False{} True{} False{}: {==}
+    case True{} True{} False{} True{} True{}: {==}
+    case True{} True{} True{} False{} False{}: {==}
+    case True{} True{} True{} False{} True{}: {==}
+    case True{} True{} True{} True{} False{}: {==}
+    case True{} True{} True{} True{} True{}: {==}
+
+def utf8_proof.value4_model(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) ->
+  {utf8_proof.value4(utf8_proof.cp4(z, y, x, t)) == utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t) : Bool}:
+  match z y x t:
+    case WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}} WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}} WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WNil{}}}}:
+      %Equal.sym(Bool, Cmp.is_le(Word.cmp(32n, word_join(16n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WNil{}}}}}}}}}}}}}}}}}, 16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}})), word_join(16n, word_ones(16n), 16n, Word.zero(16n)))), Cmp.is_le(Word.cmp(16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), Word.zero(16n))), utf8_proof.word_le_ones(16n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WNil{}}}}}}}}}}}}}}}}}, 16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), Word.zero(16n))) :
+        {Bool.and(Bool.not(_), UTF8.is_scalar(utf8_proof.cp4(WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}}, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}}, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}}, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}))) == utf8_proof.model4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}) : Bool}
+      %Equal.sym(Bool, Cmp.is_le(Word.cmp(32n, word_join(16n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WNil{}}}}}}}}}}}}}}}}}, 16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}})), word_join(16n, word_ones(16n), 16n, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(11n)}}}}}))), Cmp.is_le(Word.cmp(16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(11n)}}}}})), utf8_proof.word_le_ones(16n, WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WNil{}}}}}}}}}}}}}}}}}, 16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, Word.zero(11n)}}}}})) :
+        {Bool.and(Bool.not(Cmp.is_le(Word.cmp(16n, utf8_proof.H4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}), Word.zero(16n)))), Bool.and(_, Bool.not(UTF8.is_surrogate(utf8_proof.cp4(WCon{z0, WCon{z1, WCon{z2, WCon{z3, WCon{z4, WCon{z5, WNil{}}}}}}}, WCon{y0, WCon{y1, WCon{y2, WCon{y3, WCon{y4, WCon{y5, WNil{}}}}}}}, WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}}, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}))))) == utf8_proof.model4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}) : Bool}
+      utf8_proof.value4_rows(z0, z1, z2, z3, z4, z5, y0, y1, y2, y3, y4, y5, x0, x1, x2, x3, x4, x5, t0, t1, t2)
+
+def utf8_proof.valid4_eq(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n)) ->
+  {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t) : Bool}:
+  Equal.trans(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.value4(utf8_proof.cp4(z, y, x, t)), utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t),
+    utf8_proof.valid4_fields(z, y, x, t), utf8_proof.value4_model(z, y, x, t))
+
+def utf8_proof.any3_last.at(+z: Word(6n), +y: Word(6n), +t: Word(4n), v: {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == True{} : Bool}) -> {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), 128) == True{} : Bool}:
+  Equal.trans(Bool, UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), 128), utf8_proof.model3(utf8_proof.bit5(y), t), True{}, utf8_proof.valid3_eq(WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, y, t),
+    Equal.trans(Bool, utf8_proof.model3(utf8_proof.bit5(y), t), UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), True{},
+      Equal.sym(Bool, UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.model3(utf8_proof.bit5(y), t), utf8_proof.valid3_eq(z, y, t)), v))
+
+def utf8_proof.any3_last.eqs(+z: Word(6n), +y: Word(6n), +t: Word(4n), +b1: U32, +b2: U32, +b3: U32, +et: {b1 == utf8_proof.lead3(t) : U32}, +ey: {b2 == utf8_proof.second_byte(y) : U32}, +ez: {b3 == utf8_proof.second_byte(z) : U32}) -> {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool} -> {UTF8.valid_three_bytes(b1, b2, 128) == True{} : Bool}:
+  %Equal.sym(U32, b1, utf8_proof.lead3(t), et) : {UTF8.valid_three_bytes(_, b2, b3) == True{} : Bool} -> {UTF8.valid_three_bytes(_, b2, 128) == True{} : Bool}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(y), ey) : {UTF8.valid_three_bytes(utf8_proof.lead3(t), _, b3) == True{} : Bool} -> {UTF8.valid_three_bytes(utf8_proof.lead3(t), _, 128) == True{} : Bool}
+  %Equal.sym(U32, b3, utf8_proof.second_byte(z), ez) : {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), _) == True{} : Bool} -> {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), 128) == True{} : Bool}
+  v => utf8_proof.any3_last.at(z, y, t, v)
+
+
+def utf8_proof.any3_last.fields(+b1: U32, +b2: U32, +b3: U32, f: utf8_proof.Fields3(b1, b2, b3)) -> {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool} -> {UTF8.valid_three_bytes(b1, b2, 128) == True{} : Bool}:
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+t, f2) = f1
+  (et, g0) = f2
+  (ey, g1) = g0
+  utf8_proof.any3_last.eqs(z, y, t, b1, b2, b3, et, ey, g1)
+
+def utf8_proof.any3_last(+b1: U32, +b2: U32, +b3: U32, +valid: {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool}) -> {UTF8.valid_three_bytes(b1, b2, 128) == True{} : Bool}:
+  utf8_proof.any3_last.fields(b1, b2, b3, utf8_proof.fields3(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, valid)), valid)
+
+def utf8_proof.any3_mid.case(bit: Bool, +t: Word(4n), m: {utf8_proof.model3(bit, t) == True{} : Bool}) -> Or({UTF8.valid_three_bytes(utf8_proof.lead3(t), 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(utf8_proof.lead3(t), 191, 128) == True{} : Bool}):
+  match bit:
+    case False{}: Inl{Equal.trans(Bool, UTF8.valid_three_bytes(utf8_proof.lead3(t), 128, 128), utf8_proof.model3(False{}, t), True{}, utf8_proof.valid3_eq(WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, t), m)}
+    case True{}: Inr{Equal.trans(Bool, UTF8.valid_three_bytes(utf8_proof.lead3(t), 191, 128), utf8_proof.model3(True{}, t), True{}, utf8_proof.valid3_eq(WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}}, t), m)}
+
+def utf8_proof.any3_mid.at(+z: Word(6n), +y: Word(6n), +t: Word(4n), v: {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == True{} : Bool}) -> Or({UTF8.valid_three_bytes(utf8_proof.lead3(t), 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(utf8_proof.lead3(t), 191, 128) == True{} : Bool}):
+  utf8_proof.any3_mid.case(utf8_proof.bit5(y), t,
+    Equal.trans(Bool, utf8_proof.model3(utf8_proof.bit5(y), t), UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), True{},
+      Equal.sym(Bool, UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.model3(utf8_proof.bit5(y), t), utf8_proof.valid3_eq(z, y, t)), v))
+
+def utf8_proof.any3_mid.eqs(+z: Word(6n), +y: Word(6n), +t: Word(4n), +b1: U32, +b2: U32, +b3: U32, +et: {b1 == utf8_proof.lead3(t) : U32}, +ey: {b2 == utf8_proof.second_byte(y) : U32}, +ez: {b3 == utf8_proof.second_byte(z) : U32}) -> {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool} -> Or({UTF8.valid_three_bytes(b1, 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(b1, 191, 128) == True{} : Bool}):
+  %Equal.sym(U32, b1, utf8_proof.lead3(t), et) : {UTF8.valid_three_bytes(_, b2, b3) == True{} : Bool} -> Or({UTF8.valid_three_bytes(_, 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(_, 191, 128) == True{} : Bool})
+  %Equal.sym(U32, b2, utf8_proof.second_byte(y), ey) : {UTF8.valid_three_bytes(utf8_proof.lead3(t), _, b3) == True{} : Bool} -> Or({UTF8.valid_three_bytes(utf8_proof.lead3(t), 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(utf8_proof.lead3(t), 191, 128) == True{} : Bool})
+  %Equal.sym(U32, b3, utf8_proof.second_byte(z), ez) : {UTF8.valid_three_bytes(utf8_proof.lead3(t), utf8_proof.second_byte(y), _) == True{} : Bool} -> Or({UTF8.valid_three_bytes(utf8_proof.lead3(t), 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(utf8_proof.lead3(t), 191, 128) == True{} : Bool})
+  v => utf8_proof.any3_mid.at(z, y, t, v)
+
+
+def utf8_proof.any3_mid.fields(+b1: U32, +b2: U32, +b3: U32, f: utf8_proof.Fields3(b1, b2, b3)) -> {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool} -> Or({UTF8.valid_three_bytes(b1, 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(b1, 191, 128) == True{} : Bool}):
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+t, f2) = f1
+  (et, g0) = f2
+  (ey, g1) = g0
+  utf8_proof.any3_mid.eqs(z, y, t, b1, b2, b3, et, ey, g1)
+
+def utf8_proof.any3_mid(+b1: U32, +b2: U32, +b3: U32, +valid: {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool}) -> Or({UTF8.valid_three_bytes(b1, 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(b1, 191, 128) == True{} : Bool}):
+  utf8_proof.any3_mid.fields(b1, b2, b3, utf8_proof.fields3(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, valid)), valid)
+
+def utf8_proof.any4_last.at(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), v: {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == True{} : Bool}) -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), 128) == True{} : Bool}:
+  Equal.trans(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), 128), utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), True{}, utf8_proof.valid4_eq(WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, y, x, t),
+    Equal.trans(Bool, utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), True{},
+      Equal.sym(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), utf8_proof.valid4_eq(z, y, x, t)), v))
+
+def utf8_proof.any4_last.eqs(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), +b1: U32, +b2: U32, +b3: U32, +b4: U32, +et: {b1 == utf8_proof.lead4(t) : U32}, +ex: {b2 == utf8_proof.second_byte(x) : U32}, +ey: {b3 == utf8_proof.second_byte(y) : U32}, +ez: {b4 == utf8_proof.second_byte(z) : U32}) -> {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(b1, b2, b3, 128) == True{} : Bool}:
+  %Equal.sym(U32, b1, utf8_proof.lead4(t), et) : {UTF8.valid_four_bytes(_, b2, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(_, b2, b3, 128) == True{} : Bool}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(x), ex) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), _, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), _, b3, 128) == True{} : Bool}
+  %Equal.sym(U32, b3, utf8_proof.second_byte(y), ey) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), _, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), _, 128) == True{} : Bool}
+  %Equal.sym(U32, b4, utf8_proof.second_byte(z), ez) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), _) == True{} : Bool} -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), 128) == True{} : Bool}
+  v => utf8_proof.any4_last.at(z, y, x, t, v)
+
+
+def utf8_proof.any4_last.fields(+b1: U32, +b2: U32, +b3: U32, +b4: U32, f: utf8_proof.Fields4(b1, b2, b3, b4)) -> {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(b1, b2, b3, 128) == True{} : Bool}:
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+x, f2) = f1
+  (+t, f3) = f2
+  (et, g0) = f3
+  (ex, g1) = g0
+  (ey, g2) = g1
+  utf8_proof.any4_last.eqs(z, y, x, t, b1, b2, b3, b4, et, ex, ey, g2)
+
+def utf8_proof.any4_last(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +valid: {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool}) -> {UTF8.valid_four_bytes(b1, b2, b3, 128) == True{} : Bool}:
+  utf8_proof.any4_last.fields(b1, b2, b3, b4, utf8_proof.fields4(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, valid)), valid)
+
+def utf8_proof.any4_third.at(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), v: {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == True{} : Bool}) -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), 128, 128) == True{} : Bool}:
+  Equal.trans(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), 128, 128), utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), True{}, utf8_proof.valid4_eq(WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, x, t),
+    Equal.trans(Bool, utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), True{},
+      Equal.sym(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), utf8_proof.valid4_eq(z, y, x, t)), v))
+
+def utf8_proof.any4_third.eqs(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), +b1: U32, +b2: U32, +b3: U32, +b4: U32, +et: {b1 == utf8_proof.lead4(t) : U32}, +ex: {b2 == utf8_proof.second_byte(x) : U32}, +ey: {b3 == utf8_proof.second_byte(y) : U32}, +ez: {b4 == utf8_proof.second_byte(z) : U32}) -> {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(b1, b2, 128, 128) == True{} : Bool}:
+  %Equal.sym(U32, b1, utf8_proof.lead4(t), et) : {UTF8.valid_four_bytes(_, b2, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(_, b2, 128, 128) == True{} : Bool}
+  %Equal.sym(U32, b2, utf8_proof.second_byte(x), ex) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), _, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), _, 128, 128) == True{} : Bool}
+  %Equal.sym(U32, b3, utf8_proof.second_byte(y), ey) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), _, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), 128, 128) == True{} : Bool}
+  %Equal.sym(U32, b4, utf8_proof.second_byte(z), ez) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), _) == True{} : Bool} -> {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), 128, 128) == True{} : Bool}
+  v => utf8_proof.any4_third.at(z, y, x, t, v)
+
+
+def utf8_proof.any4_third.fields(+b1: U32, +b2: U32, +b3: U32, +b4: U32, f: utf8_proof.Fields4(b1, b2, b3, b4)) -> {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool} -> {UTF8.valid_four_bytes(b1, b2, 128, 128) == True{} : Bool}:
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+x, f2) = f1
+  (+t, f3) = f2
+  (et, g0) = f3
+  (ex, g1) = g0
+  (ey, g2) = g1
+  utf8_proof.any4_third.eqs(z, y, x, t, b1, b2, b3, b4, et, ex, ey, g2)
+
+def utf8_proof.any4_third(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +valid: {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool}) -> {UTF8.valid_four_bytes(b1, b2, 128, 128) == True{} : Bool}:
+  utf8_proof.any4_third.fields(b1, b2, b3, b4, utf8_proof.fields4(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, valid)), valid)
+
+def utf8_proof.any4_mid.Or(+t: Word(3n)) -> Type:
+  Or({utf8_proof.model4(False{}, False{}, t) == True{} : Bool}, {utf8_proof.model4(True{}, True{}, t) == True{} : Bool})
+
+def utf8_proof.any4_mid.rows(+x4: Bool, +x5: Bool, +t0: Bool, +t1: Bool, +t2: Bool,
+  v: {utf8_proof.model4(x4, x5, WCon{t0, WCon{t1, WCon{t2, WNil{}}}}) == True{} : Bool}) -> utf8_proof.any4_mid.Or(WCon{t0, WCon{t1, WCon{t2, WNil{}}}}):
+  match x4 x5 t0 t1 t2:
+    case False{} False{} False{} False{} False{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} True{}: Inl{{==}}
+    case False{} False{} False{} True{} False{}: Inl{{==}}
+    case False{} False{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} False{} True{} False{} False{}: Inl{{==}}
+    case False{} False{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} False{} True{} True{} False{}: Inl{{==}}
+    case False{} False{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} False{} False{} False{}: Inr{{==}}
+    case False{} True{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} False{} True{} False{}: Inl{{==}}
+    case False{} True{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} True{} False{} False{}: Inl{{==}}
+    case False{} True{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case False{} True{} True{} True{} False{}: Inl{{==}}
+    case False{} True{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} False{} False{} False{}: Inr{{==}}
+    case True{} False{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} False{} True{} False{}: Inl{{==}}
+    case True{} False{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} True{} False{} False{}: Inl{{==}}
+    case True{} False{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} False{} True{} True{} False{}: Inl{{==}}
+    case True{} False{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} False{} False{} False{}: Inr{{==}}
+    case True{} True{} False{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} False{} True{} False{}: Inl{{==}}
+    case True{} True{} False{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} True{} False{} False{}: Inl{{==}}
+    case True{} True{} True{} False{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+    case True{} True{} True{} True{} False{}: Inl{{==}}
+    case True{} True{} True{} True{} True{}: Empty.absurd(utf8_proof.any4_mid.Or(WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}), H.hex_u32.false_true(v))
+
+def utf8_proof.any4_mid.split(+x: Word(6n), +t: Word(3n), v: {utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t) == True{} : Bool}) -> utf8_proof.any4_mid.Or(t):
+  match x t:
+    case WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WNil{}}}}}}} WCon{t0, WCon{t1, WCon{t2, WNil{}}}}:
+      utf8_proof.any4_mid.rows(x4, x5, t0, t1, t2, v)
+
+def utf8_proof.any4_mid.pick(+t: Word(3n), o: utf8_proof.any4_mid.Or(t)) ->
+  Or({UTF8.valid_four_bytes(utf8_proof.lead4(t), 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(utf8_proof.lead4(t), 191, 128, 128) == True{} : Bool}):
+  match o:
+    case Inl{m}: Inl{Equal.trans(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), 128, 128, 128), utf8_proof.model4(False{}, False{}, t), True{}, utf8_proof.valid4_eq(WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, t), m)}
+    case Inr{m}: Inr{Equal.trans(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), 191, 128, 128), utf8_proof.model4(True{}, True{}, t), True{}, utf8_proof.valid4_eq(WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}}, t), m)}
+
+
+def utf8_proof.any4_mid.at(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), v: {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)) == True{} : Bool}) -> Or({UTF8.valid_four_bytes(utf8_proof.lead4(t), 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(utf8_proof.lead4(t), 191, 128, 128) == True{} : Bool}):
+  utf8_proof.any4_mid.pick(t, utf8_proof.any4_mid.split(x, t, Equal.trans(Bool, utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), True{},
+      Equal.sym(Bool, UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), utf8_proof.second_byte(z)), utf8_proof.model4(utf8_proof.bit4(x), utf8_proof.bit5(x), t), utf8_proof.valid4_eq(z, y, x, t)), v)))
+
+def utf8_proof.any4_mid.eqs(+z: Word(6n), +y: Word(6n), +x: Word(6n), +t: Word(3n), +b1: U32, +b2: U32, +b3: U32, +b4: U32, +et: {b1 == utf8_proof.lead4(t) : U32}, +ex: {b2 == utf8_proof.second_byte(x) : U32}, +ey: {b3 == utf8_proof.second_byte(y) : U32}, +ez: {b4 == utf8_proof.second_byte(z) : U32}) -> {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool} -> Or({UTF8.valid_four_bytes(b1, 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(b1, 191, 128, 128) == True{} : Bool}):
+  %Equal.sym(U32, b1, utf8_proof.lead4(t), et) : {UTF8.valid_four_bytes(_, b2, b3, b4) == True{} : Bool} -> Or({UTF8.valid_four_bytes(_, 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(_, 191, 128, 128) == True{} : Bool})
+  %Equal.sym(U32, b2, utf8_proof.second_byte(x), ex) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), _, b3, b4) == True{} : Bool} -> Or({UTF8.valid_four_bytes(utf8_proof.lead4(t), 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(utf8_proof.lead4(t), 191, 128, 128) == True{} : Bool})
+  %Equal.sym(U32, b3, utf8_proof.second_byte(y), ey) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), _, b4) == True{} : Bool} -> Or({UTF8.valid_four_bytes(utf8_proof.lead4(t), 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(utf8_proof.lead4(t), 191, 128, 128) == True{} : Bool})
+  %Equal.sym(U32, b4, utf8_proof.second_byte(z), ez) : {UTF8.valid_four_bytes(utf8_proof.lead4(t), utf8_proof.second_byte(x), utf8_proof.second_byte(y), _) == True{} : Bool} -> Or({UTF8.valid_four_bytes(utf8_proof.lead4(t), 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(utf8_proof.lead4(t), 191, 128, 128) == True{} : Bool})
+  v => utf8_proof.any4_mid.at(z, y, x, t, v)
+
+
+def utf8_proof.any4_mid.fields(+b1: U32, +b2: U32, +b3: U32, +b4: U32, f: utf8_proof.Fields4(b1, b2, b3, b4)) -> {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool} -> Or({UTF8.valid_four_bytes(b1, 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(b1, 191, 128, 128) == True{} : Bool}):
+  (+z, f0) = f
+  (+y, f1) = f0
+  (+x, f2) = f1
+  (+t, f3) = f2
+  (et, g0) = f3
+  (ex, g1) = g0
+  (ey, g2) = g1
+  utf8_proof.any4_mid.eqs(z, y, x, t, b1, b2, b3, b4, et, ex, ey, g2)
+
+def utf8_proof.any4_mid(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +valid: {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool}) -> Or({UTF8.valid_four_bytes(b1, 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(b1, 191, 128, 128) == True{} : Bool}):
+  utf8_proof.any4_mid.fields(b1, b2, b3, b4, utf8_proof.fields4(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, valid)), valid)
+
+def utf8_proof.mono12_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool, v: {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 127) == True{} : Bool}) -> {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}:
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      utf8_proof.word_le_ones(11n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}}}}}}}, 21n, Word.zero(21n), Word.zero(21n))
+
+def utf8_proof.mono12(+cp: U32, v: {U32.is_le(cp, 127) == True{} : Bool}) -> {U32.is_le(cp, 2047) == True{} : Bool}:
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.mono12_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, v)
+
+def utf8_proof.mono23_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool, v: {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 2047) == True{} : Bool}) -> {U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}:
+  match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16:
+    case True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _ _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} _: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{}: Empty.absurd({U32.is_le(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}, 65535) == True{} : Bool}, H.hex_u32.false_true(v))
+    case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
+      utf8_proof.word_le_ones(16n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WNil{}}}}}}}}}}}}}}}}}, 16n, Word.zero(16n), Word.zero(16n))
+
+def utf8_proof.mono23(+cp: U32, v: {U32.is_le(cp, 2047) == True{} : Bool}) -> {U32.is_le(cp, 65535) == True{} : Bool}:
+  match cp:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      utf8_proof.mono23_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, v)
+
+# When `a` implies `b`, `a || b` is just `b`.
+def utf8_proof.or_implied(a: Bool, +b: Bool, f: {a == True{} : Bool} -> {b == True{} : Bool}) ->
+  {b == Bool.or(a, b) : Bool}:
+  match a:
+    case False{}: {==}
+    case True{}: f({==})
+
+# The implementation tests only the next shorter capacity; the laws
+# state every shorter one, and the capacities nest.
+def Laws.utf8_overlong_three_bytes(b1, b2, b3, valid):
+  utf8_proof.or_implied(UTF8.can_encode_as_one_byte(UTF8.decode_three_bytes(b1, b2, b3, valid)), UTF8.can_encode_as_two_bytes(UTF8.decode_three_bytes(b1, b2, b3, valid)),
+    c => utf8_proof.mono12(UTF8.decode_three_bytes(b1, b2, b3, valid), c))
+
+def Laws.utf8_overlong_four_bytes(b1, b2, b3, b4, valid):
+  utf8_proof.or_implied(Bool.or(UTF8.can_encode_as_one_byte(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)), UTF8.can_encode_as_two_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid))), UTF8.can_encode_as_three_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)),
+    e => utf8_proof.mono23(UTF8.decode_four_bytes(b1, b2, b3, b4, valid),
+      Equal.trans(Bool, UTF8.can_encode_as_two_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)), Bool.or(UTF8.can_encode_as_one_byte(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)), UTF8.can_encode_as_two_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid))), True{},
+        utf8_proof.or_implied(UTF8.can_encode_as_one_byte(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)), UTF8.can_encode_as_two_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid)), c => utf8_proof.mono12(UTF8.decode_four_bytes(b1, b2, b3, b4, valid), c)), e)))
+
+# Which sequence length a lead byte belongs to
+# --------------------------------------------
+
+def utf8_proof.kind.if(t: Bool, yes: Nat, no: Nat) -> Nat:
+  match t:
+    case True{}: yes
+    case False{}: no
+
+def utf8_proof.kind(+b: U32) -> Nat:
+  utf8_proof.kind.if(U32.is_le(b, 127), 1n, utf8_proof.kind.if(B.byte_mask("110xxxxx", b, {==}), 2n, utf8_proof.kind.if(B.byte_mask("1110xxxx", b, {==}), 3n, 4n)))
+
+def utf8_proof.kind_lead2(+t: Word(5n)) -> {utf8_proof.kind(utf8_proof.first_byte(t)) == 2n : Nat}:
+  match t:
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+
+def utf8_proof.kind_lead3(+t: Word(4n)) -> {utf8_proof.kind(utf8_proof.lead3(t)) == 3n : Nat}:
+  match t:
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}: {==}
+
+def utf8_proof.kind_lead4(+t: Word(3n)) -> {utf8_proof.kind(utf8_proof.lead4(t)) == 4n : Nat}:
+  match t:
+    case WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}: {==}
+    case WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}: {==}
+
+def utf8_proof.valid_kind1(+b: U32, v: {UTF8.valid_one_byte(b) == True{} : Bool}) -> {utf8_proof.kind(b) == 1n : Nat}:
+  %Equal.sym(Bool, U32.is_le(b, 127), True{}, v) :
+    {utf8_proof.kind.if(_, 1n, utf8_proof.kind.if(B.byte_mask("110xxxxx", b, {==}), 2n, utf8_proof.kind.if(B.byte_mask("1110xxxx", b, {==}), 3n, 4n))) == 1n : Nat}
+  {==}
+
+def utf8_proof.valid_kind2.pay(+b1: U32, p: Exists(Word(5n), high => {b1 == utf8_proof.first_byte(high) : U32})) -> {utf8_proof.kind(b1) == 2n : Nat}:
+  (+high, e) = p
+  %Equal.sym(U32, b1, utf8_proof.first_byte(high), e) : {utf8_proof.kind(_) == 2n : Nat}
+  utf8_proof.kind_lead2(high)
+
+def utf8_proof.valid_kind2(+b1: U32, +b2: U32, +v: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}) -> {utf8_proof.kind(b1) == 2n : Nat}:
+  utf8_proof.valid_kind2.pay(b1, utf8_proof.first_payload(b1, bool_and_left_true(B.byte_mask("110xxxxx", b1, {==}), B.byte_mask("10xxxxxx", b2, {==}),
+    UTF8.valid_two_bytes.has_shape(b1, b2, v))))
+
+def utf8_proof.valid_kind3.at(+b1: U32, +b2: U32, +b3: U32, +t: Word(4n), +et: {b1 == utf8_proof.lead3(t) : U32}) -> {utf8_proof.kind(b1) == 3n : Nat}:
+  %Equal.sym(U32, b1, utf8_proof.lead3(t), et) : {utf8_proof.kind(_) == 3n : Nat}
+  utf8_proof.kind_lead3(t)
+
+def utf8_proof.valid_kind3.fields(+b1: U32, +b2: U32, +b3: U32, f: utf8_proof.Fields3(b1, b2, b3)) -> {utf8_proof.kind(b1) == 3n : Nat}:
+  (z, f0) = f
+  (y, f1) = f0
+  (+t, f2) = f1
+  (et, g0) = f2
+  utf8_proof.valid_kind3.at(b1, b2, b3, t, et)
+
+def utf8_proof.valid_kind3(+b1: U32, +b2: U32, +b3: U32, +v: {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool}) -> {utf8_proof.kind(b1) == 3n : Nat}:
+  utf8_proof.valid_kind3.fields(b1, b2, b3, utf8_proof.fields3(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, v)))
+
+def utf8_proof.valid_kind4.at(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +t: Word(3n), +et: {b1 == utf8_proof.lead4(t) : U32}) -> {utf8_proof.kind(b1) == 4n : Nat}:
+  %Equal.sym(U32, b1, utf8_proof.lead4(t), et) : {utf8_proof.kind(_) == 4n : Nat}
+  utf8_proof.kind_lead4(t)
+
+def utf8_proof.valid_kind4.fields(+b1: U32, +b2: U32, +b3: U32, +b4: U32, f: utf8_proof.Fields4(b1, b2, b3, b4)) -> {utf8_proof.kind(b1) == 4n : Nat}:
+  (z, f0) = f
+  (y, f1) = f0
+  (x, f2) = f1
+  (+t, f3) = f2
+  (et, g0) = f3
+  utf8_proof.valid_kind4.at(b1, b2, b3, b4, t, et)
+
+def utf8_proof.valid_kind4(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +v: {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool}) -> {utf8_proof.kind(b1) == 4n : Nat}:
+  utf8_proof.valid_kind4.fields(b1, b2, b3, b4, utf8_proof.fields4(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, v)))
+
 # Streaming decoder
 # =================
 
@@ -2666,49 +4239,130 @@ def PrefixCompletion(+seq: List<&2, U32>) -> Type:
   Exists(List<&2, U32>, rest =>
     {Laws.is_valid_sequence(List.append(&2, U32, seq, rest)) == True{} : Bool})
 
-# A single byte that is a valid sequence prefix is either valid by
-# itself, or completed by 0x80.
-def utf8_proof.prefix_one(+b1: U32, one: Bool,
-  checked: {UTF8.valid_one_byte(b1) == one : Bool},
-  begins: {Bool.or(one, UTF8.valid_two_bytes(b1, 128)) == True{} : Bool}) ->
-  PrefixCompletion([b1]):
-  match one:
-    case True{}: (Nil{}, checked)
-    case False{}: ([128], begins)
+# `||` chains
+# -----------
 
+def utf8_proof.or_left(+a: Bool, -b: Bool, e: {a == True{} : Bool}) -> {Bool.or(a, b) == True{} : Bool}:
+  %Equal.sym(Bool, a, True{}, e) : {Bool.or(_, b) == True{} : Bool}
+  {==}
+
+def utf8_proof.or_right(+a: Bool, +b: Bool, e: {b == True{} : Bool}) -> {Bool.or(a, b) == True{} : Bool}:
+  %Equal.sym(Bool, b, True{}, e) : {Bool.or(a, _) == True{} : Bool}
+  bool_or_true(a)
+
+def utf8_proof.OrT6(+a0: Bool, +a1: Bool, +a2: Bool, +a3: Bool, +a4: Bool, +a5: Bool) -> Type:
+  Or({a0 == True{} : Bool}, Or({a1 == True{} : Bool}, Or({a2 == True{} : Bool}, Or({a3 == True{} : Bool}, Or({a4 == True{} : Bool}, {a5 == True{} : Bool})))))
+
+def utf8_proof.or_split6(+a0: Bool, +a1: Bool, +a2: Bool, +a3: Bool, +a4: Bool, +a5: Bool, e: {Bool.or(Bool.or(Bool.or(Bool.or(Bool.or(a0, a1), a2), a3), a4), a5) == True{} : Bool}) -> utf8_proof.OrT6(a0, a1, a2, a3, a4, a5):
+  match a0 a1 a2 a3 a4 a5:
+    case True{} _ _ _ _ _: Inl{{==}}
+    case False{} True{} _ _ _ _: Inr{Inl{{==}}}
+    case False{} False{} True{} _ _ _: Inr{Inr{Inl{{==}}}}
+    case False{} False{} False{} True{} _ _: Inr{Inr{Inr{Inl{{==}}}}}
+    case False{} False{} False{} False{} True{} _: Inr{Inr{Inr{Inr{Inl{{==}}}}}}
+    case False{} False{} False{} False{} False{} True{}: Inr{Inr{Inr{Inr{Inr{{==}}}}}}
+    case False{} False{} False{} False{} False{} False{}: Empty.absurd(utf8_proof.OrT6(False{}, False{}, False{}, False{}, False{}, False{}), H.hex_u32.false_true(e))
+
+def utf8_proof.OrT3(+a0: Bool, +a1: Bool, +a2: Bool) -> Type:
+  Or({a0 == True{} : Bool}, Or({a1 == True{} : Bool}, {a2 == True{} : Bool}))
+
+def utf8_proof.or_split3(+a0: Bool, +a1: Bool, +a2: Bool, e: {Bool.or(Bool.or(a0, a1), a2) == True{} : Bool}) -> utf8_proof.OrT3(a0, a1, a2):
+  match a0 a1 a2:
+    case True{} _ _: Inl{{==}}
+    case False{} True{} _: Inr{Inl{{==}}}
+    case False{} False{} True{}: Inr{Inr{{==}}}
+    case False{} False{} False{}: Empty.absurd(utf8_proof.OrT3(False{}, False{}, False{}), H.hex_u32.false_true(e))
+
+def utf8_proof.OrT2(+a0: Bool, +a1: Bool) -> Type:
+  Or({a0 == True{} : Bool}, {a1 == True{} : Bool})
+
+def utf8_proof.or_split2(+a0: Bool, +a1: Bool, e: {Bool.or(a0, a1) == True{} : Bool}) -> utf8_proof.OrT2(a0, a1):
+  match a0 a1:
+    case True{} _: Inl{{==}}
+    case False{} True{}: Inr{{==}}
+    case False{} False{}: Empty.absurd(utf8_proof.OrT2(False{}, False{}), H.hex_u32.false_true(e))
+
+def utf8_proof.prefix.of1(+b1: U32, o: utf8_proof.OrT6(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128), UTF8.valid_three_bytes(b1, 128, 128), UTF8.valid_three_bytes(b1, 191, 128), UTF8.valid_four_bytes(b1, 128, 128, 128), UTF8.valid_four_bytes(b1, 191, 128, 128))) -> PrefixCompletion([b1]):
+  match o:
+    case Inl{e}: (Nil{}, e)
+    case Inr{Inl{e}}: ([128], e)
+    case Inr{Inr{Inl{e}}}: ([128, 128], e)
+    case Inr{Inr{Inr{Inl{e}}}}: ([191, 128], e)
+    case Inr{Inr{Inr{Inr{Inl{e}}}}}: ([128, 128, 128], e)
+    case Inr{Inr{Inr{Inr{Inr{e}}}}}: ([191, 128, 128], e)
+
+def utf8_proof.prefix.of2(+b1: U32, +b2: U32, o: utf8_proof.OrT3(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128), UTF8.valid_four_bytes(b1, b2, 128, 128))) -> PrefixCompletion([b1, b2]):
+  match o:
+    case Inl{e}: (Nil{}, e)
+    case Inr{Inl{e}}: ([128], e)
+    case Inr{Inr{e}}: ([128, 128], e)
+
+def utf8_proof.prefix.of3(+b1: U32, +b2: U32, +b3: U32, o: utf8_proof.OrT2(UTF8.valid_three_bytes(b1, b2, b3), UTF8.valid_four_bytes(b1, b2, b3, 128))) -> PrefixCompletion([b1, b2, b3]):
+  match o:
+    case Inl{e}: (Nil{}, e)
+    case Inr{e}: ([128], e)
+
+# A valid sequence prefix is completed by the bytes that the prefix test tried.
 def utf8_proof.prefix_completion(+seq: List<&2, U32>,
   begins: {UTF8.is_valid_sequence_prefix(seq) == True{} : Bool}) -> PrefixCompletion(seq):
   match seq:
     case Nil{}:
       Empty.absurd(PrefixCompletion(Nil{}), H.hex_u32.false_true(begins))
     case +b1 <> Nil{}:
-      utf8_proof.prefix_one(b1, UTF8.valid_one_byte(b1), {==}, begins)
+      utf8_proof.prefix.of1(b1, utf8_proof.or_split6(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128), UTF8.valid_three_bytes(b1, 128, 128), UTF8.valid_three_bytes(b1, 191, 128), UTF8.valid_four_bytes(b1, 128, 128, 128), UTF8.valid_four_bytes(b1, 191, 128, 128), begins))
     case +b1 <> +b2 <> Nil{}:
+      utf8_proof.prefix.of2(b1, b2, utf8_proof.or_split3(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128), UTF8.valid_four_bytes(b1, b2, 128, 128), begins))
+    case +b1 <> +b2 <> +b3 <> Nil{}:
+      utf8_proof.prefix.of3(b1, b2, b3, utf8_proof.or_split2(UTF8.valid_three_bytes(b1, b2, b3), UTF8.valid_four_bytes(b1, b2, b3, 128), begins))
+    case +b1 <> +b2 <> +b3 <> +b4 <> Nil{}:
       (Nil{}, begins)
-    case b1 <> b2 <> b3 <> rest:
-      Empty.absurd(PrefixCompletion(b1 <> b2 <> b3 <> rest), H.hex_u32.false_true(begins))
+    case b1 <> b2 <> b3 <> b4 <> b5 <> rest:
+      Empty.absurd(PrefixCompletion(b1 <> b2 <> b3 <> b4 <> b5 <> rest), H.hex_u32.false_true(begins))
+
+def utf8_proof.prefix.mid3(+b1: U32, o: Or({UTF8.valid_three_bytes(b1, 128, 128) == True{} : Bool}, {UTF8.valid_three_bytes(b1, 191, 128) == True{} : Bool})) -> {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool}:
+  match o:
+    case Inl{e}: utf8_proof.or_left(Bool.or(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128)), UTF8.valid_four_bytes(b1, 191, 128, 128), utf8_proof.or_left(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128), utf8_proof.or_left(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128), utf8_proof.or_right(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128), e))))
+    case Inr{e}: utf8_proof.or_left(Bool.or(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128)), UTF8.valid_four_bytes(b1, 191, 128, 128), utf8_proof.or_left(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128), utf8_proof.or_right(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128), e)))
+
+def utf8_proof.prefix.mid4(+b1: U32, o: Or({UTF8.valid_four_bytes(b1, 128, 128, 128) == True{} : Bool}, {UTF8.valid_four_bytes(b1, 191, 128, 128) == True{} : Bool})) -> {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool}:
+  match o:
+    case Inl{e}: utf8_proof.or_left(Bool.or(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128)), UTF8.valid_four_bytes(b1, 191, 128, 128), utf8_proof.or_right(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128), e))
+    case Inr{e}: utf8_proof.or_right(Bool.or(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128)), UTF8.valid_four_bytes(b1, 191, 128, 128), e)
 
 def utf8_proof.prefix_from_valid(+b1: U32, +more: List<&2, U32>, +rest: List<&2, U32>,
   valid: {Laws.is_valid_sequence(List.append(&2, U32, b1 <> more, rest)) == True{} : Bool}) ->
   {UTF8.is_valid_sequence_prefix(b1 <> more) == True{} : Bool}:
   match more rest:
     case Nil{} Nil{}:
-      %Equal.sym(Bool, UTF8.valid_one_byte(b1), True{}, valid) :
-        {Bool.or(_, UTF8.valid_two_bytes(b1, 128)) == True{} : Bool}
-      {==}
+      utf8_proof.or_left(Bool.or(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128)), UTF8.valid_four_bytes(b1, 191, 128, 128), utf8_proof.or_left(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128), utf8_proof.or_left(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128), utf8_proof.or_left(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128), utf8_proof.or_left(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128), valid)))))
     case Nil{} +b2 <> Nil{}:
-      +lead = utf8_proof.any_continuation(b1, b2, valid)
-      %Equal.sym(Bool, UTF8.valid_two_bytes(b1, 128), True{}, lead) :
-        {Bool.or(UTF8.valid_one_byte(b1), _) == True{} : Bool}
-      bool_or_true(UTF8.valid_one_byte(b1))
-    case Nil{} b2 <> b3 <> after:
-      Empty.absurd({UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool}, H.hex_u32.false_true(valid))
+      utf8_proof.or_left(Bool.or(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128)), UTF8.valid_four_bytes(b1, 191, 128, 128), utf8_proof.or_left(Bool.or(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128)), UTF8.valid_four_bytes(b1, 128, 128, 128), utf8_proof.or_left(Bool.or(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128)), UTF8.valid_three_bytes(b1, 191, 128), utf8_proof.or_left(Bool.or(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128)), UTF8.valid_three_bytes(b1, 128, 128), utf8_proof.or_right(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128), utf8_proof.any_continuation(b1, b2, valid))))))
+    case Nil{} +b2 <> +b3 <> Nil{}:
+      utf8_proof.prefix.mid3(b1, utf8_proof.any3_mid(b1, b2, b3, valid))
+    case Nil{} +b2 <> +b3 <> +b4 <> Nil{}:
+      utf8_proof.prefix.mid4(b1, utf8_proof.any4_mid(b1, b2, b3, b4, valid))
+    case Nil{} b2 <> b3 <> b4 <> b5 <> after:
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> Nil{}) == True{} : Bool}, H.hex_u32.false_true(valid))
     case +b2 <> Nil{} Nil{}:
+      utf8_proof.or_left(Bool.or(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128)), UTF8.valid_four_bytes(b1, b2, 128, 128), utf8_proof.or_left(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128), valid))
+    case +b2 <> Nil{} +b3 <> Nil{}:
+      utf8_proof.or_left(Bool.or(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128)), UTF8.valid_four_bytes(b1, b2, 128, 128), utf8_proof.or_right(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128), utf8_proof.any3_last(b1, b2, b3, valid)))
+    case +b2 <> Nil{} +b3 <> +b4 <> Nil{}:
+      utf8_proof.or_right(Bool.or(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128)), UTF8.valid_four_bytes(b1, b2, 128, 128), utf8_proof.any4_third(b1, b2, b3, b4, valid))
+    case +b2 <> Nil{} b3 <> b4 <> b5 <> after:
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2]) == True{} : Bool}, H.hex_u32.false_true(valid))
+    case +b2 <> +b3 <> Nil{} Nil{}:
+      utf8_proof.or_left(UTF8.valid_three_bytes(b1, b2, b3), UTF8.valid_four_bytes(b1, b2, b3, 128), valid)
+    case +b2 <> +b3 <> Nil{} +b4 <> Nil{}:
+      utf8_proof.or_right(UTF8.valid_three_bytes(b1, b2, b3), UTF8.valid_four_bytes(b1, b2, b3, 128), utf8_proof.any4_last(b1, b2, b3, b4, valid))
+    case +b2 <> +b3 <> Nil{} b4 <> b5 <> after:
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2, b3]) == True{} : Bool}, H.hex_u32.false_true(valid))
+    case +b2 <> +b3 <> +b4 <> Nil{} Nil{}:
       valid
-    case b2 <> Nil{} b3 <> after:
-      Empty.absurd({UTF8.is_valid_sequence_prefix([b1, b2]) == True{} : Bool}, H.hex_u32.false_true(valid))
-    case b2 <> b3 <> after _:
-      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> b2 <> b3 <> after) == True{} : Bool}, H.hex_u32.false_true(valid))
+    case +b2 <> +b3 <> +b4 <> Nil{} b5 <> after:
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> [b2, b3, b4]) == True{} : Bool}, H.hex_u32.false_true(valid))
+    case b2 <> b3 <> b4 <> b5 <> after _:
+      Empty.absurd({UTF8.is_valid_sequence_prefix(b1 <> (b2 <> b3 <> b4 <> b5 <> after)) == True{} : Bool}, H.hex_u32.false_true(valid))
 
 def utf8_proof.prefix_from_completion(+b1: U32, +more: List<&2, U32>,
   completion: PrefixCompletion(b1 <> more)) ->
@@ -3365,13 +5019,29 @@ def utf8_proof.next_scalar.found(scalar: Maybe<&2, U32>, rest: List<&2, U32>,
     case None{}:
       otherwise(rest)
 
+def utf8_proof.next_scalar.four(+b1: U32, +b2: U32, +b3: U32, rest: List<&2, U32>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match rest:
+    case Nil{}:
+      None{}
+    case +b4 <> after:
+      utf8_proof.next_scalar.found(UTF8.four_byte_scalar(b1, b2, b3, b4), after, r => None{})
+
+def utf8_proof.next_scalar.three(+b1: U32, +b2: U32, rest: List<&2, U32>) ->
+  Maybe<&1, U32 & List<&2, U32>>:
+  match rest:
+    case Nil{}:
+      None{}
+    case +b3 <> after:
+      utf8_proof.next_scalar.found(UTF8.three_byte_scalar(b1, b2, b3), after, r => utf8_proof.next_scalar.four(b1, b2, b3, r))
+
 def utf8_proof.next_scalar.two(+b1: U32, rest: List<&2, U32>) ->
   Maybe<&1, U32 & List<&2, U32>>:
   match rest:
     case Nil{}:
       None{}
     case +b2 <> after:
-      utf8_proof.next_scalar.found(utf8_proof.two_byte_scalar(b1, b2), after, r => None{})
+      utf8_proof.next_scalar.found(utf8_proof.two_byte_scalar(b1, b2), after, r => utf8_proof.next_scalar.three(b1, b2, r))
 
 def utf8_proof.next_scalar(bytes: List<&2, U32>) -> Maybe<&1, U32 & List<&2, U32>>:
   match bytes:
@@ -3430,61 +5100,37 @@ def utf8_proof.next_two(+p: U32, +b: U32, +rest: List<&2, U32>, +cp: U32,
   %Equal.sym(Maybe<&2, U32>, utf8_proof.one_byte_scalar(p), None{}, one) :
     {utf8_proof.next_scalar.found(_, b <> rest, r => utf8_proof.next_scalar.two(p, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
   %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(p, b), Some{cp}, two) :
-    {utf8_proof.next_scalar.found(_, rest, r => None{}) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+    {utf8_proof.next_scalar.found(_, rest, r => utf8_proof.next_scalar.three(p, b, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
   {==}
 
-# Prefix-free: a lead byte with the two-byte shape is 110xxxxx, so it
-# does not have the one-byte shape.
-def utf8_proof.lead_not_one_bits(+high: Word(5n)) ->
-  {UTF8.has_one_byte_shape(utf8_proof.first_byte(high)) == False{} : Bool}:
-  match high:
-    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{False{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
-    case WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WCon{True{}, WNil{}}}}}}: {==}
+def utf8_proof.next_three(+p: U32, +q: U32, +b: U32, +rest: List<&2, U32>, +cp: U32,
+  one: {utf8_proof.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
+  two: {utf8_proof.two_byte_scalar(p, q) == None{} : Maybe<&2, U32>},
+  three: {UTF8.three_byte_scalar(p, q, b) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar(p <> q <> b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.one_byte_scalar(p), None{}, one) :
+    {utf8_proof.next_scalar.found(_, q <> b <> rest, r => utf8_proof.next_scalar.two(p, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(p, q), None{}, two) :
+    {utf8_proof.next_scalar.found(_, b <> rest, r => utf8_proof.next_scalar.three(p, q, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  %Equal.sym(Maybe<&2, U32>, UTF8.three_byte_scalar(p, q, b), Some{cp}, three) :
+    {utf8_proof.next_scalar.found(_, rest, r => utf8_proof.next_scalar.four(p, q, b, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  {==}
 
-def utf8_proof.lead_not_one.payload(+b1: U32,
-  first: Exists(Word(5n), high => {b1 == utf8_proof.first_byte(high) : U32})) ->
-  {UTF8.has_one_byte_shape(b1) == False{} : Bool}:
-  (+high, e) = first
-  %Equal.sym(U32, b1, utf8_proof.first_byte(high), e) : {UTF8.has_one_byte_shape(_) == False{} : Bool}
-  utf8_proof.lead_not_one_bits(high)
-
-def utf8_proof.lead_not_one(+b1: U32, +b2: U32,
-  valid: {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}) ->
-  {UTF8.has_one_byte_shape(b1) == False{} : Bool}:
-  +shape = utf8_proof.valid_two_bytes_has_shape(b1, b2, valid)
-  utf8_proof.lead_not_one.payload(b1,
-    utf8_proof.first_payload(b1, bool_and_left_true(B.byte_mask("110xxxxx", b1, {==}),
-      B.byte_mask("10xxxxxx", b2, {==}), shape)))
+def utf8_proof.next_four(+p: U32, +q: U32, +r1: U32, +b: U32, +rest: List<&2, U32>, +cp: U32,
+  one: {utf8_proof.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
+  two: {utf8_proof.two_byte_scalar(p, q) == None{} : Maybe<&2, U32>},
+  three: {UTF8.three_byte_scalar(p, q, r1) == None{} : Maybe<&2, U32>},
+  four: {UTF8.four_byte_scalar(p, q, r1, b) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar(p <> q <> r1 <> b <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.one_byte_scalar(p), None{}, one) :
+    {utf8_proof.next_scalar.found(_, q <> r1 <> b <> rest, r => utf8_proof.next_scalar.two(p, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(p, q), None{}, two) :
+    {utf8_proof.next_scalar.found(_, r1 <> b <> rest, r => utf8_proof.next_scalar.three(p, q, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  %Equal.sym(Maybe<&2, U32>, UTF8.three_byte_scalar(p, q, r1), None{}, three) :
+    {utf8_proof.next_scalar.found(_, b <> rest, r => utf8_proof.next_scalar.four(p, q, r1, r)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  %Equal.sym(Maybe<&2, U32>, UTF8.four_byte_scalar(p, q, r1, b), Some{cp}, four) :
+    {utf8_proof.next_scalar.found(_, rest, r => None{}) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  {==}
 
 def utf8_proof.two_scalar_valid(+b1: U32, +b2: U32, +cp: U32, valid: Bool,
   checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
@@ -3498,36 +5144,80 @@ def utf8_proof.two_scalar_valid(+b1: U32, +b2: U32, +cp: U32, valid: Bool,
     case True{}:
       checked
 
-def utf8_proof.one_scalar_false(+byte: U32, valid: Bool,
+def utf8_proof.one_scalar_none(+byte: U32, valid: Bool,
   -checked: {UTF8.valid_one_byte(byte) == valid : Bool},
-  invalid: {valid == False{} : Bool}) ->
+  invalid: {valid == True{} : Bool} -> Empty) ->
   {utf8_proof.one_byte_scalar.if(byte, valid, checked) == None{} : Maybe<&2, U32>}:
   match valid:
-    case False{}:
-      {==}
-    case True{}:
-      Empty.absurd({utf8_proof.one_byte_scalar.if(byte, True{}, checked) == None{} : Maybe<&2, U32>},
-        utf8_proof.true_false(invalid))
+    case False{}: {==}
+    case True{}: Empty.absurd({utf8_proof.one_byte_scalar.if(byte, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
 
-# No valid two-byte sequence begins with a valid one-byte sequence.
-def utf8_proof.lead_one_none(+b1: U32, +b2: U32, +cp: U32,
-  two: {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}) ->
-  {utf8_proof.one_byte_scalar(b1) == None{} : Maybe<&2, U32>}:
-  +not_one = utf8_proof.lead_not_one(b1, b2,
-    utf8_proof.two_scalar_valid(b1, b2, cp, UTF8.valid_two_bytes(b1, b2), {==}, two))
-  utf8_proof.one_scalar_false(b1, UTF8.valid_one_byte(b1), {==}, not_one)
+def utf8_proof.two_scalar_none(+b1: U32, +b2: U32, valid: Bool,
+  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
+  invalid: {valid == True{} : Bool} -> Empty) ->
+  {utf8_proof.two_byte_scalar.if(b1, b2, valid, checked) == None{} : Maybe<&2, U32>}:
+  match valid:
+    case False{}: {==}
+    case True{}: Empty.absurd({utf8_proof.two_byte_scalar.if(b1, b2, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
+
+def utf8_proof.three_scalar_valid(+b1: U32, +b2: U32, +b3: U32, +cp: U32, valid: Bool,
+  checked: {UTF8.valid_three_bytes(b1, b2, b3) == valid : Bool},
+  e: {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool}:
+  match valid:
+    case False{}:
+      Empty.absurd({UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool},
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+    case True{}:
+      checked
+
+def utf8_proof.three_scalar_none(+b1: U32, +b2: U32, +b3: U32, valid: Bool,
+  -checked: {UTF8.valid_three_bytes(b1, b2, b3) == valid : Bool},
+  invalid: {valid == True{} : Bool} -> Empty) ->
+  {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == None{} : Maybe<&2, U32>}:
+  match valid:
+    case False{}: {==}
+    case True{}: Empty.absurd({UTF8.three_byte_scalar.if(b1, b2, b3, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
+
+def utf8_proof.four_scalar_valid(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +cp: U32, valid: Bool,
+  checked: {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid : Bool},
+  e: {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool}:
+  match valid:
+    case False{}:
+      Empty.absurd({UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool},
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+    case True{}:
+      checked
+
+def utf8_proof.two_scalar_any_valid(+b1: U32, +b2: U32, +cp: U32,
+  two: {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}) -> {UTF8.valid_two_bytes(b1, b2) == True{} : Bool}:
+  utf8_proof.two_scalar_valid(b1, b2, cp, UTF8.valid_two_bytes(b1, b2), {==}, two)
 
 def utf8_proof.next_two_valid(+b1: U32, +b2: U32, +rest: List<&2, U32>, +cp: U32,
   +two: {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}) ->
   {utf8_proof.next_scalar(b1 <> b2 <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
-  utf8_proof.next_two(b1, b2, rest, cp, utf8_proof.lead_one_none(b1, b2, cp, two), two)
+  +k = utf8_proof.valid_kind2(b1, b2, utf8_proof.two_scalar_any_valid(b1, b2, cp, two))
+  utf8_proof.next_two(b1, b2, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 2n), 1n, 2n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 2n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), two)
+
+def utf8_proof.next_three_valid(+b1: U32, +b2: U32, +b3: U32, +rest: List<&2, U32>, +cp: U32,
+  +three: {UTF8.three_byte_scalar(b1, b2, b3) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar(b1 <> b2 <> b3 <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  +k = utf8_proof.valid_kind3(b1, b2, b3, utf8_proof.three_scalar_valid(b1, b2, b3, cp, UTF8.valid_three_bytes(b1, b2, b3), {==}, three))
+  utf8_proof.next_three(b1, b2, b3, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 1n, 3n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), utf8_proof.two_scalar_none(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 2n, 3n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v)), k)))), three)
+
+def utf8_proof.next_four_valid(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +rest: List<&2, U32>, +cp: U32,
+  +four: {UTF8.four_byte_scalar(b1, b2, b3, b4) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.next_scalar(b1 <> b2 <> b3 <> b4 <> rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  +k = utf8_proof.valid_kind4(b1, b2, b3, b4, utf8_proof.four_scalar_valid(b1, b2, b3, b4, cp, UTF8.valid_four_bytes(b1, b2, b3, b4), {==}, four))
+  utf8_proof.next_four(b1, b2, b3, b4, rest, cp, utf8_proof.one_scalar_none(b1, UTF8.valid_one_byte(b1), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 1n, 4n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v)), k)))), utf8_proof.two_scalar_none(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 2n, 4n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v)), k)))), utf8_proof.three_scalar_none(b1, b2, b3, UTF8.valid_three_bytes(b1, b2, b3), {==}, v => H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 3n, 4n, Equal.trans(Nat, 3n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 3n, utf8_proof.valid_kind3(b1, b2, b3, v)), k)))), four)
 
 # The two directions of `Laws.encodes`
 # -------------------------------------
 #
 # `Laws.encodes` says that `seq` is the encoding of `cp`.
 # `utf8_proof.Decodes` says the same thing in the decoding direction:
-# `seq` is a valid one- or two-byte sequence and `cp` is the scalar it
+# `seq` is a valid sequence and `cp` is the scalar it
 # decodes to.  `utf8_proof.from_old` and `utf8_proof.to_old` convert
 # between them.
 
@@ -3537,6 +5227,10 @@ def utf8_proof.Decodes(seq: List<&2, U32>, cp: U32) -> Type:
       {utf8_proof.one_byte_scalar(b1) == Some{cp} : Maybe<&2, U32>}
     case +b1 <> +b2 <> Nil{}:
       {utf8_proof.two_byte_scalar(b1, b2) == Some{cp} : Maybe<&2, U32>}
+    case +b1 <> +b2 <> +b3 <> Nil{}:
+      {UTF8.three_byte_scalar(b1, b2, b3) == Some{cp} : Maybe<&2, U32>}
+    case +b1 <> +b2 <> +b3 <> +b4 <> Nil{}:
+      {UTF8.four_byte_scalar(b1, b2, b3, b4) == Some{cp} : Maybe<&2, U32>}
     case _:
       Empty
 
@@ -3595,6 +5289,27 @@ def utf8_proof.one_encodes.if(+b: U32, valid: Bool, +checked: {UTF8.valid_one_by
 # value is a scalar; it has no one-byte shape, since the pair is not
 # overlong; and its two-byte shape is the pair.
 
+def utf8_proof.none_of2(m: Maybe<&1, U32 & U32>,
+  e: {Maybe.is_some(&1, U32 & U32, m) == False{} : Bool}) -> {m == None{} : Maybe<&1, U32 & U32>}:
+  match m:
+    case None{}:
+      {==}
+    case Some{x}:
+      Empty.absurd({Some{x} == None{} : Maybe<&1, U32 & U32>}, utf8_proof.true_false(e))
+
+def utf8_proof.none_of3(m: Maybe<&1, U32 & U32 & U32>,
+  e: {Maybe.is_some(&1, U32 & U32 & U32, m) == False{} : Bool}) -> {m == None{} : Maybe<&1, U32 & U32 & U32>}:
+  match m:
+    case None{}:
+      {==}
+    case Some{x}:
+      Empty.absurd({Some{x} == None{} : Maybe<&1, U32 & U32 & U32>}, utf8_proof.true_false(e))
+
+def utf8_proof.false_of(+x: Bool, c: {x == True{} : Bool} -> Empty) -> {x == False{} : Bool}:
+  match x:
+    case False{}: {==}
+    case True{}: Empty.absurd({True{} == False{} : Bool}, c({==}))
+
 def utf8_proof.two_encoding(+cp: U32, +b1: U32, +b2: U32,
   no_one: {Laws.one_byte_shape(cp) == None{} : Maybe<&2, U32>},
   two: {Laws.two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
@@ -3602,7 +5317,36 @@ def utf8_proof.two_encoding(+cp: U32, +b1: U32, +b2: U32,
   %Equal.sym(Maybe<&2, U32>, Laws.one_byte_shape(cp), None{}, no_one) :
     {Laws.encoding.if(cp, _) == Some{[b1, b2]} : Maybe<&1, List<&2, U32>>}
   %Equal.sym(Maybe<&1, U32 & U32>, Laws.two_byte_shape(cp), Some{(b1, b2)}, two) :
-    {Laws.encoding.two(_) == Some{[b1, b2]} : Maybe<&1, List<&2, U32>>}
+    {Laws.encoding.two(cp, _) == Some{[b1, b2]} : Maybe<&1, List<&2, U32>>}
+  {==}
+
+def utf8_proof.three_encoding(+cp: U32, +b1: U32, +b2: U32, +b3: U32,
+  no_one: {Laws.one_byte_shape(cp) == None{} : Maybe<&2, U32>},
+  no_two: {Laws.two_byte_shape(cp) == None{} : Maybe<&1, U32 & U32>},
+  three: {Laws.three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}) ->
+  {Laws.encoding(cp) == Some{[b1, b2, b3]} : Maybe<&1, List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_shape(cp), None{}, no_one) :
+    {Laws.encoding.if(cp, _) == Some{[b1, b2, b3]} : Maybe<&1, List<&2, U32>>}
+  %Equal.sym(Maybe<&1, U32 & U32>, Laws.two_byte_shape(cp), None{}, no_two) :
+    {Laws.encoding.two(cp, _) == Some{[b1, b2, b3]} : Maybe<&1, List<&2, U32>>}
+  %Equal.sym(Maybe<&1, U32 & U32 & U32>, Laws.three_byte_shape(cp), Some{(b1, b2, b3)}, three) :
+    {Laws.encoding.three(cp, _) == Some{[b1, b2, b3]} : Maybe<&1, List<&2, U32>>}
+  {==}
+
+def utf8_proof.four_encoding(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  no_one: {Laws.one_byte_shape(cp) == None{} : Maybe<&2, U32>},
+  no_two: {Laws.two_byte_shape(cp) == None{} : Maybe<&1, U32 & U32>},
+  no_three: {Laws.three_byte_shape(cp) == None{} : Maybe<&1, U32 & U32 & U32>},
+  four: {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}) ->
+  {Laws.encoding(cp) == Some{[b1, b2, b3, b4]} : Maybe<&1, List<&2, U32>>}:
+  %Equal.sym(Maybe<&2, U32>, Laws.one_byte_shape(cp), None{}, no_one) :
+    {Laws.encoding.if(cp, _) == Some{[b1, b2, b3, b4]} : Maybe<&1, List<&2, U32>>}
+  %Equal.sym(Maybe<&1, U32 & U32>, Laws.two_byte_shape(cp), None{}, no_two) :
+    {Laws.encoding.two(cp, _) == Some{[b1, b2, b3, b4]} : Maybe<&1, List<&2, U32>>}
+  %Equal.sym(Maybe<&1, U32 & U32 & U32>, Laws.three_byte_shape(cp), None{}, no_three) :
+    {Laws.encoding.three(cp, _) == Some{[b1, b2, b3, b4]} : Maybe<&1, List<&2, U32>>}
+  %Equal.sym(Maybe<&1, U32 & U32 & U32 & U32>, Laws.four_byte_shape(cp), Some{(b1, b2, b3, b4)}, four) :
+    {Laws.encoding.four(_) == Some{[b1, b2, b3, b4]} : Maybe<&1, List<&2, U32>>}
   {==}
 
 def utf8_proof.two_encodes(+b1: U32, +b2: U32,
@@ -3637,21 +5381,68 @@ def utf8_proof.two_encodes.if(+b1: U32, +b2: U32, valid: Bool,
         Laws.encodes([b1, b2], _)
       utf8_proof.two_encodes(b1, b2, utf8_proof.valid_two_bytes_has_shape(b1, b2, checked), checked)
 
+def utf8_proof.three_encodes(+b1: U32, +b2: U32, +b3: U32,
+  +shape: {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool},
+  valid: {UTF8.valid_three_bytes(b1, b2, b3) == True{} : Bool}) ->
+  Laws.encodes([b1, b2, b3], UTF8.decode_three_bytes(b1, b2, b3, shape)):
+  +cp = UTF8.decode_three_bytes(b1, b2, b3, shape)
+  +v = Equal.trans(Bool, utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)), UTF8.valid_three_bytes(b1, b2, b3), True{}, Equal.sym(Bool, UTF8.valid_three_bytes(b1, b2, b3), utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)), utf8_proof.valid3_value(b1, b2, b3, shape)), valid)
+  +not2 = utf8_proof.not_true(UTF8.can_encode_as_two_bytes(cp), bool_and_left_true(Bool.not(UTF8.can_encode_as_two_bytes(cp)), UTF8.is_scalar(cp), v))
+  +sc = Equal.trans(Bool, Laws.is_unicode_scalar(cp), UTF8.is_scalar(cp), True{}, Equal.sym(Bool, UTF8.is_scalar(cp), Laws.is_unicode_scalar(cp), utf8_proof.scalar_agrees(cp)), bool_and_right_true(Bool.not(UTF8.can_encode_as_two_bytes(cp)), UTF8.is_scalar(cp), v))
+  +not1 = utf8_proof.false_of(UTF8.can_encode_as_one_byte(cp), c => utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.can_encode_as_two_bytes(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_two_bytes(cp), True{}, utf8_proof.mono12(cp, c)), not2)))
+  (sc, utf8_proof.three_encoding(cp, b1, b2, b3, utf8_proof.none_from_is_some(Laws.one_byte_shape(cp), Equal.trans(Bool, Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), UTF8.can_encode_as_one_byte(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_one_byte(cp), Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), Laws.utf8_can_encode_as_one_byte(cp)), not1)), utf8_proof.none_of2(Laws.two_byte_shape(cp), Equal.trans(Bool, Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), UTF8.can_encode_as_two_bytes(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_two_bytes(cp), Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), Laws.utf8_can_encode_as_two_bytes(cp)), not2)), utf8_proof.dec_produces3(b1, b2, b3, utf8_proof.fields3(b1, b2, b3, shape))))
+
+def utf8_proof.three_encodes.if(+b1: U32, +b2: U32, +b3: U32, valid: Bool,
+  +checked: {UTF8.valid_three_bytes(b1, b2, b3) == valid : Bool}, +cp: U32,
+  e: {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  Laws.encodes([b1, b2, b3], cp):
+  match valid:
+    case False{}:
+      Empty.absurd(Laws.encodes([b1, b2, b3], cp),
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+    case True{}:
+      %utf8_proof.some_value(UTF8.decode_three_bytes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked)), cp, e) : Laws.encodes([b1, b2, b3], _)
+      utf8_proof.three_encodes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked), checked)
+
+def utf8_proof.four_encodes(+b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  +shape: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool},
+  valid: {UTF8.valid_four_bytes(b1, b2, b3, b4) == True{} : Bool}) ->
+  Laws.encodes([b1, b2, b3, b4], UTF8.decode_four_bytes(b1, b2, b3, b4, shape)):
+  +cp = UTF8.decode_four_bytes(b1, b2, b3, b4, shape)
+  +v = Equal.trans(Bool, utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)), UTF8.valid_four_bytes(b1, b2, b3, b4), True{}, Equal.sym(Bool, UTF8.valid_four_bytes(b1, b2, b3, b4), utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)), utf8_proof.valid4_value(b1, b2, b3, b4, shape)), valid)
+  +not3 = utf8_proof.not_true(UTF8.can_encode_as_three_bytes(cp), bool_and_left_true(Bool.not(UTF8.can_encode_as_three_bytes(cp)), UTF8.is_scalar(cp), v))
+  +sc = Equal.trans(Bool, Laws.is_unicode_scalar(cp), UTF8.is_scalar(cp), True{}, Equal.sym(Bool, UTF8.is_scalar(cp), Laws.is_unicode_scalar(cp), utf8_proof.scalar_agrees(cp)), bool_and_right_true(Bool.not(UTF8.can_encode_as_three_bytes(cp)), UTF8.is_scalar(cp), v))
+  +not2 = utf8_proof.false_of(UTF8.can_encode_as_two_bytes(cp), c => utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.can_encode_as_three_bytes(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_three_bytes(cp), True{}, utf8_proof.mono23(cp, c)), not3)))
+  +not1 = utf8_proof.false_of(UTF8.can_encode_as_one_byte(cp), c => utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.can_encode_as_two_bytes(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_two_bytes(cp), True{}, utf8_proof.mono12(cp, c)), not2)))
+  (sc, utf8_proof.four_encoding(cp, b1, b2, b3, b4, utf8_proof.none_from_is_some(Laws.one_byte_shape(cp), Equal.trans(Bool, Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), UTF8.can_encode_as_one_byte(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_one_byte(cp), Maybe.is_some(&2, U32, Laws.one_byte_shape(cp)), Laws.utf8_can_encode_as_one_byte(cp)), not1)), utf8_proof.none_of2(Laws.two_byte_shape(cp), Equal.trans(Bool, Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), UTF8.can_encode_as_two_bytes(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_two_bytes(cp), Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), Laws.utf8_can_encode_as_two_bytes(cp)), not2)), utf8_proof.none_of3(Laws.three_byte_shape(cp), Equal.trans(Bool, Maybe.is_some(&1, U32 & U32 & U32, Laws.three_byte_shape(cp)), UTF8.can_encode_as_three_bytes(cp), False{}, Equal.sym(Bool, UTF8.can_encode_as_three_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32, Laws.three_byte_shape(cp)), Laws.utf8_can_encode_as_three_bytes(cp)), not3)), utf8_proof.dec_produces4(b1, b2, b3, b4, utf8_proof.fields4(b1, b2, b3, b4, shape))))
+
+def utf8_proof.four_encodes.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, valid: Bool,
+  +checked: {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid : Bool}, +cp: U32,
+  e: {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == Some{cp} : Maybe<&2, U32>}) ->
+  Laws.encodes([b1, b2, b3, b4], cp):
+  match valid:
+    case False{}:
+      Empty.absurd(Laws.encodes([b1, b2, b3, b4], cp),
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+    case True{}:
+      %utf8_proof.some_value(UTF8.decode_four_bytes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked)), cp, e) : Laws.encodes([b1, b2, b3, b4], _)
+      utf8_proof.four_encodes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked), checked)
+
 def utf8_proof.from_old(+seq: List<&2, U32>, +cp: U32, decoded: utf8_proof.Decodes(seq, cp)) ->
   Laws.encodes(seq, cp):
   match seq:
     case Nil{}:
       Empty.absurd(Laws.encodes(Nil{}, cp), decoded)
-    case +x <> +xs:
-      match xs:
-        case Nil{}:
-          utf8_proof.one_encodes.if(x, UTF8.valid_one_byte(x), {==}, cp, decoded)
-        case +y <> +ys:
-          match ys:
-            case Nil{}:
-              utf8_proof.two_encodes.if(x, y, UTF8.valid_two_bytes(x, y), {==}, cp, decoded)
-            case +z <> +zs:
-              Empty.absurd(Laws.encodes(x <> y <> z <> zs, cp), decoded)
+    case +x <> Nil{}:
+      utf8_proof.one_encodes.if(x, UTF8.valid_one_byte(x), {==}, cp, decoded)
+    case +x <> +y <> Nil{}:
+      utf8_proof.two_encodes.if(x, y, UTF8.valid_two_bytes(x, y), {==}, cp, decoded)
+    case +x <> +y <> +z <> Nil{}:
+      utf8_proof.three_encodes.if(x, y, z, UTF8.valid_three_bytes(x, y, z), {==}, cp, decoded)
+    case +x <> +y <> +z <> +w <> Nil{}:
+      utf8_proof.four_encodes.if(x, y, z, w, UTF8.valid_four_bytes(x, y, z, w), {==}, cp, decoded)
+    case x <> y <> z <> w <> v <> rest:
+      Empty.absurd(Laws.encodes(x <> y <> z <> w <> v <> rest, cp), decoded)
 
 # Encoding direction to decoding direction.  A one-byte shape is the code
 # point itself, which is a valid byte.  A two-byte shape with no
@@ -3708,36 +5499,156 @@ def utf8_proof.two_decodes(+cp: U32, +b1: U32, +b2: U32,
     Equal.cong(Bool, Bool, x => Bool.not(x), UTF8.can_encode_as_one_byte(cp), False{}, not_one))
   utf8_proof.two_scalar_some(b1, b2, cp, UTF8.valid_two_bytes(b1, b2), {==}, valid, produced)
 
-def utf8_proof.to_old.two(+seq: List<&2, U32>, +cp: U32,
+def utf8_proof.three_scalar_some(+b1: U32, +b2: U32, +b3: U32, +cp: U32, valid: Bool,
+  +checked: {UTF8.valid_three_bytes(b1, b2, b3) == valid : Bool}, is_true: {valid == True{} : Bool},
+  +dec: {utf8_proof.dec3(b1, b2, b3) == cp : U32}) ->
+  {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == Some{cp} : Maybe<&2, U32>}:
+  match valid:
+    case False{}:
+      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+    case True{}:
+      Equal.cong(U32, Maybe<&2, U32>, x => Some{x}, UTF8.decode_three_bytes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked)), cp, dec)
+
+def utf8_proof.three_value_true(+b1: U32, +b2: U32, +b3: U32, +cp: U32,
+  +dec: {utf8_proof.dec3(b1, b2, b3) == cp : U32},
+  +not_prev: {UTF8.can_encode_as_two_bytes(cp) == False{} : Bool},
+  +sc: {UTF8.is_scalar(cp) == True{} : Bool}) -> {utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)) == True{} : Bool}:
+  %Equal.sym(U32, utf8_proof.dec3(b1, b2, b3), cp, dec) : {utf8_proof.value3(_) == True{} : Bool}
+  %Equal.sym(Bool, UTF8.can_encode_as_two_bytes(cp), False{}, not_prev) : {Bool.and(Bool.not(_), UTF8.is_scalar(cp)) == True{} : Bool}
+  %Equal.sym(Bool, UTF8.is_scalar(cp), True{}, sc) : {Bool.and(Bool.not(False{}), _) == True{} : Bool}
+  {==}
+
+def utf8_proof.three_decodes.p(+b1: U32, +b2: U32, +b3: U32, +cp: U32,
+  +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool},
+  +no_prev: {Laws.two_byte_shape(cp) == None{} : Maybe<&1, U32 & U32>},
+  p: utf8_proof.Produced3(cp, b1, b2, b3)) ->
+  {UTF8.three_byte_scalar(b1, b2, b3) == Some{cp} : Maybe<&2, U32>}:
+  (+shape, +dec) = p
+  +not_prev = Equal.trans(Bool, UTF8.can_encode_as_two_bytes(cp), Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), False{}, Laws.utf8_can_encode_as_two_bytes(cp),
+    Equal.cong(Maybe<&1, U32 & U32>, Bool, m => Maybe.is_some(&1, U32 & U32, m), Laws.two_byte_shape(cp), None{}, no_prev))
+  +sc2 = Equal.trans(Bool, UTF8.is_scalar(cp), Laws.is_unicode_scalar(cp), True{}, utf8_proof.scalar_agrees(cp), sc)
+  +valid = Equal.trans(Bool, UTF8.valid_three_bytes(b1, b2, b3), utf8_proof.value3(utf8_proof.dec3(b1, b2, b3)), True{}, utf8_proof.valid3_value(b1, b2, b3, shape),
+    utf8_proof.three_value_true(b1, b2, b3, cp, dec, not_prev, sc2))
+  utf8_proof.three_scalar_some(b1, b2, b3, cp, UTF8.valid_three_bytes(b1, b2, b3), {==}, valid, dec)
+
+def utf8_proof.three_decodes(+cp: U32, +b1: U32, +b2: U32, +b3: U32,
+  +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool},
+  +no_prev: {Laws.two_byte_shape(cp) == None{} : Maybe<&1, U32 & U32>},
+  +produced: {Laws.three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>}) ->
+  {UTF8.three_byte_scalar(b1, b2, b3) == Some{cp} : Maybe<&2, U32>}:
+  utf8_proof.three_decodes.p(b1, b2, b3, cp, sc, no_prev, utf8_proof.produced3(cp, b1, b2, b3, produced))
+
+def utf8_proof.four_scalar_some(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +cp: U32, valid: Bool,
+  +checked: {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid : Bool}, is_true: {valid == True{} : Bool},
+  +dec: {utf8_proof.dec4(b1, b2, b3, b4) == cp : U32}) ->
+  {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == Some{cp} : Maybe<&2, U32>}:
+  match valid:
+    case False{}:
+      Empty.absurd({None{} == Some{cp} : Maybe<&2, U32>}, H.hex_u32.false_true(is_true))
+    case True{}:
+      Equal.cong(U32, Maybe<&2, U32>, x => Some{x}, UTF8.decode_four_bytes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked)), cp, dec)
+
+def utf8_proof.four_value_true(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +cp: U32,
+  +dec: {utf8_proof.dec4(b1, b2, b3, b4) == cp : U32},
+  +not_prev: {UTF8.can_encode_as_three_bytes(cp) == False{} : Bool},
+  +sc: {UTF8.is_scalar(cp) == True{} : Bool}) -> {utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)) == True{} : Bool}:
+  %Equal.sym(U32, utf8_proof.dec4(b1, b2, b3, b4), cp, dec) : {utf8_proof.value4(_) == True{} : Bool}
+  %Equal.sym(Bool, UTF8.can_encode_as_three_bytes(cp), False{}, not_prev) : {Bool.and(Bool.not(_), UTF8.is_scalar(cp)) == True{} : Bool}
+  %Equal.sym(Bool, UTF8.is_scalar(cp), True{}, sc) : {Bool.and(Bool.not(False{}), _) == True{} : Bool}
+  {==}
+
+def utf8_proof.four_decodes.p(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +cp: U32,
+  +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool},
+  +no_prev: {Laws.three_byte_shape(cp) == None{} : Maybe<&1, U32 & U32 & U32>},
+  p: utf8_proof.Produced4(cp, b1, b2, b3, b4)) ->
+  {UTF8.four_byte_scalar(b1, b2, b3, b4) == Some{cp} : Maybe<&2, U32>}:
+  (+shape, +dec) = p
+  +not_prev = Equal.trans(Bool, UTF8.can_encode_as_three_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32, Laws.three_byte_shape(cp)), False{}, Laws.utf8_can_encode_as_three_bytes(cp),
+    Equal.cong(Maybe<&1, U32 & U32 & U32>, Bool, m => Maybe.is_some(&1, U32 & U32 & U32, m), Laws.three_byte_shape(cp), None{}, no_prev))
+  +sc2 = Equal.trans(Bool, UTF8.is_scalar(cp), Laws.is_unicode_scalar(cp), True{}, utf8_proof.scalar_agrees(cp), sc)
+  +valid = Equal.trans(Bool, UTF8.valid_four_bytes(b1, b2, b3, b4), utf8_proof.value4(utf8_proof.dec4(b1, b2, b3, b4)), True{}, utf8_proof.valid4_value(b1, b2, b3, b4, shape),
+    utf8_proof.four_value_true(b1, b2, b3, b4, cp, dec, not_prev, sc2))
+  utf8_proof.four_scalar_some(b1, b2, b3, b4, cp, UTF8.valid_four_bytes(b1, b2, b3, b4), {==}, valid, dec)
+
+def utf8_proof.four_decodes(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32,
+  +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool},
+  +no_prev: {Laws.three_byte_shape(cp) == None{} : Maybe<&1, U32 & U32 & U32>},
+  +produced: {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}) ->
+  {UTF8.four_byte_scalar(b1, b2, b3, b4) == Some{cp} : Maybe<&2, U32>}:
+  utf8_proof.four_decodes.p(b1, b2, b3, b4, cp, sc, no_prev, utf8_proof.produced4(cp, b1, b2, b3, b4, produced))
+
+def utf8_proof.to_old.four.l2(+b1: U32, +b2: U32, r: U32 & U32, +seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool}, +no3: {Laws.three_byte_shape(cp) == None{} : Maybe<&1, U32 & U32 & U32>}, +checked: {Laws.four_byte_shape(cp) == Some{(b1, b2, r)} : Maybe<&1, U32 & U32 & U32 & U32>}, e: {Laws.encoding.four(Some{(b1, b2, r)}) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
+  match r:
+    case (+b3, +b4):
+      %utf8_proof.some_list([b1, b2, b3, b4], seq, e) : utf8_proof.Decodes(_, cp)
+      utf8_proof.four_decodes(cp, b1, b2, b3, b4, sc, no3, checked)
+
+def utf8_proof.to_old.four.l1(+b1: U32, r: U32 & U32 & U32, +seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool}, +no3: {Laws.three_byte_shape(cp) == None{} : Maybe<&1, U32 & U32 & U32>}, +checked: {Laws.four_byte_shape(cp) == Some{(b1, r)} : Maybe<&1, U32 & U32 & U32 & U32>}, e: {Laws.encoding.four(Some{(b1, r)}) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
+  match r:
+    case (+b2, r2):
+      utf8_proof.to_old.four.l2(b1, b2, r2, seq, cp, sc, no3, checked, e)
+
+def utf8_proof.to_old.four.l0(r: U32 & U32 & U32 & U32, +seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool}, +no3: {Laws.three_byte_shape(cp) == None{} : Maybe<&1, U32 & U32 & U32>}, +checked: {Laws.four_byte_shape(cp) == Some{r} : Maybe<&1, U32 & U32 & U32 & U32>}, e: {Laws.encoding.four(Some{r}) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
+  match r:
+    case (+b1, r2):
+      utf8_proof.to_old.four.l1(b1, r2, seq, cp, sc, no3, checked, e)
+
+def utf8_proof.to_old.four(+seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool},
+  +no3: {Laws.three_byte_shape(cp) == None{} : Maybe<&1, U32 & U32 & U32>},
+  four: Maybe<&1, U32 & U32 & U32 & U32>, +checked: {Laws.four_byte_shape(cp) == four : Maybe<&1, U32 & U32 & U32 & U32>},
+  e: {Laws.encoding.four(four) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
+  match four:
+    case None{}:
+      Empty.absurd(utf8_proof.Decodes(seq, cp), H.hex_u32.false_true(Equal.cong(Maybe<&1, List<&2, U32>>, Bool, m => Maybe.is_some(&1, List<&2, U32>, m), None{}, Some{seq}, e)))
+    case Some{p}:
+      utf8_proof.to_old.four.l0(p, seq, cp, sc, no3, checked, e)
+
+def utf8_proof.to_old.three.l1(+b1: U32, r: U32 & U32, +seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool}, +no2: {Laws.two_byte_shape(cp) == None{} : Maybe<&1, U32 & U32>}, +checked: {Laws.three_byte_shape(cp) == Some{(b1, r)} : Maybe<&1, U32 & U32 & U32>}, e: {Laws.encoding.three(cp, Some{(b1, r)}) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
+  match r:
+    case (+b2, +b3):
+      %utf8_proof.some_list([b1, b2, b3], seq, e) : utf8_proof.Decodes(_, cp)
+      utf8_proof.three_decodes(cp, b1, b2, b3, sc, no2, checked)
+
+def utf8_proof.to_old.three.l0(r: U32 & U32 & U32, +seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool}, +no2: {Laws.two_byte_shape(cp) == None{} : Maybe<&1, U32 & U32>}, +checked: {Laws.three_byte_shape(cp) == Some{r} : Maybe<&1, U32 & U32 & U32>}, e: {Laws.encoding.three(cp, Some{r}) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
+  match r:
+    case (+b1, r2):
+      utf8_proof.to_old.three.l1(b1, r2, seq, cp, sc, no2, checked, e)
+
+def utf8_proof.to_old.three(+seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool},
+  +no2: {Laws.two_byte_shape(cp) == None{} : Maybe<&1, U32 & U32>},
+  three: Maybe<&1, U32 & U32 & U32>, +checked: {Laws.three_byte_shape(cp) == three : Maybe<&1, U32 & U32 & U32>},
+  e: {Laws.encoding.three(cp, three) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
+  match three:
+    case None{}:
+      utf8_proof.to_old.four(seq, cp, sc, checked, Laws.four_byte_shape(cp), {==}, e)
+    case Some{p}:
+      utf8_proof.to_old.three.l0(p, seq, cp, sc, no2, checked, e)
+
+def utf8_proof.to_old.two(+seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool},
   +no_one: {Laws.one_byte_shape(cp) == None{} : Maybe<&2, U32>},
   two: Maybe<&1, U32 & U32>, +checked: {Laws.two_byte_shape(cp) == two : Maybe<&1, U32 & U32>},
-  e: {Laws.encoding.two(two) == Some{seq} : Maybe<&1, List<&2, U32>>}) ->
-  utf8_proof.Decodes(seq, cp):
+  e: {Laws.encoding.two(cp, two) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
   match two:
     case None{}:
-      Empty.absurd(utf8_proof.Decodes(seq, cp),
-        H.hex_u32.false_true(Equal.cong(Maybe<&1, List<&2, U32>>, Bool,
-          m => Maybe.is_some(&1, List<&2, U32>, m), None{}, Some{seq}, e)))
+      utf8_proof.to_old.three(seq, cp, sc, checked, Laws.three_byte_shape(cp), {==}, e)
     case Some{p}:
       (+b1, +b2) = p
       %utf8_proof.some_list([b1, b2], seq, e) : utf8_proof.Decodes(_, cp)
       utf8_proof.two_decodes(cp, b1, b2, no_one, checked)
 
-def utf8_proof.to_old.one(+seq: List<&2, U32>, +cp: U32, one: Maybe<&2, U32>,
+def utf8_proof.to_old.one(+seq: List<&2, U32>, +cp: U32, +sc: {Laws.is_unicode_scalar(cp) == True{} : Bool}, one: Maybe<&2, U32>,
   +checked: {Laws.one_byte_shape(cp) == one : Maybe<&2, U32>},
-  e: {Laws.encoding.if(cp, one) == Some{seq} : Maybe<&1, List<&2, U32>>}) ->
-  utf8_proof.Decodes(seq, cp):
+  e: {Laws.encoding.if(cp, one) == Some{seq} : Maybe<&1, List<&2, U32>>}) -> utf8_proof.Decodes(seq, cp):
   match one:
     case Some{+b}:
       %utf8_proof.some_list([b], seq, e) : utf8_proof.Decodes(_, cp)
       utf8_proof.one_decodes(cp, b, checked)
     case None{}:
-      utf8_proof.to_old.two(seq, cp, checked, Laws.two_byte_shape(cp), {==}, e)
+      utf8_proof.to_old.two(seq, cp, sc, checked, Laws.two_byte_shape(cp), {==}, e)
 
-def utf8_proof.to_old(+seq: List<&2, U32>, +cp: U32, enc: Laws.encodes(seq, cp)) ->
-  utf8_proof.Decodes(seq, cp):
+def utf8_proof.to_old(+seq: List<&2, U32>, +cp: U32, enc: Laws.encodes(seq, cp)) -> utf8_proof.Decodes(seq, cp):
   (scalar, e) = enc
-  utf8_proof.to_old.one(seq, cp, Laws.one_byte_shape(cp), {==}, e)
+  utf8_proof.to_old.one(seq, cp, scalar, Laws.one_byte_shape(cp), {==}, e)
 
 # The valid sequences are exactly the encodings.
 
@@ -3758,37 +5669,47 @@ def utf8_proof.decodes_valid(+seq: List<&2, U32>, +cp: U32, decoded: utf8_proof.
   match seq:
     case Nil{}:
       Empty.absurd({Laws.is_valid_sequence(Nil{}) == True{} : Bool}, decoded)
-    case +x <> +xs:
-      match xs:
-        case Nil{}:
-          utf8_proof.one_scalar_valid(x, cp, UTF8.valid_one_byte(x), {==}, decoded)
-        case +y <> +ys:
-          match ys:
-            case Nil{}:
-              utf8_proof.two_scalar_valid(x, y, cp, UTF8.valid_two_bytes(x, y), {==}, decoded)
-            case +z <> +zs:
-              Empty.absurd({Laws.is_valid_sequence(x <> y <> z <> zs) == True{} : Bool}, decoded)
+    case +x <> Nil{}:
+      utf8_proof.one_scalar_valid(x, cp, UTF8.valid_one_byte(x), {==}, decoded)
+    case +x <> +y <> Nil{}:
+      utf8_proof.two_scalar_valid(x, y, cp, UTF8.valid_two_bytes(x, y), {==}, decoded)
+    case +x <> +y <> +z <> Nil{}:
+      utf8_proof.three_scalar_valid(x, y, z, cp, UTF8.valid_three_bytes(x, y, z), {==}, decoded)
+    case +x <> +y <> +z <> +w <> Nil{}:
+      utf8_proof.four_scalar_valid(x, y, z, w, cp, UTF8.valid_four_bytes(x, y, z, w), {==}, decoded)
+    case x <> y <> z <> w <> v <> rest:
+      Empty.absurd({Laws.is_valid_sequence(x <> y <> z <> w <> v <> rest) == True{} : Bool}, decoded)
 
 def utf8_proof.two_valid_encodes(+x: U32, +y: U32, +valid: {UTF8.valid_two_bytes(x, y) == True{} : Bool}) ->
   Exists(U32, cp => Laws.encodes([x, y], cp)):
   +shape = utf8_proof.valid_two_bytes_has_shape(x, y, valid)
   (UTF8.decode_two_bytes(x, y, shape), utf8_proof.two_encodes(x, y, shape, valid))
 
+def utf8_proof.three_valid_encodes(+x: U32, +y: U32, +z: U32, +valid: {UTF8.valid_three_bytes(x, y, z) == True{} : Bool}) ->
+  Exists(U32, cp => Laws.encodes([x, y, z], cp)):
+  +shape = UTF8.valid_three_bytes.has_shape(x, y, z, valid)
+  (UTF8.decode_three_bytes(x, y, z, shape), utf8_proof.three_encodes(x, y, z, shape, valid))
+
+def utf8_proof.four_valid_encodes(+x: U32, +y: U32, +z: U32, +w: U32, +valid: {UTF8.valid_four_bytes(x, y, z, w) == True{} : Bool}) ->
+  Exists(U32, cp => Laws.encodes([x, y, z, w], cp)):
+  +shape = UTF8.valid_four_bytes.has_shape(x, y, z, w, valid)
+  (UTF8.decode_four_bytes(x, y, z, w, shape), utf8_proof.four_encodes(x, y, z, w, shape, valid))
+
 def utf8_proof.valid_encodes(+seq: List<&2, U32>, valid: {Laws.is_valid_sequence(seq) == True{} : Bool}) ->
   Exists(U32, cp => Laws.encodes(seq, cp)):
   match seq:
     case Nil{}:
       Empty.absurd(Exists(U32, cp => Laws.encodes(Nil{}, cp)), H.hex_u32.false_true(valid))
-    case +x <> +xs:
-      match xs:
-        case Nil{}:
-          (x, utf8_proof.one_encodes(x, valid))
-        case +y <> +ys:
-          match ys:
-            case Nil{}:
-              utf8_proof.two_valid_encodes(x, y, valid)
-            case +z <> +zs:
-              Empty.absurd(Exists(U32, cp => Laws.encodes(x <> y <> z <> zs, cp)), H.hex_u32.false_true(valid))
+    case +x <> Nil{}:
+      (x, utf8_proof.one_encodes(x, valid))
+    case +x <> +y <> Nil{}:
+      utf8_proof.two_valid_encodes(x, y, valid)
+    case +x <> +y <> +z <> Nil{}:
+      utf8_proof.three_valid_encodes(x, y, z, valid)
+    case +x <> +y <> +z <> +w <> Nil{}:
+      utf8_proof.four_valid_encodes(x, y, z, w, valid)
+    case x <> y <> z <> w <> v <> rest:
+      Empty.absurd(Exists(U32, cp => Laws.encodes(x <> y <> z <> w <> v <> rest, cp)), H.hex_u32.false_true(valid))
 
 def utf8_proof.encodes_valid(+seq: List<&2, U32>, some: Exists(U32, cp => Laws.encodes(seq, cp))) ->
   {Laws.is_valid_sequence(seq) == True{} : Bool}:
@@ -3806,17 +5727,16 @@ def utf8_proof.next_of_encodes(+seq: List<&2, U32>, +cp: U32, +rest: List<&2, U3
   match seq:
     case Nil{}:
       Empty.absurd({utf8_proof.next_scalar(rest) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}, enc)
-    case +x <> +xs:
-      match xs:
-        case Nil{}:
-          utf8_proof.next_one(x, rest, cp, enc)
-        case +y <> +ys:
-          match ys:
-            case Nil{}:
-              utf8_proof.next_two_valid(x, y, rest, cp, enc)
-            case +z <> +zs:
-              Empty.absurd({utf8_proof.next_scalar(x <> y <> z <> List.append(&2, U32, zs, rest)) ==
-                Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}, enc)
+    case +x <> Nil{}:
+      utf8_proof.next_one(x, rest, cp, enc)
+    case +x <> +y <> Nil{}:
+      utf8_proof.next_two_valid(x, y, rest, cp, enc)
+    case +x <> +y <> +z <> Nil{}:
+      utf8_proof.next_three_valid(x, y, z, rest, cp, enc)
+    case +x <> +y <> +z <> +w <> Nil{}:
+      utf8_proof.next_four_valid(x, y, z, w, rest, cp, enc)
+    case x <> y <> z <> w <> v <> more:
+      Empty.absurd({utf8_proof.next_scalar(List.append(&2, U32, (x <> y <> z <> w <> v <> more), rest)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}, enc)
 
 def utf8_proof.next_of_begins(+bytes: List<&2, U32>, +cp: U32, +rest: List<&2, U32>,
   begins: Laws.begins_with_scalar(bytes, cp, rest)) ->
@@ -3856,12 +5776,46 @@ def utf8_proof.Finds(bytes: List<&2, U32>, found: Maybe<&1, U32 & List<&2, U32>>
     case Some{(cp, rest)}:
       Laws.begins_with_scalar(bytes, cp, rest)
 
-def utf8_proof.finds.pair(+b1: U32, +b2: U32, +after: List<&2, U32>, m: Maybe<&2, U32>,
-  checked: {utf8_proof.two_byte_scalar(b1, b2) == m : Maybe<&2, U32>}) ->
-  utf8_proof.Finds(b1 <> b2 <> after, utf8_proof.next_scalar.found(m, after, r => None{})):
+def utf8_proof.finds.quad(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +after: List<&2, U32>, m: Maybe<&2, U32>,
+  checked: {UTF8.four_byte_scalar(b1, b2, b3, b4) == m : Maybe<&2, U32>}) ->
+  utf8_proof.Finds(b1 <> b2 <> b3 <> b4 <> after, utf8_proof.next_scalar.found(m, after, r => None{})):
   match m:
     case None{}:
       Unit{}
+    case Some{+c}:
+      ([b1, b2, b3, b4], (utf8_proof.from_old([b1, b2, b3, b4], c, checked), {==}))
+
+def utf8_proof.finds.four(+b1: U32, +b2: U32, +b3: U32, +rest: List<&2, U32>) ->
+  utf8_proof.Finds(b1 <> b2 <> b3 <> rest, utf8_proof.next_scalar.four(b1, b2, b3, rest)):
+  match rest:
+    case Nil{}:
+      Unit{}
+    case +b4 <> +after:
+      utf8_proof.finds.quad(b1, b2, b3, b4, after, UTF8.four_byte_scalar(b1, b2, b3, b4), {==})
+
+def utf8_proof.finds.triple(+b1: U32, +b2: U32, +b3: U32, +after: List<&2, U32>, m: Maybe<&2, U32>,
+  checked: {UTF8.three_byte_scalar(b1, b2, b3) == m : Maybe<&2, U32>}) ->
+  utf8_proof.Finds(b1 <> b2 <> b3 <> after, utf8_proof.next_scalar.found(m, after, r => utf8_proof.next_scalar.four(b1, b2, b3, r))):
+  match m:
+    case None{}:
+      utf8_proof.finds.four(b1, b2, b3, after)
+    case Some{+c}:
+      ([b1, b2, b3], (utf8_proof.from_old([b1, b2, b3], c, checked), {==}))
+
+def utf8_proof.finds.three(+b1: U32, +b2: U32, +rest: List<&2, U32>) ->
+  utf8_proof.Finds(b1 <> b2 <> rest, utf8_proof.next_scalar.three(b1, b2, rest)):
+  match rest:
+    case Nil{}:
+      Unit{}
+    case +b3 <> +after:
+      utf8_proof.finds.triple(b1, b2, b3, after, UTF8.three_byte_scalar(b1, b2, b3), {==})
+
+def utf8_proof.finds.pair(+b1: U32, +b2: U32, +after: List<&2, U32>, m: Maybe<&2, U32>,
+  checked: {utf8_proof.two_byte_scalar(b1, b2) == m : Maybe<&2, U32>}) ->
+  utf8_proof.Finds(b1 <> b2 <> after, utf8_proof.next_scalar.found(m, after, r => utf8_proof.next_scalar.three(b1, b2, r))):
+  match m:
+    case None{}:
+      utf8_proof.finds.three(b1, b2, after)
     case Some{+c}:
       ([b1, b2], (utf8_proof.from_old([b1, b2], c, checked), {==}))
 
@@ -4000,14 +5954,46 @@ def utf8_proof.next_found_progress(scalar: Maybe<&2, U32>, +rest: List<&2, U32>,
     case Some{cp}: suffix
     case None{}: other
 
+def utf8_proof.progress_cons.pair(+b: U32, +more: List<&2, U32>, x: U32 & List<&2, U32>,
+  p: utf8_proof.Progress.pair(more, x)) -> utf8_proof.Progress.pair(b <> more, x):
+  (cp, +rest) = x
+  (+q, e) = p
+  (b <> q, Equal.cong(List<&2, U32>, List<&2, U32>, xs => b <> xs, List.append(&2, U32, q, rest), more, e))
+
+def utf8_proof.progress_cons(+b: U32, +more: List<&2, U32>, result: Maybe<&1, U32 & List<&2, U32>>, p: utf8_proof.Progress(more, result)) ->
+  utf8_proof.Progress(b <> more, result):
+  match result:
+    case None{}: Unit{}
+    case Some{x}: utf8_proof.progress_cons.pair(b, more, x, p)
+
+def utf8_proof.next_four_progress(+b1: U32, +b2: U32, +b3: U32, +more: List<&2, U32>) ->
+  utf8_proof.Progress(more, utf8_proof.next_scalar.four(b1, b2, b3, more)):
+  match more:
+    case Nil{}:
+      Unit{}
+    case +b4 <> +after:
+      utf8_proof.next_found_progress(UTF8.four_byte_scalar(b1, b2, b3, b4), after, r => None{},
+        b4 <> after, ([b4], {==}), Unit{})
+
+def utf8_proof.next_three_progress(+b1: U32, +b2: U32, +more: List<&2, U32>) ->
+  utf8_proof.Progress(more, utf8_proof.next_scalar.three(b1, b2, more)):
+  match more:
+    case Nil{}:
+      Unit{}
+    case +b3 <> +after:
+      utf8_proof.next_found_progress(UTF8.three_byte_scalar(b1, b2, b3), after, r => utf8_proof.next_scalar.four(b1, b2, b3, r),
+        b3 <> after, ([b3], {==}),
+        utf8_proof.progress_cons(b3, after, utf8_proof.next_scalar.four(b1, b2, b3, after), utf8_proof.next_four_progress(b1, b2, b3, after)))
+
 def utf8_proof.next_two_progress(+b1: U32, +more: List<&2, U32>) ->
   utf8_proof.Progress(more, utf8_proof.next_scalar.two(b1, more)):
   match more:
     case Nil{}:
       Unit{}
     case +b2 <> +after:
-      utf8_proof.next_found_progress(utf8_proof.two_byte_scalar(b1, b2), after, r => None{},
-        b2 <> after, ([b2], {==}), Unit{})
+      utf8_proof.next_found_progress(utf8_proof.two_byte_scalar(b1, b2), after, r => utf8_proof.next_scalar.three(b1, b2, r),
+        b2 <> after, ([b2], {==}),
+        utf8_proof.progress_cons(b2, after, utf8_proof.next_scalar.three(b1, b2, after), utf8_proof.next_three_progress(b1, b2, after)))
 
 def utf8_proof.next_progress(+b1: U32, +more: List<&2, U32>) ->
   utf8_proof.Progress(more, utf8_proof.next_scalar(b1 <> more)):
@@ -4382,35 +6368,36 @@ def Laws.decodes_examples():
   ({==},
   (([66], (utf8_proof.first_found(65, [66], 65, [66], {==}), ([], (utf8_proof.first_found(66, [], 66, [], {==}), {==})))),
   (([], (utf8_proof.first_found(194, [169], 169, [], {==}), {==})),
-  (([65], (utf8_proof.first_replaced(194, [65], [194], [65], {==}, (([65], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 65], {==}))), {==}),
-    ([], (utf8_proof.first_found(65, [], 65, [], {==}), {==})))),
-  (([128], (utf8_proof.first_replaced(192, [128], [192], [128], {==}, {==}, {==}),
-    ([], (utf8_proof.first_replaced(128, [], [128], [], {==}, {==}, {==}), {==})))),
+  (([65], (utf8_proof.first_replaced(194, [65], [194], [65], {==}, (([65], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 65], {==}))), {==}), ([], (utf8_proof.first_found(65, [], 65, [], {==}), {==})))),
+  (([128], (utf8_proof.first_replaced(192, [128], [192], [128], {==}, {==}, {==}), ([], (utf8_proof.first_replaced(128, [], [128], [], {==}, {==}, {==}), {==})))),
   (([], (utf8_proof.first_replaced(194, [], [194], [], {==}, (([], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194], Unit{}))), {==}), {==})),
-  (([194, 169], (utf8_proof.first_replaced(194, [194, 169], [194], [194, 169], {==}, (([194, 169], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 194, 169], {==}))), {==}),
-    ([], (utf8_proof.first_found(194, [169], 169, [], {==}), {==})))),
-  (([194, 169, 255], (utf8_proof.first_found(72, [194, 169, 255], 72, [194, 169, 255], {==}),
-    ([255], (utf8_proof.first_found(194, [169, 255], 169, [255], {==}),
-      ([], (utf8_proof.first_replaced(255, [], [255], [], {==}, {==}, {==}), {==}))))))))))))))
+  (([194, 169], (utf8_proof.first_replaced(194, [194, 169], [194], [194, 169], {==}, (([194, 169], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([194], [194, 194, 169], {==}))), {==}), ([], (utf8_proof.first_found(194, [169], 169, [], {==}), {==})))),
+  (([194, 169, 255], (utf8_proof.first_found(72, [194, 169, 255], 72, [194, 169, 255], {==}), ([255], (utf8_proof.first_found(194, [169, 255], 169, [255], {==}), ([], (utf8_proof.first_replaced(255, [], [255], [], {==}, {==}, {==}), {==})))))),
+  (([], (utf8_proof.first_found(226, [130, 172], 8364, [], {==}), {==})),
+  (([], (utf8_proof.first_found(240, [159, 152, 128], 128512, [], {==}), {==})),
+  (([], (utf8_proof.first_replaced(226, [130], [226, 130], [], {==}, (([], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([226, 130], [226, 130], Unit{}))), {==}), {==})),
+  (([65], (utf8_proof.first_replaced(226, [130, 65], [226, 130], [65], {==}, (([65], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([226, 130], [226, 130, 65], {==}))), {==}), ([], (utf8_proof.first_found(65, [], 65, [], {==}), {==})))),
+  (([], (utf8_proof.first_replaced(240, [159, 152], [240, 159, 152], [], {==}, (([], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([240, 159, 152], [240, 159, 152], Unit{}))), {==}), {==})),
+  (([128, 128], (utf8_proof.first_replaced(224, [128, 128], [224], [128, 128], {==}, (([128, 128], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([224], [224, 128, 128], {==}))), {==}), ([128], (utf8_proof.first_replaced(128, [128], [128], [128], {==}, {==}, {==}), ([], (utf8_proof.first_replaced(128, [], [128], [], {==}, {==}, {==}), {==})))))),
+  (([160, 128], (utf8_proof.first_replaced(237, [160, 128], [237], [160, 128], {==}, (([160, 128], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([237], [237, 160, 128], {==}))), {==}), ([128], (utf8_proof.first_replaced(160, [128], [160], [128], {==}, {==}, {==}), ([], (utf8_proof.first_replaced(128, [], [128], [], {==}, {==}, {==}), {==})))))),
+  ([144, 128, 128], (utf8_proof.first_replaced(244, [144, 128, 128], [244], [144, 128, 128], {==}, (([144, 128, 128], {==}), ({==}, utf8_proof.longer_not_valid_from_not_extended([244], [244, 144, 128, 128], {==}))), {==}), ([128, 128], (utf8_proof.first_replaced(144, [128, 128], [144], [128, 128], {==}, {==}, {==}), ([128], (utf8_proof.first_replaced(128, [128], [128], [128], {==}, {==}, {==}), ([], (utf8_proof.first_replaced(128, [], [128], [], {==}, {==}, {==}), {==})))))))))))))))))))))))
 
 # Running the decoder satisfies `decodes`
 # ---------------------------------------
 #
 # The decoder's byte loop, `UTF8.decode_buffer.bytes`, keeps pending
-# either nothing or one byte that is a valid sequence prefix without
+# either nothing or some bytes that are a valid sequence prefix without
 # being a whole valid sequence.  Each step turns a decoding of what
-# follows into a decoding of the whole input; at the end, a pending
-# byte is replaced.
+# follows into a decoding of the whole input; at the end, the pending
+# bytes are replaced by one U+FFFD.
 
 def utf8_proof.Pending(pending: List<&2, U32>) -> Type:
   match pending:
     case Nil{}:
       Unit
-    case +p <> Nil{}:
-      {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool} &
-      {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}
-    case _:
-      Empty
+    case +p <> +ps:
+      {UTF8.is_valid_sequence_prefix(p <> ps) == True{} : Bool} &
+      {UTF8.sequence_scalar(p <> ps) == None{} : Maybe<&2, U32>}
 
 # After a step from `pending` on byte `b`, with `rest` still to come:
 # the new pending bytes keep the invariant, and the step's text followed
@@ -4449,61 +6436,42 @@ def utf8_proof.prefix_contra(+b: U32,
   utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.is_valid_sequence_prefix([b]), False{},
     Equal.sym(Bool, UTF8.is_valid_sequence_prefix([b]), True{}, begins), not_begins))
 
+# The implementation's scalar function and `Decodes` agree.
+def utf8_proof.scalar_to_decodes(+seq: List<&2, U32>, +cp: U32, e: {UTF8.sequence_scalar(seq) == Some{cp} : Maybe<&2, U32>}) -> utf8_proof.Decodes(seq, cp):
+  match seq:
+    case Nil{}:
+      Empty.absurd(utf8_proof.Decodes(Nil{}, cp),
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+    case +x <> Nil{}:
+      utf8_proof.one_scalar_is(x, Some{cp}, e)
+    case +x <> +y <> Nil{}:
+      utf8_proof.two_scalar_is(x, y, Some{cp}, e)
+    case +x <> +y <> +z <> Nil{}:
+      e
+    case +x <> +y <> +z <> +w <> Nil{}:
+      e
+    case x <> y <> z <> w <> v <> rest:
+      Empty.absurd(utf8_proof.Decodes(x <> y <> z <> w <> v <> rest, cp),
+        H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp}, e)))
+
+def utf8_proof.decodes_to_scalar(+seq: List<&2, U32>, +cp: U32, d: utf8_proof.Decodes(seq, cp)) -> {UTF8.sequence_scalar(seq) == Some{cp} : Maybe<&2, U32>}:
+  match seq:
+    case Nil{}:
+      Empty.absurd({UTF8.sequence_scalar(Nil{}) == Some{cp} : Maybe<&2, U32>}, d)
+    case +x <> Nil{}:
+      Equal.trans(Maybe<&2, U32>, UTF8.one_byte_scalar(x), utf8_proof.one_byte_scalar(x), Some{cp},
+        utf8_proof.one_scalar_agrees(x, UTF8.valid_one_byte(x), {==}, UTF8.valid_one_byte(x), {==}, {==}), d)
+    case +x <> +y <> Nil{}:
+      Equal.trans(Maybe<&2, U32>, UTF8.two_byte_scalar(x, y), utf8_proof.two_byte_scalar(x, y), Some{cp},
+        utf8_proof.two_scalar_agrees(x, y, UTF8.valid_two_bytes(x, y), {==}, UTF8.valid_two_bytes(x, y), {==}, {==}), d)
+    case +x <> +y <> +z <> Nil{}:
+      d
+    case +x <> +y <> +z <> +w <> Nil{}:
+      d
+    case x <> y <> z <> w <> v <> rest:
+      Empty.absurd({UTF8.sequence_scalar(x <> y <> z <> w <> v <> rest) == Some{cp} : Maybe<&2, U32>}, d)
+
 # A reference scalar is None when its validity test cannot be True.
-def utf8_proof.one_scalar_none(+byte: U32, valid: Bool,
-  -checked: {UTF8.valid_one_byte(byte) == valid : Bool},
-  invalid: {valid == True{} : Bool} -> Empty) ->
-  {utf8_proof.one_byte_scalar.if(byte, valid, checked) == None{} : Maybe<&2, U32>}:
-  match valid:
-    case False{}: {==}
-    case True{}: Empty.absurd({utf8_proof.one_byte_scalar.if(byte, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
-
-def utf8_proof.two_scalar_none(+b1: U32, +b2: U32, valid: Bool,
-  -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
-  invalid: {valid == True{} : Bool} -> Empty) ->
-  {utf8_proof.two_byte_scalar.if(b1, b2, valid, checked) == None{} : Maybe<&2, U32>}:
-  match valid:
-    case False{}: {==}
-    case True{}: Empty.absurd({utf8_proof.two_byte_scalar.if(b1, b2, True{}, checked) == None{} : Maybe<&2, U32>}, invalid({==}))
-
-# A byte that is not a valid sequence prefix is not a valid sequence,
-# nor the start of a two-byte one.
-def utf8_proof.not_one(+b: U32, +not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) ->
-  {utf8_proof.one_byte_scalar(b) == None{} : Maybe<&2, U32>}:
-  utf8_proof.one_scalar_none(b, UTF8.valid_one_byte(b), {==},
-    valid => utf8_proof.prefix_contra(b, utf8_proof.prefix_from_valid(b, Nil{}, Nil{}, valid), not_begins))
-
-def utf8_proof.not_two(+b: U32, +b2: U32,
-  +not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) ->
-  {utf8_proof.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}:
-  utf8_proof.two_scalar_none(b, b2, UTF8.valid_two_bytes(b, b2), {==},
-    valid => utf8_proof.prefix_contra(b, utf8_proof.prefix_from_valid(b, Nil{}, [b2], valid), not_begins))
-
-def utf8_proof.two_none_all(+b: U32, +rest: List<&2, U32>,
-  none: @b2: U32 -> {utf8_proof.two_byte_scalar(b, b2) == None{} : Maybe<&2, U32>}) ->
-  {utf8_proof.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
-  match rest:
-    case Nil{}: {==}
-    case +b2 <> +after:
-      %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(b, b2), None{}, none(b2)) :
-        {utf8_proof.next_scalar.found(_, after, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
-      {==}
-
-def utf8_proof.two_none_at(+p: U32, +b: U32, +rest: List<&2, U32>,
-  none: {utf8_proof.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
-  {utf8_proof.next_scalar.two(p, b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
-  %Equal.sym(Maybe<&2, U32>, utf8_proof.two_byte_scalar(p, b), None{}, none) :
-    {utf8_proof.next_scalar.found(_, rest, r => None{}) == None{} : Maybe<&1, U32 & List<&2, U32>>}
-  {==}
-
-def utf8_proof.next_none(+b: U32, +rest: List<&2, U32>,
-  one: {utf8_proof.one_byte_scalar(b) == None{} : Maybe<&2, U32>},
-  two: {utf8_proof.next_scalar.two(b, rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}) ->
-  {utf8_proof.next_scalar(b <> rest) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
-  %Equal.sym(Maybe<&2, U32>, utf8_proof.one_byte_scalar(b), None{}, one) :
-    {utf8_proof.next_scalar.found(_, rest, r => utf8_proof.next_scalar.two(b, r)) == None{} : Maybe<&1, U32 & List<&2, U32>>}
-  two
-
 # A byte that is not a valid sequence prefix is its own maximal subpart.
 def utf8_proof.single_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
   checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
@@ -4520,24 +6488,203 @@ def utf8_proof.single_subpart(+b1: U32, +more: List<&2, U32>,
   Laws.maximal_subpart(b1, more, [b1]):
   utf8_proof.single_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==}, not_begins)
 
-# A byte that is a valid sequence prefix, which the next byte (if any)
-# cannot continue, is its own maximal subpart.
-def utf8_proof.lead_subpart.if(+p: U32, +more: List<&2, U32>, begins: Bool,
-  checked: {UTF8.is_valid_sequence_prefix([p]) == begins : Bool},
-  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
-  not_extended: utf8_proof.not_extended_by([p], utf8_proof.next_byte_after(p <> more, [p]))) ->
-  Laws.maximal_subpart.if(p, more, begins, [p]):
-  match begins:
-    case True{}: ((more, {==}), (lead, utf8_proof.longer_not_valid_from_not_extended([p], p <> more, not_extended)))
-    case False{}:
-      Empty.absurd(Laws.maximal_subpart.single_byte(p, [p]),
-        utf8_proof.prefix_contra(p, lead, checked))
+def utf8_proof.append_nil(+x: List<&2, U32>) -> {List.append(&2, U32, x, Nil{}) == x : List<&2, U32>}:
+  match x:
+    case Nil{}: {==}
+    case +h <> +t:
+      Equal.cong(List<&2, U32>, List<&2, U32>, y => h <> y, List.append(&2, U32, t, Nil{}), t, utf8_proof.append_nil(t))
 
-def utf8_proof.lead_subpart(+p: U32, +more: List<&2, U32>,
-  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
-  not_extended: utf8_proof.not_extended_by([p], utf8_proof.next_byte_after(p <> more, [p]))) ->
-  Laws.maximal_subpart(p, more, [p]):
-  utf8_proof.lead_subpart.if(p, more, UTF8.is_valid_sequence_prefix([p]), {==}, lead, not_extended)
+def utf8_proof.valid_append_nil(+h: U32, +t: List<&2, U32>, v: {Laws.is_valid_sequence(h <> t) == True{} : Bool}) ->
+  {Laws.is_valid_sequence(List.append(&2, U32, h <> t, Nil{})) == True{} : Bool}:
+  %Equal.sym(List<&2, U32>, List.append(&2, U32, h <> t, Nil{}), h <> t, utf8_proof.append_nil(h <> t)) : {Laws.is_valid_sequence(_) == True{} : Bool}
+  v
+
+# No valid sequence is a proper prefix of another: their lead bytes say
+# how long they are.
+def utf8_proof.valid_prefix_free(+b1: U32, +more: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
+  v1: {Laws.is_valid_sequence(b1 <> more) == True{} : Bool},
+  v2: {Laws.is_valid_sequence(List.append(&2, U32, b1 <> more, c <> extra)) == True{} : Bool}) -> Empty:
+  match more extra:
+    case Nil{} Nil{}:
+      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 2n), 1n, 2n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 2n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind2(b1, c, v2))))
+    case Nil{} +e2 <> Nil{}:
+      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 1n, 3n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind3(b1, c, e2, v2))))
+    case Nil{} +e2 <> +e3 <> Nil{}:
+      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 1n, 4n, Equal.trans(Nat, 1n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 1n, utf8_proof.valid_kind1(b1, v1)), utf8_proof.valid_kind4(b1, c, e2, e3, v2))))
+    case Nil{} e2 <> e3 <> e4 <> after:
+      H.hex_u32.false_true(v2)
+    case +b2 <> Nil{} Nil{}:
+      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 3n), 2n, 3n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 3n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v1)), utf8_proof.valid_kind3(b1, b2, c, v2))))
+    case +b2 <> Nil{} +e2 <> Nil{}:
+      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 2n, 4n, Equal.trans(Nat, 2n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 2n, utf8_proof.valid_kind2(b1, b2, v1)), utf8_proof.valid_kind4(b1, b2, c, e2, v2))))
+    case +b2 <> Nil{} e2 <> e3 <> after:
+      H.hex_u32.false_true(v2)
+    case +b2 <> +b3 <> Nil{} Nil{}:
+      H.hex_u32.false_true(Equal.cong(Nat, Bool, m => Nat.is_eq(m, 4n), 3n, 4n, Equal.trans(Nat, 3n, utf8_proof.kind(b1), 4n, Equal.sym(Nat, utf8_proof.kind(b1), 3n, utf8_proof.valid_kind3(b1, b2, b3, v1)), utf8_proof.valid_kind4(b1, b2, b3, c, v2))))
+    case +b2 <> +b3 <> Nil{} e2 <> after:
+      H.hex_u32.false_true(v2)
+    case +b2 <> +b3 <> +b4 <> Nil{} _:
+      H.hex_u32.false_true(v2)
+    case b2 <> b3 <> b4 <> b5 <> after _:
+      H.hex_u32.false_true(v2)
+
+def utf8_proof.valid_is_prefix(+h: U32, +t: List<&2, U32>, v: {Laws.is_valid_sequence(h <> t) == True{} : Bool}) -> {UTF8.is_valid_sequence_prefix(h <> t) == True{} : Bool}:
+  utf8_proof.prefix_from_completion(h, t, (Nil{},
+    utf8_proof.valid_append_nil(h, t, v)))
+
+def utf8_proof.pf_scalar_none(+b1: U32, +more: List<&2, U32>, +c: U32, +extra: List<&2, U32>, m: Maybe<&2, U32>,
+  +checked: {UTF8.sequence_scalar(b1 <> more) == m : Maybe<&2, U32>},
+  v2: {Laws.is_valid_sequence(List.append(&2, U32, b1 <> more, c <> extra)) == True{} : Bool}) -> {UTF8.sequence_scalar(b1 <> more) == None{} : Maybe<&2, U32>}:
+  match m:
+    case None{}: checked
+    case Some{+x}:
+      Empty.absurd({UTF8.sequence_scalar(b1 <> more) == None{} : Maybe<&2, U32>},
+        utf8_proof.valid_prefix_free(b1, more, c, extra,
+          utf8_proof.decodes_valid(b1 <> more, x, utf8_proof.scalar_to_decodes(b1 <> more, x, checked)), v2))
+
+def utf8_proof.next_none.if(+bytes: List<&2, U32>, found: Maybe<&1, U32 & List<&2, U32>>,
+  +checked: {utf8_proof.next_scalar(bytes) == found : Maybe<&1, U32 & List<&2, U32>>}, none: Laws.no_valid_sequence(bytes)) ->
+  {utf8_proof.next_scalar(bytes) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  match found:
+    case None{}: checked
+    case Some{x}:
+      (+cp, +rest) = x
+      Empty.absurd({utf8_proof.next_scalar(bytes) == None{} : Maybe<&1, U32 & List<&2, U32>>}, none(cp, rest, utf8_proof.finds_at(bytes, Some{(cp, rest)}, checked)))
+
+def utf8_proof.next_none(+bytes: List<&2, U32>, none: Laws.no_valid_sequence(bytes)) -> {utf8_proof.next_scalar(bytes) == None{} : Maybe<&1, U32 & List<&2, U32>>}:
+  utf8_proof.next_none.if(bytes, utf8_proof.next_scalar(bytes), {==}, none)
+
+def utf8_proof.no_begin_not_prefix.seq(+b: U32, +rest: List<&2, U32>, +seq: List<&2, U32>, +r: List<&2, U32>, +split: {List.append(&2, U32, seq, r) == b <> rest : List<&2, U32>},
+  valid: {Laws.is_valid_sequence(seq) == True{} : Bool}, not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool}) -> Empty:
+  match seq:
+    case Nil{}: H.hex_u32.false_true(valid)
+    case +h <> +t:
+      +same = utf8_proof.cons_head(h, b, List.append(&2, U32, t, r), rest, split)
+      +closed = utf8_proof.prefix_closed(h, Nil{}, t, utf8_proof.valid_is_prefix(h, t, valid))
+      utf8_proof.prefix_contra(b, Equal.trans(Bool, UTF8.is_valid_sequence_prefix([b]), UTF8.is_valid_sequence_prefix([h]), True{}, Equal.cong(U32, Bool, x => UTF8.is_valid_sequence_prefix([x]), b, h, Equal.sym(U32, h, b, same)), closed), not_begins)
+
+def utf8_proof.no_begin_not_prefix(+b: U32, +rest: List<&2, U32>, not_begins: {UTF8.is_valid_sequence_prefix([b]) == False{} : Bool},
+  +cp: U32, +r: List<&2, U32>, begins: Laws.begins_with_scalar(b <> rest, cp, r)) -> Empty:
+  (+seq, facts) = begins
+  (enc, split) = facts
+  utf8_proof.no_begin_not_prefix.seq(b, rest, seq, r, split,
+    utf8_proof.decodes_valid(seq, cp, utf8_proof.to_old(seq, cp, enc)), not_begins)
+
+def utf8_proof.no_begin.shorter_seq(+h: U32, +t: List<&2, U32>, +q: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
+  v1: {Laws.is_valid_sequence(h <> t) == True{} : Bool},
+  +eq: {q == List.append(&2, U32, h <> t, c <> extra) : List<&2, U32>},
+  completion: PrefixCompletion(q)) -> Empty:
+  (+rest2, v) = completion
+  +regrouped = Equal.trans(List<&2, U32>, List.append(&2, U32, h <> t, c <> List.append(&2, U32, extra, rest2)), List.append(&2, U32, List.append(&2, U32, h <> t, c <> extra), rest2), List.append(&2, U32, q, rest2),
+    Equal.sym(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, h <> t, c <> extra), rest2), List.append(&2, U32, h <> t, c <> List.append(&2, U32, extra, rest2)), utf8_proof.append_assoc(h <> t, c <> extra, rest2)),
+    Equal.cong(List<&2, U32>, List<&2, U32>, x => List.append(&2, U32, x, rest2), List.append(&2, U32, h <> t, c <> extra), q, Equal.sym(List<&2, U32>, q, List.append(&2, U32, h <> t, c <> extra), eq)))
+  utf8_proof.valid_prefix_free(h, t, c, List.append(&2, U32, extra, rest2), v1,
+    Equal.trans(Bool, Laws.is_valid_sequence(List.append(&2, U32, h <> t, c <> List.append(&2, U32, extra, rest2))), Laws.is_valid_sequence(List.append(&2, U32, q, rest2)), True{},
+      Equal.cong(List<&2, U32>, Bool, x => Laws.is_valid_sequence(x), List.append(&2, U32, h <> t, c <> List.append(&2, U32, extra, rest2)), List.append(&2, U32, q, rest2), regrouped), v))
+
+def utf8_proof.no_begin.shorter(+seq: List<&2, U32>, +q: List<&2, U32>, +c: U32, +extra: List<&2, U32>,
+  v1: {Laws.is_valid_sequence(seq) == True{} : Bool},
+  +eq: {q == List.append(&2, U32, seq, c <> extra) : List<&2, U32>},
+  completion: PrefixCompletion(q)) -> Empty:
+  match seq:
+    case Nil{}: H.hex_u32.false_true(v1)
+    case +h <> +t: utf8_proof.no_begin.shorter_seq(h, t, q, c, extra, v1, eq, completion)
+
+def utf8_proof.valid_head_prefix(+seq: List<&2, U32>, v: {Laws.is_valid_sequence(seq) == True{} : Bool}) -> {UTF8.is_valid_sequence_prefix(seq) == True{} : Bool}:
+  match seq:
+    case Nil{}: Empty.absurd({UTF8.is_valid_sequence_prefix(Nil{}) == True{} : Bool}, H.hex_u32.false_true(v))
+    case +h <> +t: utf8_proof.valid_is_prefix(h, t, v)
+
+def utf8_proof.no_begin.shorter_unpack(+seq: List<&2, U32>, +q: List<&2, U32>, +bytes: List<&2, U32>,
+  shorter: utf8_proof.Shorter(seq, q, bytes),
+  v1: {Laws.is_valid_sequence(seq) == True{} : Bool}, completion: PrefixCompletion(q)) -> Empty:
+  (+c, more) = shorter
+  (+extra, facts) = more
+  (eq, next) = facts
+  utf8_proof.no_begin.shorter(seq, q, c, extra, v1, eq, completion)
+
+def utf8_proof.no_begin.longer_unpack(+q: List<&2, U32>, +seq: List<&2, U32>, +bytes: List<&2, U32>, +r: List<&2, U32>,
+  +split: {List.append(&2, U32, seq, r) == bytes : List<&2, U32>},
+  shorter: utf8_proof.Shorter(q, seq, bytes),
+  not_ext: utf8_proof.not_extended_by(q, utf8_proof.next_byte_after(bytes, q)),
+  begins_seq: {UTF8.is_valid_sequence_prefix(seq) == True{} : Bool}) -> Empty:
+  (+c, more) = shorter
+  (+extra, facts) = more
+  (+eq, next) = facts
+  +split2 = Equal.trans(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, q, c <> extra), r), List.append(&2, U32, seq, r), bytes,
+    Equal.cong(List<&2, U32>, List<&2, U32>, x => List.append(&2, U32, x, r), List.append(&2, U32, q, c <> extra), seq, Equal.sym(List<&2, U32>, seq, List.append(&2, U32, q, c <> extra), eq)), split)
+  +no = utf8_proof.longer_not_valid_from_not_extended(q, bytes, not_ext)(c, extra, (r, split2))
+  utf8_proof.true_false(Equal.trans(Bool, True{}, UTF8.is_valid_sequence_prefix(seq), False{},
+    Equal.sym(Bool, UTF8.is_valid_sequence_prefix(seq), True{}, begins_seq),
+    Equal.trans(Bool, UTF8.is_valid_sequence_prefix(seq), UTF8.is_valid_sequence_prefix(List.append(&2, U32, q, c <> extra)), False{},
+      Equal.cong(List<&2, U32>, Bool, x => UTF8.is_valid_sequence_prefix(x), seq, List.append(&2, U32, q, c <> extra), eq), no)))
+
+def utf8_proof.no_begin.compared(+q: List<&2, U32>, +seq: List<&2, U32>, +bytes: List<&2, U32>, +cp: U32, +r: List<&2, U32>,
+  +split: {List.append(&2, U32, seq, r) == bytes : List<&2, U32>},
+  enc: Laws.encodes(seq, cp),
+  begins_q: {UTF8.is_valid_sequence_prefix(q) == True{} : Bool},
+  none_q: {UTF8.sequence_scalar(q) == None{} : Maybe<&2, U32>},
+  not_ext: utf8_proof.not_extended_by(q, utf8_proof.next_byte_after(bytes, q)),
+  compared: utf8_proof.Compared(seq, q, bytes)) -> Empty:
+  match compared:
+    case Inl{same}:
+      H.hex_u32.false_true(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), None{}, Some{cp},
+        Equal.trans(Maybe<&2, U32>, None{}, UTF8.sequence_scalar(q), Some{cp}, Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar(q), None{}, none_q),
+          Equal.trans(Maybe<&2, U32>, UTF8.sequence_scalar(q), UTF8.sequence_scalar(seq), Some{cp}, Equal.cong(List<&2, U32>, Maybe<&2, U32>, x => UTF8.sequence_scalar(x), q, seq, Equal.sym(List<&2, U32>, seq, q, same)),
+            utf8_proof.decodes_to_scalar(seq, cp, utf8_proof.to_old(seq, cp, enc))))))
+    case Inr{Inl{shorter}}:
+      utf8_proof.no_begin.shorter_unpack(seq, q, bytes, shorter,
+        utf8_proof.decodes_valid(seq, cp, utf8_proof.to_old(seq, cp, enc)), utf8_proof.prefix_completion(q, begins_q))
+    case Inr{Inr{shorter}}:
+      utf8_proof.no_begin.longer_unpack(q, seq, bytes, r, split, shorter, not_ext,
+        utf8_proof.valid_head_prefix(seq, utf8_proof.decodes_valid(seq, cp, utf8_proof.to_old(seq, cp, enc))))
+
+def utf8_proof.no_begin.split(+q: List<&2, U32>, +tail: List<&2, U32>, +seq: List<&2, U32>, +cp: U32, +r: List<&2, U32>,
+  +split: {List.append(&2, U32, seq, r) == List.append(&2, U32, q, tail) : List<&2, U32>},
+  enc: Laws.encodes(seq, cp),
+  begins_q: {UTF8.is_valid_sequence_prefix(q) == True{} : Bool},
+  none_q: {UTF8.sequence_scalar(q) == None{} : Maybe<&2, U32>},
+  not_ext: utf8_proof.not_extended_by(q, utf8_proof.next_byte_after(List.append(&2, U32, q, tail), q))) -> Empty:
+  utf8_proof.no_begin.compared(q, seq, List.append(&2, U32, q, tail), cp, r, split, enc, begins_q, none_q, not_ext,
+    utf8_proof.compare(seq, q, List.append(&2, U32, q, tail), r, tail, split, {==}))
+
+def utf8_proof.no_begin_pending(+q: List<&2, U32>, +tail: List<&2, U32>,
+  begins_q: {UTF8.is_valid_sequence_prefix(q) == True{} : Bool},
+  none_q: {UTF8.sequence_scalar(q) == None{} : Maybe<&2, U32>},
+  not_ext: utf8_proof.not_extended_by(q, utf8_proof.next_byte_after(List.append(&2, U32, q, tail), q)),
+  +cp: U32, +r: List<&2, U32>, begins: Laws.begins_with_scalar(List.append(&2, U32, q, tail), cp, r)) -> Empty:
+  (+seq, facts) = begins
+  (enc, split) = facts
+  utf8_proof.no_begin.split(q, tail, seq, cp, r, split, enc, begins_q, none_q, not_ext)
+
+def utf8_proof.not_ext_some(+q: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
+  not_begins: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, q, [b])) == False{} : Bool}) ->
+  utf8_proof.not_extended_by(q, utf8_proof.next_byte_after(List.append(&2, U32, q, b <> rest), q)):
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.next_byte_after(List.append(&2, U32, q, b <> rest), q), Some{b}, utf8_proof.next_after_append(q, b <> rest)) : utf8_proof.not_extended_by(q, _)
+  not_begins
+
+def utf8_proof.not_ext_nil(+q: List<&2, U32>) ->
+  utf8_proof.not_extended_by(q, utf8_proof.next_byte_after(List.append(&2, U32, q, Nil{}), q)):
+  %Equal.sym(Maybe<&2, U32>, utf8_proof.next_byte_after(List.append(&2, U32, q, Nil{}), q), None{}, utf8_proof.next_after_append(q, Nil{})) : utf8_proof.not_extended_by(q, _)
+  Unit{}
+
+def utf8_proof.pending_subpart.if(+p: U32, +ps: List<&2, U32>, +tail: List<&2, U32>, begins: Bool,
+  checked: {UTF8.is_valid_sequence_prefix([p]) == begins : Bool},
+  prefix_q: {UTF8.is_valid_sequence_prefix(p <> ps) == True{} : Bool},
+  not_ext: utf8_proof.not_extended_by(p <> ps, utf8_proof.next_byte_after(List.append(&2, U32, p <> ps, tail), p <> ps))) ->
+  Laws.maximal_subpart.if(p, List.append(&2, U32, ps, tail), begins, p <> ps):
+  match begins:
+    case True{}:
+      ((tail, {==}), (prefix_q, utf8_proof.longer_not_valid_from_not_extended(p <> ps, List.append(&2, U32, p <> ps, tail), not_ext)))
+    case False{}:
+      Empty.absurd(Laws.maximal_subpart.single_byte(p, p <> ps),
+        utf8_proof.prefix_contra(p, utf8_proof.prefix_closed(p, Nil{}, ps, prefix_q), checked))
+
+def utf8_proof.pending_subpart(+p: U32, +ps: List<&2, U32>, +tail: List<&2, U32>,
+  prefix_q: {UTF8.is_valid_sequence_prefix(p <> ps) == True{} : Bool},
+  not_ext: utf8_proof.not_extended_by(p <> ps, utf8_proof.next_byte_after(List.append(&2, U32, p <> ps, tail), p <> ps))) ->
+  Laws.maximal_subpart(p, List.append(&2, U32, ps, tail), p <> ps):
+  utf8_proof.pending_subpart.if(p, ps, tail, UTF8.is_valid_sequence_prefix([p]), {==}, prefix_q, not_ext)
 
 # A step with nothing pending.
 def utf8_proof.start_ok.if(+b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
@@ -4555,8 +6702,7 @@ def utf8_proof.start_ok.if(+b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>
     case None{} False{}:
       (Unit{}, after => d =>
         (rest, (utf8_proof.first_replaced(b, rest, [b], rest,
-          utf8_proof.next_none(b, rest, utf8_proof.not_one(b, begins_is),
-            utf8_proof.two_none_all(b, rest, b2 => utf8_proof.not_two(b, b2, begins_is))),
+          utf8_proof.next_none(b <> rest, c => r => bg => utf8_proof.no_begin_not_prefix(b, rest, begins_is, c, r, bg)),
           utf8_proof.single_subpart(b, rest, begins_is), {==}), d)))
 
 def utf8_proof.start_ok(+b: U32, +rest: List<&2, U32>) ->
@@ -4564,56 +6710,57 @@ def utf8_proof.start_ok(+b: U32, +rest: List<&2, U32>) ->
   utf8_proof.start_ok.if(b, rest, UTF8.sequence_scalar([b]), {==},
     UTF8.is_valid_sequence_prefix([b]), {==})
 
-# The pending byte cannot be continued: it is replaced, and the new byte
-# starts afresh.
-def utf8_proof.extend_fail(+p: U32, +b: U32, +rest: List<&2, U32>,
+# The pending bytes cannot be continued: they are replaced by one
+# U+FFFD, and the new byte starts afresh.
+def utf8_proof.extend_fail(+p: U32, +ps: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
   s: UTF8.decode_buffer.Step(), started: utf8_proof.StepOK(Nil{}, b, rest, s),
-  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
-  one: {utf8_proof.one_byte_scalar(p) == None{} : Maybe<&2, U32>},
-  not_begins: {UTF8.is_valid_sequence_prefix([p, b]) == False{} : Bool},
-  two: {utf8_proof.two_byte_scalar(p, b) == None{} : Maybe<&2, U32>}) ->
-  utf8_proof.StepOK([p], b, rest,
+  +begins_q: {UTF8.is_valid_sequence_prefix(p <> ps) == True{} : Bool},
+  +none_q: {UTF8.sequence_scalar(p <> ps) == None{} : Maybe<&2, U32>},
+  +not_begins: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, p <> ps, [b])) == False{} : Bool}) ->
+  utf8_proof.StepOK(p <> ps, b, rest,
     UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), s)):
   (+t, +q) = s
   (pending_q, continue) = started
   (pending_q, after => d =>
-    (b <> rest, (utf8_proof.first_replaced(p, b <> rest, [p], b <> rest,
-      utf8_proof.next_none(p, b <> rest, one, utf8_proof.two_none_at(p, b, rest, two)),
-      utf8_proof.lead_subpart(p, b <> rest, lead, not_begins), {==}),
+    (b <> rest, (utf8_proof.first_replaced(p, List.append(&2, U32, ps, b <> rest), p <> ps, b <> rest,
+      utf8_proof.next_none(p <> List.append(&2, U32, ps, b <> rest),
+        c => r => bg => utf8_proof.no_begin_pending(p <> ps, b <> rest, begins_q, none_q,
+          utf8_proof.not_ext_some(p <> ps, b, rest, not_begins), c, r, bg)),
+      utf8_proof.pending_subpart(p, ps, b <> rest, begins_q, utf8_proof.not_ext_some(p <> ps, b, rest, not_begins)), {==}),
       continue(after, d))))
 
-def utf8_proof.two_valid_some(+p: U32, +b: U32, valid: Bool,
-  -checked: {UTF8.valid_two_bytes(p, b) == valid : Bool},
-  none: {UTF8.two_byte_scalar.if(p, b, valid, checked) == None{} : Maybe<&2, U32>},
-  is_true: {valid == True{} : Bool}) -> Empty:
-  match valid:
-    case False{}: H.hex_u32.false_true(is_true)
-    case True{}:
-      utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
-        UTF8.two_byte_scalar.if(p, b, True{}, checked), None{}, none))
+# A step with bytes pending.
+def utf8_proof.extend_found(+p: U32, +ps: List<&2, U32>, +b: U32, +rest: List<&2, U32>, +cp: U32,
+  e: {utf8_proof.next_scalar(List.append(&2, U32, List.append(&2, U32, p <> ps, [b]), rest)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}) ->
+  {utf8_proof.next_scalar(p <> List.append(&2, U32, ps, b <> rest)) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}:
+  %utf8_proof.append_assoc(p <> ps, [b], rest) : {utf8_proof.next_scalar(_) == Some{(cp, rest)} : Maybe<&1, U32 & List<&2, U32>>}
+  e
 
-# A step with one byte pending.
-def utf8_proof.extend_ok.if(+p: U32, +b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
-  scalar_is: {UTF8.sequence_scalar([p, b]) == scalar : Maybe<&2, U32>}, begins: Bool,
-  begins_is: {UTF8.is_valid_sequence_prefix([p, b]) == begins : Bool},
-  pending: utf8_proof.Pending([p])) ->
-  utf8_proof.StepOK([p], b, rest, UTF8.decode_buffer.advance([p, b], scalar, begins,
+def utf8_proof.extend_keep(+p: U32, +ps: List<&2, U32>, +b: U32, +rest: List<&2, U32>, +after: String,
+  d: Laws.decodes(List.append(&2, U32, List.append(&2, U32, p <> ps, [b]), rest), after)) ->
+  Laws.decodes(p <> List.append(&2, U32, ps, b <> rest), after):
+  %utf8_proof.append_assoc(p <> ps, [b], rest) : Laws.decodes(_, after)
+  d
+
+def utf8_proof.extend_ok.if(+p: U32, +ps: List<&2, U32>, +b: U32, +rest: List<&2, U32>, scalar: Maybe<&2, U32>,
+  scalar_is: {UTF8.sequence_scalar(List.append(&2, U32, p <> ps, [b])) == scalar : Maybe<&2, U32>}, begins: Bool,
+  begins_is: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, p <> ps, [b])) == begins : Bool},
+  pending: utf8_proof.Pending(p <> ps)) ->
+  utf8_proof.StepOK(p <> ps, b, rest, UTF8.decode_buffer.advance(List.append(&2, U32, p <> ps, [b]), scalar, begins,
     u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(b)))):
   match scalar begins:
     case Some{+cp} _:
-      (lead, alone) = pending
       (Unit{}, after => d =>
-        (rest, (utf8_proof.first_found(p, b <> rest, cp, rest,
-          utf8_proof.next_two(p, b, rest, cp, utf8_proof.one_scalar_is(p, None{}, alone),
-            utf8_proof.two_scalar_is(p, b, Some{cp}, scalar_is))), d)))
+        (rest, (utf8_proof.first_found(p, List.append(&2, U32, ps, b <> rest), cp, rest,
+          utf8_proof.extend_found(p, ps, b, rest, cp,
+            utf8_proof.next_of_encodes(List.append(&2, U32, p <> ps, [b]), cp, rest,
+              utf8_proof.scalar_to_decodes(List.append(&2, U32, p <> ps, [b]), cp, scalar_is)))), d)))
     case None{} True{}:
-      Empty.absurd(utf8_proof.StepOK([p], b, rest, ("", [p, b])),
-        utf8_proof.two_valid_some(p, b, UTF8.valid_two_bytes(p, b), {==}, scalar_is, begins_is))
+      ((begins_is, scalar_is), after => d => utf8_proof.extend_keep(p, ps, b, rest, after, d))
     case None{} False{}:
       (lead, alone) = pending
-      utf8_proof.extend_fail(p, b, rest, UTF8.decode_buffer.start(b), utf8_proof.start_ok(b, rest),
-        lead, utf8_proof.one_scalar_is(p, None{}, alone), begins_is,
-        utf8_proof.two_scalar_is(p, b, None{}, scalar_is))
+      utf8_proof.extend_fail(p, ps, b, rest, UTF8.decode_buffer.start(b), utf8_proof.start_ok(b, rest),
+        lead, alone, begins_is)
 
 def utf8_proof.step_ok(+pending: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
   invariant: utf8_proof.Pending(pending)) ->
@@ -4621,27 +6768,26 @@ def utf8_proof.step_ok(+pending: List<&2, U32>, +b: U32, +rest: List<&2, U32>,
   match pending:
     case Nil{}:
       utf8_proof.start_ok(b, rest)
-    case +p <> Nil{}:
-      utf8_proof.extend_ok.if(p, b, rest, UTF8.sequence_scalar([p, b]), {==},
-        UTF8.is_valid_sequence_prefix([p, b]), {==}, invariant)
-    case p <> q <> more:
-      Empty.absurd(utf8_proof.StepOK(p <> q <> more, b, rest, UTF8.decode_buffer.step(p <> q <> more, b)),
-        invariant)
+    case +p <> +ps:
+      utf8_proof.extend_ok.if(p, ps, b, rest, UTF8.sequence_scalar(List.append(&2, U32, p <> ps, [b])), {==}, UTF8.is_valid_sequence_prefix(List.append(&2, U32, p <> ps, [b])), {==}, invariant)
 
-# At the end of the input, a pending byte is replaced.
+# At the end of the input, pending bytes are replaced by one U+FFFD.
+def utf8_proof.done_pending(+p: U32, +ps: List<&2, U32>,
+  +lead: {UTF8.is_valid_sequence_prefix(p <> ps) == True{} : Bool}, +alone: {UTF8.sequence_scalar(p <> ps) == None{} : Maybe<&2, U32>}) ->
+  Laws.decodes(List.append(&2, U32, p <> ps, Nil{}), UTF8.decode_done(p <> ps)):
+  (Nil{}, (utf8_proof.first_replaced(p, List.append(&2, U32, ps, Nil{}), p <> ps, Nil{},
+    utf8_proof.next_none(p <> List.append(&2, U32, ps, Nil{}),
+      c => r => bg => utf8_proof.no_begin_pending(p <> ps, Nil{}, lead, alone, utf8_proof.not_ext_nil(p <> ps), c, r, bg)),
+    utf8_proof.pending_subpart(p, ps, Nil{}, lead, utf8_proof.not_ext_nil(p <> ps)), {==}), {==}))
+
 def utf8_proof.done_ok(+pending: List<&2, U32>, invariant: utf8_proof.Pending(pending)) ->
   Laws.decodes(List.append(&2, U32, pending, Nil{}), UTF8.decode_done(pending)):
   match pending:
     case Nil{}:
       {==}
-    case +p <> Nil{}:
+    case +p <> +ps:
       (lead, alone) = invariant
-      (Nil{}, (utf8_proof.first_replaced(p, Nil{}, [p], Nil{},
-        utf8_proof.next_none(p, Nil{}, utf8_proof.one_scalar_is(p, None{}, alone), {==}),
-        utf8_proof.lead_subpart(p, Nil{}, lead, Unit{}), {==}), {==}))
-    case p <> q <> more:
-      Empty.absurd(Laws.decodes(List.append(&2, U32, p <> q <> more, Nil{}), UTF8.decode_done(p <> q <> more)),
-        invariant)
+      utf8_proof.done_pending(p, ps, lead, alone)
 
 def utf8_proof.final_prepend(+t: String, s: UTF8.decode_buffer.Step()) ->
   {utf8_proof.final_text(UTF8.decode_buffer.prepend(t, s)) == t ++ utf8_proof.final_text(s) : String}:
@@ -4855,127 +7001,236 @@ def utf8_proof.head_eq(+c1: U32, +c2: U32, +m1: String, +m2: String,
   e: {SCon{Chr{c1}, m1} == SCon{Chr{c2}, m2} : String}) -> {c1 == c2 : U32}:
   Equal.cong(String, U32, s => utf8_proof.char_of(c1, s), SCon{Chr{c1}, m1}, SCon{Chr{c2}, m2}, e)
 
-def utf8_proof.le_at(+x: U32, +y: U32, e: {x == y : U32},
-  le: {U32.is_le(x, 2047) == True{} : Bool}) -> {U32.is_le(y, 2047) == True{} : Bool}:
-  %e : {U32.is_le(_, 2047) == True{} : Bool}
-  le
-
 def utf8_proof.ends_here(+c: U32, +more: String, e: {SCon{Chr{c}, more} == SNil{} : String}) -> Empty:
   utf8_proof.true_false(Equal.cong(String, Bool, utf8_proof.string_is_cons, SCon{Chr{c}, more}, SNil{}, e))
 
-def utf8_proof.not_replacement(+c: U32, +more: String,
-  small: {U32.is_le(c, 2047) == True{} : Bool},
-  e: {SCon{Chr{c}, more} == SCon{Chr{65533}, SNil{}} : String}) -> Empty:
-  H.hex_u32.false_true(utf8_proof.le_at(c, 65533, utf8_proof.head_eq(c, 65533, more, SNil{}, e), small))
+def utf8_proof.low6_at(+x: U32, +y: U32, +e: {x == y : U32}, v: {U32.is_eq(U32.and(x, 63), 0) == True{} : Bool}) -> {U32.is_eq(U32.and(y, 63), 0) == True{} : Bool}:
+  %e : {U32.is_eq(U32.and(_, 63), 0) == True{} : Bool}
+  v
 
-def utf8_proof.not_two_byte(+c: U32, +cp: U32, +more: String, +rest: String,
-  large: {U32.is_le(c, 2047) == False{} : Bool},
+def utf8_proof.not_replacement(+c: U32, +more: String,
+  small: {U32.is_eq(U32.and(c, 63), 0) == True{} : Bool},
+  e: {SCon{Chr{c}, more} == SCon{Chr{65533}, SNil{}} : String}) -> Empty:
+  H.hex_u32.false_true(utf8_proof.low6_at(c, 65533, utf8_proof.head_eq(c, 65533, more, SNil{}, e), small))
+
+def utf8_proof.differs(+c: U32, +cp: U32, +more: String, +rest: String,
+  large: {U32.is_eq(U32.and(c, 63), 0) == False{} : Bool},
   rest_is: {rest == SCon{Chr{cp}, SNil{}} : String},
-  bound: {U32.is_le(cp, 2047) == True{} : Bool},
+  bound: {U32.is_eq(U32.and(cp, 63), 0) == True{} : Bool},
   e: {SCon{Chr{c}, more} == rest : String}) -> Empty:
-  utf8_proof.true_false(Equal.trans(Bool, True{}, U32.is_le(c, 2047), False{},
-    Equal.sym(Bool, U32.is_le(c, 2047), True{},
-      utf8_proof.le_at(cp, c, Equal.sym(U32, c, cp,
+  utf8_proof.true_false(Equal.trans(Bool, True{}, U32.is_eq(U32.and(c, 63), 0), False{},
+    Equal.sym(Bool, U32.is_eq(U32.and(c, 63), 0), True{},
+      utf8_proof.low6_at(cp, c, Equal.sym(U32, c, cp,
         utf8_proof.head_eq(c, cp, more, SNil{},
           Equal.trans(String, SCon{Chr{c}, more}, rest, SCon{Chr{cp}, SNil{}}, e, rest_is))), bound)),
     large))
 
-# A pending byte begins a two-byte sequence, which 0x80 completes.
-def utf8_proof.lead_two.if(+p: U32, one: Bool, -checked: {UTF8.valid_one_byte(p) == one : Bool},
-  lead: {(one || UTF8.valid_two_bytes(p, 128)) == True{} : Bool},
-  alone: {UTF8.one_byte_scalar.if(p, one, checked) == None{} : Maybe<&2, U32>}) ->
-  {UTF8.valid_two_bytes(p, 128) == True{} : Bool}:
-  match one:
-    case False{}: lead
-    case True{}:
-      Empty.absurd({UTF8.valid_two_bytes(p, 128) == True{} : Bool},
-        utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m),
-          UTF8.one_byte_scalar.if(p, True{}, checked), None{}, alone)))
-
-def utf8_proof.lead_two(+p: U32,
-  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
-  alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}) ->
-  {UTF8.valid_two_bytes(p, 128) == True{} : Bool}:
-  utf8_proof.lead_two.if(p, UTF8.valid_one_byte(p), {==}, lead, alone)
-
-def utf8_proof.TwoAfter(+p: U32, step: UTF8.decode_buffer.Step()) -> Type:
-  Exists(U32, cp =>
-    {utf8_proof.final_text(UTF8.decode_buffer.then(step, q => UTF8.decode_buffer.bytes(Nil{}, q))) ==
-      SCon{Chr{cp}, SNil{}} : String} &
-    {U32.is_le(cp, 2047) == True{} : Bool})
-
-def utf8_proof.two_after.if(+p: U32, valid: Bool, +checked: {UTF8.valid_two_bytes(p, 128) == valid : Bool},
+def utf8_proof.low6(+acc: U32) -> {U32.is_eq(U32.and(UTF8.append_continuation(acc, 128), 63), 0) == True{} : Bool}:
+  match acc:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      %Equal.sym(Word(32n), Word.add(32n, word_join(6n, Word.zero(6n), 26n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}), Word.zero(32n)), word_join(6n, Word.zero(6n), 26n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}), word_add_zero(32n, word_join(6n, Word.zero(6n), 26n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}))) :
+        {U32.is_eq(U32.and(U32{_}, 63), 0) == True{} : Bool}
+      %Equal.sym(Word(32n), Word.and(32n, word_join(6n, Word.zero(6n), 26n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}), word_join(6n, word_ones(6n), 26n, Word.zero(26n))), word_join(6n, Word.zero(6n), 26n, Word.zero(26n)),
+          word_mask_fields(6n, Word.zero(6n), 26n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}})) :
+        {U32.is_eq(U32{_}, 0) == True{} : Bool}
+      {==}
+def utf8_proof.some2.if(+b1: U32, +b2: U32, valid: Bool, +checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
   is_true: {valid == True{} : Bool}) ->
-  utf8_proof.TwoAfter(p, UTF8.decode_buffer.advance([p, 128], UTF8.two_byte_scalar.if(p, 128, valid, checked), valid,
-    u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(128)))):
+  Exists(U32, cp => {UTF8.two_byte_scalar.if(b1, b2, valid, checked) == Some{cp} : Maybe<&2, U32>} & {cp == (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32}):
   match valid:
+    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32}), H.hex_u32.false_true(is_true))
+    case True{}: (UTF8.decode_two_bytes(b1, b2, UTF8.valid_two_bytes.has_shape(b1, b2, checked)), ({==}, {==}))
+
+def utf8_proof.none2.contra(+b1: U32, +b2: U32, valid: Bool, -checked: {UTF8.valid_two_bytes(b1, b2) == valid : Bool},
+  none: {UTF8.two_byte_scalar.if(b1, b2, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
+  match valid:
+    case False{}: H.hex_u32.false_true(is_true)
     case True{}:
-      (UTF8.decode_two_bytes(p, 128, UTF8.valid_two_bytes.has_shape(p, 128, checked)),
-        ({==}, utf8_proof.exists_witness(
-          {UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(p, 128,
-            UTF8.valid_two_bytes.has_shape(p, 128, checked))) == True{} : Bool},
-          accepted => {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(p, 128,
-            UTF8.valid_two_bytes.has_shape(p, 128, checked)), accepted) == (p, 128) : U32 & U32},
-          utf8_proof.two_encode_decode((p, 128), UTF8.valid_two_bytes.has_shape(p, 128, checked)))))
-    case False{}:
-      Empty.absurd(utf8_proof.TwoAfter(p, UTF8.decode_buffer.advance([p, 128],
-          UTF8.two_byte_scalar.if(p, 128, False{}, checked), False{},
-          u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(128)))),
-        H.hex_u32.false_true(is_true))
+      utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.two_byte_scalar.if(b1, b2, True{}, checked), None{}, none))
 
-# With `p` pending, the continuation 0x80 gives one character, at most
-# 2047.
-def utf8_proof.two_after(+p: U32,
-  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
-  alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>}) ->
-  Exists(U32, cp =>
-    {utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])) == SCon{Chr{cp}, SNil{}} : String} &
-    {U32.is_le(cp, 2047) == True{} : Bool}):
-  utf8_proof.two_after.if(p, UTF8.valid_two_bytes(p, 128), {==}, utf8_proof.lead_two(p, lead, alone))
+def utf8_proof.some3.if(+b1: U32, +b2: U32, +b3: U32, valid: Bool, +checked: {UTF8.valid_three_bytes(b1, b2, b3) == valid : Bool},
+  is_true: {valid == True{} : Bool}) ->
+  Exists(U32, cp => {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec3(b1, b2, b3) : U32}):
+  match valid:
+    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec3(b1, b2, b3) : U32}), H.hex_u32.false_true(is_true))
+    case True{}: (UTF8.decode_three_bytes(b1, b2, b3, UTF8.valid_three_bytes.has_shape(b1, b2, b3, checked)), ({==}, {==}))
 
-def utf8_proof.prompt.large2(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32,
+def utf8_proof.none3.contra(+b1: U32, +b2: U32, +b3: U32, valid: Bool, -checked: {UTF8.valid_three_bytes(b1, b2, b3) == valid : Bool},
+  none: {UTF8.three_byte_scalar.if(b1, b2, b3, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
+  match valid:
+    case False{}: H.hex_u32.false_true(is_true)
+    case True{}:
+      utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.three_byte_scalar.if(b1, b2, b3, True{}, checked), None{}, none))
+
+def utf8_proof.some4.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, valid: Bool, +checked: {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid : Bool},
+  is_true: {valid == True{} : Bool}) ->
+  Exists(U32, cp => {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec4(b1, b2, b3, b4) : U32}):
+  match valid:
+    case False{}: Empty.absurd(Exists(U32, cp => {None{} == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec4(b1, b2, b3, b4) : U32}), H.hex_u32.false_true(is_true))
+    case True{}: (UTF8.decode_four_bytes(b1, b2, b3, b4, UTF8.valid_four_bytes.has_shape(b1, b2, b3, b4, checked)), ({==}, {==}))
+
+def utf8_proof.none4.contra(+b1: U32, +b2: U32, +b3: U32, +b4: U32, valid: Bool, -checked: {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid : Bool},
+  none: {UTF8.four_byte_scalar.if(b1, b2, b3, b4, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
+  match valid:
+    case False{}: H.hex_u32.false_true(is_true)
+    case True{}:
+      utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.four_byte_scalar.if(b1, b2, b3, b4, True{}, checked), None{}, none))
+
+def utf8_proof.none1.contra(+b1: U32, valid: Bool, -checked: {UTF8.valid_one_byte(b1) == valid : Bool},
+  none: {UTF8.one_byte_scalar.if(b1, valid, checked) == None{} : Maybe<&2, U32>}, is_true: {valid == True{} : Bool}) -> Empty:
+  match valid:
+    case False{}: H.hex_u32.false_true(is_true)
+    case True{}:
+      utf8_proof.true_false(Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), UTF8.one_byte_scalar.if(b1, True{}, checked), None{}, none))
+
+def utf8_proof.Completion(+p: U32, +ps: List<&2, U32>) -> Type:
+  Exists(U32, c0 => Exists(List<&2, U32>, cs => Exists(U32, cp =>
+    {UTF8.sequence_scalar(List.append(&2, U32, p <> ps, c0 <> cs)) == Some{cp} : Maybe<&2, U32>} &
+    {U32.is_eq(U32.and(cp, 63), 0) == True{} : Bool} &
+    {Laws.all_bytes(c0 <> cs) == True{} : Bool})))
+
+def utf8_proof.complete2.w(+b1: U32, +b2: U32, +acc: U32, +c0: U32, +cs: List<&2, U32>, +p: U32, +ps: List<&2, U32>,
+  +eqacc: {UTF8.append_continuation(acc, 128) == (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32},
+  +same: {List.append(&2, U32, p <> ps, c0 <> cs) == [b1, b2] : List<&2, U32>},
+  allb: {Laws.all_bytes(c0 <> cs) == True{} : Bool},
+  w: Exists(U32, cp => {UTF8.two_byte_scalar.if(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}) == Some{cp} : Maybe<&2, U32>} & {cp == (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32) : U32})) ->
+  utf8_proof.Completion(p, ps):
+  (+cp, r) = w
+  (+some, +eq) = r
+  (c0, (cs, (cp, (
+    Equal.trans(Maybe<&2, U32>, UTF8.sequence_scalar(List.append(&2, U32, p <> ps, c0 <> cs)), UTF8.sequence_scalar([b1, b2]), Some{cp}, Equal.cong(List<&2, U32>, Maybe<&2, U32>, x => UTF8.sequence_scalar(x), List.append(&2, U32, p <> ps, c0 <> cs), [b1, b2], same), some),
+    (utf8_proof.low6_at(UTF8.append_continuation(acc, 128), cp, Equal.sym(U32, cp, UTF8.append_continuation(acc, 128), Equal.trans(U32, cp, (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32), UTF8.append_continuation(acc, 128), eq, Equal.sym(U32, UTF8.append_continuation(acc, 128), (U32.shln(U32.and(b1, 31), 6n) + U32.and(b2, 63) : U32), eqacc))), utf8_proof.low6(acc)), allb)))))
+
+def utf8_proof.complete3.w(+b1: U32, +b2: U32, +b3: U32, +acc: U32, +c0: U32, +cs: List<&2, U32>, +p: U32, +ps: List<&2, U32>,
+  +eqacc: {UTF8.append_continuation(acc, 128) == utf8_proof.dec3(b1, b2, b3) : U32},
+  +same: {List.append(&2, U32, p <> ps, c0 <> cs) == [b1, b2, b3] : List<&2, U32>},
+  allb: {Laws.all_bytes(c0 <> cs) == True{} : Bool},
+  w: Exists(U32, cp => {UTF8.three_byte_scalar.if(b1, b2, b3, UTF8.valid_three_bytes(b1, b2, b3), {==}) == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec3(b1, b2, b3) : U32})) ->
+  utf8_proof.Completion(p, ps):
+  (+cp, r) = w
+  (+some, +eq) = r
+  (c0, (cs, (cp, (
+    Equal.trans(Maybe<&2, U32>, UTF8.sequence_scalar(List.append(&2, U32, p <> ps, c0 <> cs)), UTF8.sequence_scalar([b1, b2, b3]), Some{cp}, Equal.cong(List<&2, U32>, Maybe<&2, U32>, x => UTF8.sequence_scalar(x), List.append(&2, U32, p <> ps, c0 <> cs), [b1, b2, b3], same), some),
+    (utf8_proof.low6_at(UTF8.append_continuation(acc, 128), cp, Equal.sym(U32, cp, UTF8.append_continuation(acc, 128), Equal.trans(U32, cp, utf8_proof.dec3(b1, b2, b3), UTF8.append_continuation(acc, 128), eq, Equal.sym(U32, UTF8.append_continuation(acc, 128), utf8_proof.dec3(b1, b2, b3), eqacc))), utf8_proof.low6(acc)), allb)))))
+
+def utf8_proof.complete4.w(+b1: U32, +b2: U32, +b3: U32, +b4: U32, +acc: U32, +c0: U32, +cs: List<&2, U32>, +p: U32, +ps: List<&2, U32>,
+  +eqacc: {UTF8.append_continuation(acc, 128) == utf8_proof.dec4(b1, b2, b3, b4) : U32},
+  +same: {List.append(&2, U32, p <> ps, c0 <> cs) == [b1, b2, b3, b4] : List<&2, U32>},
+  allb: {Laws.all_bytes(c0 <> cs) == True{} : Bool},
+  w: Exists(U32, cp => {UTF8.four_byte_scalar.if(b1, b2, b3, b4, UTF8.valid_four_bytes(b1, b2, b3, b4), {==}) == Some{cp} : Maybe<&2, U32>} & {cp == utf8_proof.dec4(b1, b2, b3, b4) : U32})) ->
+  utf8_proof.Completion(p, ps):
+  (+cp, r) = w
+  (+some, +eq) = r
+  (c0, (cs, (cp, (
+    Equal.trans(Maybe<&2, U32>, UTF8.sequence_scalar(List.append(&2, U32, p <> ps, c0 <> cs)), UTF8.sequence_scalar([b1, b2, b3, b4]), Some{cp}, Equal.cong(List<&2, U32>, Maybe<&2, U32>, x => UTF8.sequence_scalar(x), List.append(&2, U32, p <> ps, c0 <> cs), [b1, b2, b3, b4], same), some),
+    (utf8_proof.low6_at(UTF8.append_continuation(acc, 128), cp, Equal.sym(U32, cp, UTF8.append_continuation(acc, 128), Equal.trans(U32, cp, utf8_proof.dec4(b1, b2, b3, b4), UTF8.append_continuation(acc, 128), eq, Equal.sym(U32, UTF8.append_continuation(acc, 128), utf8_proof.dec4(b1, b2, b3, b4), eqacc))), utf8_proof.low6(acc)), allb)))))
+
+def utf8_proof.complete.of1(+b1: U32, none: {UTF8.sequence_scalar([b1]) == None{} : Maybe<&2, U32>}, o: utf8_proof.OrT6(UTF8.valid_one_byte(b1), UTF8.valid_two_bytes(b1, 128), UTF8.valid_three_bytes(b1, 128, 128), UTF8.valid_three_bytes(b1, 191, 128), UTF8.valid_four_bytes(b1, 128, 128, 128), UTF8.valid_four_bytes(b1, 191, 128, 128))) -> utf8_proof.Completion(b1, Nil{}):
+  match o:
+    case Inl{e}: Empty.absurd(utf8_proof.Completion(b1, Nil{}), utf8_proof.none1.contra(b1, UTF8.valid_one_byte(b1), {==}, none, e))
+    case Inr{Inl{e}}: utf8_proof.complete2.w(b1, 128, U32.and(b1, 31), 128, Nil{}, b1, Nil{}, {==}, {==}, {==}, utf8_proof.some2.if(b1, 128, UTF8.valid_two_bytes(b1, 128), {==}, e))
+    case Inr{Inr{Inl{e}}}: utf8_proof.complete3.w(b1, 128, 128, UTF8.append_continuation(U32.and(b1, 15), 128), 128, [128], b1, Nil{}, {==}, {==}, {==}, utf8_proof.some3.if(b1, 128, 128, UTF8.valid_three_bytes(b1, 128, 128), {==}, e))
+    case Inr{Inr{Inr{Inl{e}}}}: utf8_proof.complete3.w(b1, 191, 128, UTF8.append_continuation(U32.and(b1, 15), 191), 191, [128], b1, Nil{}, {==}, {==}, {==}, utf8_proof.some3.if(b1, 191, 128, UTF8.valid_three_bytes(b1, 191, 128), {==}, e))
+    case Inr{Inr{Inr{Inr{Inl{e}}}}}: utf8_proof.complete4.w(b1, 128, 128, 128, UTF8.append_continuation(UTF8.append_continuation(U32.and(b1, 7), 128), 128), 128, [128, 128], b1, Nil{}, {==}, {==}, {==}, utf8_proof.some4.if(b1, 128, 128, 128, UTF8.valid_four_bytes(b1, 128, 128, 128), {==}, e))
+    case Inr{Inr{Inr{Inr{Inr{e}}}}}: utf8_proof.complete4.w(b1, 191, 128, 128, UTF8.append_continuation(UTF8.append_continuation(U32.and(b1, 7), 191), 128), 191, [128, 128], b1, Nil{}, {==}, {==}, {==}, utf8_proof.some4.if(b1, 191, 128, 128, UTF8.valid_four_bytes(b1, 191, 128, 128), {==}, e))
+
+def utf8_proof.complete.of2(+b1: U32, +b2: U32, none: {UTF8.sequence_scalar([b1, b2]) == None{} : Maybe<&2, U32>}, o: utf8_proof.OrT3(UTF8.valid_two_bytes(b1, b2), UTF8.valid_three_bytes(b1, b2, 128), UTF8.valid_four_bytes(b1, b2, 128, 128))) -> utf8_proof.Completion(b1, [b2]):
+  match o:
+    case Inl{e}: Empty.absurd(utf8_proof.Completion(b1, [b2]), utf8_proof.none2.contra(b1, b2, UTF8.valid_two_bytes(b1, b2), {==}, none, e))
+    case Inr{Inl{e}}: utf8_proof.complete3.w(b1, b2, 128, UTF8.append_continuation(U32.and(b1, 15), b2), 128, Nil{}, b1, [b2], {==}, {==}, {==}, utf8_proof.some3.if(b1, b2, 128, UTF8.valid_three_bytes(b1, b2, 128), {==}, e))
+    case Inr{Inr{e}}: utf8_proof.complete4.w(b1, b2, 128, 128, UTF8.append_continuation(UTF8.append_continuation(U32.and(b1, 7), b2), 128), 128, [128], b1, [b2], {==}, {==}, {==}, utf8_proof.some4.if(b1, b2, 128, 128, UTF8.valid_four_bytes(b1, b2, 128, 128), {==}, e))
+
+def utf8_proof.complete.of3(+b1: U32, +b2: U32, +b3: U32, none: {UTF8.sequence_scalar([b1, b2, b3]) == None{} : Maybe<&2, U32>}, o: utf8_proof.OrT2(UTF8.valid_three_bytes(b1, b2, b3), UTF8.valid_four_bytes(b1, b2, b3, 128))) -> utf8_proof.Completion(b1, [b2, b3]):
+  match o:
+    case Inl{e}: Empty.absurd(utf8_proof.Completion(b1, [b2, b3]), utf8_proof.none3.contra(b1, b2, b3, UTF8.valid_three_bytes(b1, b2, b3), {==}, none, e))
+    case Inr{e}: utf8_proof.complete4.w(b1, b2, b3, 128, UTF8.append_continuation(UTF8.append_continuation(U32.and(b1, 7), b2), b3), 128, Nil{}, b1, [b2, b3], {==}, {==}, {==}, utf8_proof.some4.if(b1, b2, b3, 128, UTF8.valid_four_bytes(b1, b2, b3, 128), {==}, e))
+
+def utf8_proof.complete(+p: U32, +ps: List<&2, U32>, begins: {UTF8.is_valid_sequence_prefix(p <> ps) == True{} : Bool}, none: {UTF8.sequence_scalar(p <> ps) == None{} : Maybe<&2, U32>}) -> utf8_proof.Completion(p, ps):
+  match ps:
+    case Nil{}:
+      utf8_proof.complete.of1(p, none, utf8_proof.or_split6(UTF8.valid_one_byte(p), UTF8.valid_two_bytes(p, 128), UTF8.valid_three_bytes(p, 128, 128), UTF8.valid_three_bytes(p, 191, 128), UTF8.valid_four_bytes(p, 128, 128, 128), UTF8.valid_four_bytes(p, 191, 128, 128), begins))
+    case +b2 <> Nil{}:
+      utf8_proof.complete.of2(p, b2, none, utf8_proof.or_split3(UTF8.valid_two_bytes(p, b2), UTF8.valid_three_bytes(p, b2, 128), UTF8.valid_four_bytes(p, b2, 128, 128), begins))
+    case +b2 <> +b3 <> Nil{}:
+      utf8_proof.complete.of3(p, b2, b3, none, utf8_proof.or_split2(UTF8.valid_three_bytes(p, b2, b3), UTF8.valid_four_bytes(p, b2, b3, 128), begins))
+    case +b2 <> +b3 <> +b4 <> Nil{}:
+      Empty.absurd(utf8_proof.Completion(p, [b2, b3, b4]), utf8_proof.none4.contra(p, b2, b3, b4, UTF8.valid_four_bytes(p, b2, b3, b4), {==}, none, begins))
+    case b2 <> b3 <> b4 <> b5 <> after:
+      Empty.absurd(utf8_proof.Completion(p, b2 <> b3 <> b4 <> b5 <> after), H.hex_u32.false_true(begins))
+
+def utf8_proof.run.regroup(+p: U32, +ps: List<&2, U32>, +c0: U32, +c1: U32, +cs: List<&2, U32>, +cp: U32,
+  e: {UTF8.sequence_scalar(List.append(&2, U32, p <> ps, c0 <> c1 <> cs)) == Some{cp} : Maybe<&2, U32>}) ->
+  {UTF8.sequence_scalar(List.append(&2, U32, p <> List.append(&2, U32, ps, [c0]), c1 <> cs)) == Some{cp} : Maybe<&2, U32>}:
+  %Equal.sym(List<&2, U32>, List.append(&2, U32, List.append(&2, U32, p <> ps, [c0]), c1 <> cs), List.append(&2, U32, p <> ps, c0 <> c1 <> cs), utf8_proof.append_assoc(p <> ps, [c0], c1 <> cs)) : {UTF8.sequence_scalar(_) == Some{cp} : Maybe<&2, U32>}
+  e
+
+def utf8_proof.run.last(+p: U32, +ps: List<&2, U32>, +c0: U32, +cp: U32,
+  e: {UTF8.sequence_scalar(List.append(&2, U32, p <> ps, [c0])) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.final_text(UTF8.decode_buffer.bytes([c0], p <> ps)) == SCon{Chr{cp}, SNil{}} : String}:
+  %Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar(List.append(&2, U32, p <> ps, [c0])), Some{cp}, e) :
+    {utf8_proof.final_text(UTF8.decode_buffer.then(UTF8.decode_buffer.advance(List.append(&2, U32, p <> ps, [c0]), _, UTF8.is_valid_sequence_prefix(List.append(&2, U32, p <> ps, [c0])), u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(c0))), q => UTF8.decode_buffer.bytes(Nil{}, q))) == SCon{Chr{cp}, SNil{}} : String}
+  {==}
+
+def utf8_proof.run.next(+p: U32, +ps: List<&2, U32>, +c0: U32, +c1: U32, +cs: List<&2, U32>, +cp: U32,
+  +none: {UTF8.sequence_scalar(List.append(&2, U32, p <> ps, [c0])) == None{} : Maybe<&2, U32>},
+  +begins: {UTF8.is_valid_sequence_prefix(List.append(&2, U32, p <> ps, [c0])) == True{} : Bool},
+  ih: {utf8_proof.final_text(UTF8.decode_buffer.bytes(c1 <> cs, List.append(&2, U32, p <> ps, [c0]))) == SCon{Chr{cp}, SNil{}} : String}) ->
+  {utf8_proof.final_text(UTF8.decode_buffer.bytes(c0 <> c1 <> cs, p <> ps)) == SCon{Chr{cp}, SNil{}} : String}:
+  %Equal.sym(Maybe<&2, U32>, UTF8.sequence_scalar(List.append(&2, U32, p <> ps, [c0])), None{}, none) :
+    {utf8_proof.final_text(UTF8.decode_buffer.then(UTF8.decode_buffer.advance(List.append(&2, U32, p <> ps, [c0]), _, UTF8.is_valid_sequence_prefix(List.append(&2, U32, p <> ps, [c0])), u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(c0))), q => UTF8.decode_buffer.bytes(c1 <> cs, q))) == SCon{Chr{cp}, SNil{}} : String}
+  %Equal.sym(Bool, UTF8.is_valid_sequence_prefix(List.append(&2, U32, p <> ps, [c0])), True{}, begins) :
+    {utf8_proof.final_text(UTF8.decode_buffer.then(UTF8.decode_buffer.advance(List.append(&2, U32, p <> ps, [c0]), None{}, _, u => UTF8.decode_buffer.prepend(UTF8.replacement_char_string(), UTF8.decode_buffer.start(c0))), q => UTF8.decode_buffer.bytes(c1 <> cs, q))) == SCon{Chr{cp}, SNil{}} : String}
+  Equal.trans(String, utf8_proof.final_text(UTF8.decode_buffer.prepend("", UTF8.decode_buffer.bytes(c1 <> cs, List.append(&2, U32, p <> ps, [c0])))), "" ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(c1 <> cs, List.append(&2, U32, p <> ps, [c0]))), SCon{Chr{cp}, SNil{}},
+    utf8_proof.final_prepend("", UTF8.decode_buffer.bytes(c1 <> cs, List.append(&2, U32, p <> ps, [c0]))), ih)
+
+def utf8_proof.run(+cs: List<&2, U32>, +p: U32, +ps: List<&2, U32>, +c0: U32, +cp: U32,
+  e: {UTF8.sequence_scalar(List.append(&2, U32, p <> ps, c0 <> cs)) == Some{cp} : Maybe<&2, U32>}) ->
+  {utf8_proof.final_text(UTF8.decode_buffer.bytes(c0 <> cs, p <> ps)) == SCon{Chr{cp}, SNil{}} : String}:
+  match cs:
+    case Nil{}:
+      utf8_proof.run.last(p, ps, c0, cp, e)
+    case +c1 <> +more:
+      +e2 = utf8_proof.run.regroup(p, ps, c0, c1, more, cp, e)
+      +v2 = utf8_proof.decodes_valid(List.append(&2, U32, p <> List.append(&2, U32, ps, [c0]), c1 <> more), cp, utf8_proof.scalar_to_decodes(List.append(&2, U32, p <> List.append(&2, U32, ps, [c0]), c1 <> more), cp, e2))
+      utf8_proof.run.next(p, ps, c0, c1, more, cp,
+        utf8_proof.pf_scalar_none(p, List.append(&2, U32, ps, [c0]), c1, more, UTF8.sequence_scalar(p <> List.append(&2, U32, ps, [c0])), {==}, v2),
+        utf8_proof.prefix_from_valid(p, List.append(&2, U32, ps, [c0]), c1 <> more, v2),
+        utf8_proof.run(more, p, List.append(&2, U32, ps, [c0]), c1, cp, e2))
+
+def utf8_proof.prompt.large(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32, +ps: List<&2, U32>,
   +same: {t == text : String},
   split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
-    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, [p]))),
-  +large: {U32.is_le(c, 2047) == False{} : Bool}, +cp: U32,
-  +rest_is: {utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])) == SCon{Chr{cp}, SNil{}} : String},
-  +bound: {U32.is_le(cp, 2047) == True{} : Bool}) ->
+    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, p <> ps))),
+  +large: {U32.is_eq(U32.and(c, 63), 0) == False{} : Bool},
+  comp: utf8_proof.Completion(p, ps)) ->
   utf8_proof.PromptGoal(bytes, text, c):
-  ([128], ({==}, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])),
-    (split([128]), prefix => utf8_proof.not_prefix(text, t, c,
-      utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])), same, prefix,
-      more => e => utf8_proof.not_two_byte(c, cp, more,
-        utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])), large, rest_is, bound, e))))))
+  (+c0, r1) = comp
+  (+cs, r2) = r1
+  (+cp, facts) = r2
+  (e, r3) = facts
+  (bound, allb) = r3
+  +rest_is = utf8_proof.run(cs, p, ps, c0, cp, e)
+  (c0 <> cs, (allb, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(c0 <> cs, p <> ps)),
+    (split(c0 <> cs), prefix => utf8_proof.not_prefix(text, t, c,
+      utf8_proof.final_text(UTF8.decode_buffer.bytes(c0 <> cs, p <> ps)), same, prefix,
+      more => e2 => utf8_proof.differs(c, cp, more, utf8_proof.final_text(UTF8.decode_buffer.bytes(c0 <> cs, p <> ps)), large, rest_is, bound, e2))))))
 
-def utf8_proof.prompt.large(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32,
+def utf8_proof.prompt.lead(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32, +ps: List<&2, U32>,
   +same: {t == text : String},
+  lead: {UTF8.is_valid_sequence_prefix(p <> ps) == True{} : Bool},
+  alone: {UTF8.sequence_scalar(p <> ps) == None{} : Maybe<&2, U32>},
   split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
-    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, [p]))),
-  +large: {U32.is_le(c, 2047) == False{} : Bool},
-  after: Exists(U32, cp =>
-    {utf8_proof.final_text(UTF8.decode_buffer.bytes([128], [p])) == SCon{Chr{cp}, SNil{}} : String} &
-    {U32.is_le(cp, 2047) == True{} : Bool})) ->
-  utf8_proof.PromptGoal(bytes, text, c):
-  (+cp, facts) = after
-  (rest_is, bound) = facts
-  utf8_proof.prompt.large2(bytes, text, c, t, p, same, split, large, cp, rest_is, bound)
-
-def utf8_proof.prompt.lead(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String, +p: U32,
-  +same: {t == text : String},
-  lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
-  alone: {UTF8.sequence_scalar([p]) == None{} : Maybe<&2, U32>},
-  split: @rest: List<&2, U32> -> Laws.decodes(List.append(&2, U32, bytes, rest),
-    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, [p]))),
-  small: Bool, +small_is: {U32.is_le(c, 2047) == small : Bool}) ->
+    t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, p <> ps))),
+  small: Bool, +small_is: {U32.is_eq(U32.and(c, 63), 0) == small : Bool}) ->
   utf8_proof.PromptGoal(bytes, text, c):
   match small:
     case True{}:
-      (Nil{}, ({==}, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(Nil{}, [p])),
+      (Nil{}, ({==}, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(Nil{}, p <> ps)),
         (split(Nil{}), prefix => utf8_proof.not_prefix(text, t, c, SCon{Chr{65533}, SNil{}}, same, prefix,
           more => e => utf8_proof.not_replacement(c, more, small_is, e))))))
     case False{}:
-      utf8_proof.prompt.large(bytes, text, c, t, p, same, split, small_is,
-        utf8_proof.two_after(p, lead, alone))
+      utf8_proof.prompt.large(bytes, text, c, t, p, ps, same, split, small_is,
+        utf8_proof.complete(p, ps, lead, alone))
 
 def utf8_proof.prompt.pending(+bytes: List<&2, U32>, +text: String, +c: U32, +t: String,
   +q: List<&2, U32>, +same: {t == text : String}, pending: utf8_proof.Pending(q),
@@ -4987,11 +7242,9 @@ def utf8_proof.prompt.pending(+bytes: List<&2, U32>, +text: String, +c: U32, +t:
       (Nil{}, ({==}, (t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(Nil{}, Nil{})),
         (split(Nil{}), prefix => utf8_proof.not_prefix(text, t, c, SNil{}, same, prefix,
           more => e => utf8_proof.ends_here(c, more, e))))))
-    case +p <> Nil{}:
+    case +p <> +ps:
       (lead, alone) = pending
-      utf8_proof.prompt.lead(bytes, text, c, t, p, same, lead, alone, split, U32.is_le(c, 2047), {==})
-    case p <> r <> more:
-      Empty.absurd(utf8_proof.PromptGoal(bytes, text, c), pending)
+      utf8_proof.prompt.lead(bytes, text, c, t, p, ps, same, lead, alone, split, U32.is_eq(U32.and(c, 63), 0), {==})
 
 def utf8_proof.prompt.step(+bytes: List<&2, U32>, +text: String, +c: U32,
   step: UTF8.decode_buffer.Step(),
