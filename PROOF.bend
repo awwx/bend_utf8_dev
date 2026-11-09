@@ -3160,8 +3160,8 @@ def utf8_proof.sequence_prefix_unique.split(+s1: List<&2, U32>, +s2: List<&2, U3
 def utf8_proof.sequence_prefix_unique(+b1: U32, +more: List<&2, U32>,
   -first: {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool},
   +s1: List<&2, U32>, +s2: List<&2, U32>,
-  p1: Laws.maximal_subpart.sequence_prefix(b1, more, first, s1),
-  p2: Laws.maximal_subpart.sequence_prefix(b1, more, first, s2)) -> {s1 == s2 : List<&2, U32>}:
+  p1: Laws.maximal_subpart.sequence_prefix(b1, more, s1),
+  p2: Laws.maximal_subpart.sequence_prefix(b1, more, s2)) -> {s1 == s2 : List<&2, U32>}:
   (prefix1, facts1) = p1
   (+r1, e1) = prefix1
   (begins1, longer_not_valid1) = facts1
@@ -3174,8 +3174,8 @@ def utf8_proof.sequence_prefix_unique(+b1: U32, +more: List<&2, U32>,
 def utf8_proof.maximal_subpart_unique.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
   -checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
   +s1: List<&2, U32>, +s2: List<&2, U32>,
-  p1: Laws.maximal_subpart.if(b1, more, begins, checked, s1),
-  p2: Laws.maximal_subpart.if(b1, more, begins, checked, s2)) -> {s1 == s2 : List<&2, U32>}:
+  p1: Laws.maximal_subpart.if(b1, more, begins, s1),
+  p2: Laws.maximal_subpart.if(b1, more, begins, s2)) -> {s1 == s2 : List<&2, U32>}:
   match begins:
     case True{}:
       utf8_proof.sequence_prefix_unique(b1, more, checked, s1, s2, p1, p2)
@@ -3322,7 +3322,7 @@ def utf8_proof.longest_found(+bytes: List<&2, U32>, found: utf8_proof.Unextended
 
 def utf8_proof.maximal_subpart_exists.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
   checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool}) ->
-  Exists(List<&2, U32>, s => Laws.maximal_subpart.if(b1, more, begins, checked, s)):
+  Exists(List<&2, U32>, s => Laws.maximal_subpart.if(b1, more, begins, s)):
   match begins:
     case True{}: utf8_proof.longest_found(b1 <> more, utf8_proof.longest_from(more, [b1], b1 <> more, {==}, checked))
     case False{}: ([b1], {==})
@@ -4034,7 +4034,7 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
     Laws.maximal_subpart.longer_not_valid_prefix(sub, b1 <> more)) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
-      Laws.maximal_subpart.sequence_prefix(b1, more, checked, subpart) &
+      Laws.maximal_subpart.sequence_prefix(b1, more, subpart) &
       {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
       {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
     utf8_proof.Progress(more, result)):
@@ -4043,7 +4043,7 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
       (begins_sub, longer_not_valid) = facts
       Empty.absurd(Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
           Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
-            Laws.maximal_subpart.sequence_prefix(b1, more, checked, subpart) &
+            Laws.maximal_subpart.sequence_prefix(b1, more, subpart) &
             {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
             {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
           utf8_proof.Progress(more, result)),
@@ -4057,10 +4057,10 @@ def utf8_proof.replaced_from.sequence(+b1: U32, +more: List<&2, U32>,
 
 def utf8_proof.replaced_from.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
   checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
-  +sub: List<&2, U32>, maximal: Laws.maximal_subpart.if(b1, more, begins, checked, sub)) ->
+  +sub: List<&2, U32>, maximal: Laws.maximal_subpart.if(b1, more, begins, sub)) ->
   Exists(Maybe<&1, U32 & List<&2, U32>>, result =>
     Exists(List<&2, U32>, subpart => Exists(List<&2, U32>, rest =>
-      Laws.maximal_subpart.if(b1, more, begins, checked, subpart) &
+      Laws.maximal_subpart.if(b1, more, begins, subpart) &
       {List.append(&2, U32, subpart, rest) == b1 <> more : List<&2, U32>} &
       {result == Some{(Laws.replacement_char(), rest)} : Maybe<&1, U32 & List<&2, U32>>})) &
     utf8_proof.Progress(more, result)):
@@ -4508,11 +4508,11 @@ def utf8_proof.next_none(+b: U32, +rest: List<&2, U32>,
 def utf8_proof.single_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
   checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
   not_begins: {UTF8.is_valid_sequence_prefix([b1]) == False{} : Bool}) ->
-  Laws.maximal_subpart.if(b1, more, begins, checked, [b1]):
+  Laws.maximal_subpart.if(b1, more, begins, [b1]):
   match begins:
     case False{}: {==}
     case True{}:
-      Empty.absurd(Laws.maximal_subpart.sequence_prefix(b1, more, checked, [b1]),
+      Empty.absurd(Laws.maximal_subpart.sequence_prefix(b1, more, [b1]),
         utf8_proof.prefix_contra(b1, checked, not_begins))
 
 def utf8_proof.single_subpart(+b1: U32, +more: List<&2, U32>,
@@ -4526,11 +4526,11 @@ def utf8_proof.lead_subpart.if(+p: U32, +more: List<&2, U32>, begins: Bool,
   checked: {UTF8.is_valid_sequence_prefix([p]) == begins : Bool},
   lead: {UTF8.is_valid_sequence_prefix([p]) == True{} : Bool},
   not_extended: utf8_proof.not_extended_by([p], utf8_proof.next_byte_after(p <> more, [p]))) ->
-  Laws.maximal_subpart.if(p, more, begins, checked, [p]):
+  Laws.maximal_subpart.if(p, more, begins, [p]):
   match begins:
     case True{}: ((more, {==}), (lead, utf8_proof.longer_not_valid_from_not_extended([p], p <> more, not_extended)))
     case False{}:
-      Empty.absurd(Laws.maximal_subpart.single_byte(p, more, checked, [p]),
+      Empty.absurd(Laws.maximal_subpart.single_byte(p, [p]),
         utf8_proof.prefix_contra(p, lead, checked))
 
 def utf8_proof.lead_subpart(+p: U32, +more: List<&2, U32>,

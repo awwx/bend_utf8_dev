@@ -2,10 +2,13 @@ import Base
 import ./defs.bend as Defs
 import ./binary.bend as B
 import ./utf8.bend as UTF8
-import ./binary_LAWS.bend as BinaryLaws
 import ./func_LAWS.bend as Func
 
 ### UTF-8 encoding specification
+
+# Only one- and two-byte sequences are covered so far.  Until three-
+# and four-byte sequences are added, the bytes of a longer sequence
+# are treated as ill-formed: E2 82 AC (U+20AC) decodes to three U+FFFD.
 
 ## Surrogate code points
 
@@ -40,7 +43,7 @@ def is_unicode_scalar(+cp: U32) -> Bool:
 # By a "byte shape" we mean a series of bytes that has the correct bit
 # pattern for a UTF-8 encoding.  This includes invalid UTF-8 encodings
 # such as overlong encodings, encodings of surrogate code points, and
-# encodings of code points values above U+10FFFF.
+# encodings of code point values above U+10FFFF.
 
 # UTF-8 one-byte shape
 #
@@ -126,11 +129,11 @@ law utf8_encode_as_two_bytes:
   {Some{UTF8.encode_as_two_bytes(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 
-## has_N_byte_shape(cp) -> Bool
+## has_N_byte_shape(bytes) -> Bool
 
-# Return True if the code point *can be* encoded as a sequence of the
-# specified number of bytes.  (At this point we're still ignoring
-# overlong encodings.)
+# Return True if the bytes have the byte shape for that number of
+# bytes: that is, they are what some code point encodes to.  (At this
+# point we're still ignoring overlong encodings.)
 
 law utf8_has_one_byte_shape:
   for +byte: U32
@@ -174,7 +177,7 @@ law utf8_two_byte_inverse:
 ## Overlong encodings
 
 # In UTF-8, an "overlong" encoding is an encoding which is the correct
-# shape for encoding the code point, but a shorter enconding also
+# shape for encoding the code point, but a shorter encoding also
 # encodes the code point.  These are invalid in UTF-8.
 
 # No one-byte encoding is overlong.
@@ -198,8 +201,8 @@ law utf8_overlong_two_bytes:
 # A UTF-8 encoding is valid when:
 # * It has the correct byte shape, and
 # * It is not overlong, and
-# * the code point it encodes is a Unicode scalar (not a forbidden
-#   surrogate).
+# * the code point it encodes is a Unicode scalar (at most U+10FFFF
+#   and not a surrogate).
 #
 # A "valid sequence" is a sequence of bytes which are a valid UTF-8
 # encoding.
@@ -330,7 +333,7 @@ law begins_with_scalar_unique:
 # Later we may find out that the actual input doesn't describe a valid
 # sequence, so this says that if we've only seen these bytes so far,
 # they *could* be the start of a legal encoding (including being
-# themselves a complete valid complete).
+# themselves a complete valid sequence).
 #
 # `UTF8.is_valid_sequence_prefix(seq)` returns True iff `seq` is a
 # valid sequence prefix.
@@ -382,7 +385,7 @@ def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
 # * the first byte alone, when it is not a valid sequence prefix; or,
 #
 # * when the first byte is a valid sequence prefix, the longest run of
-#   bytes at the front is also a valid sequence prefix.
+#   bytes at the front that is also a valid sequence prefix.
 #
 # In the second case the prefix stops short of a whole sequence:
 # either the input ends after it, or the next byte cannot extend it.
@@ -407,7 +410,6 @@ def maximal_subpart.longer_not_valid_prefix(subpart: List<&2, U32>, bytes: List<
 # code unit sequence".)
 
 def maximal_subpart.sequence_prefix(+b1: U32, +more: List<&2, U32>,
-  -first: {UTF8.is_valid_sequence_prefix([b1]) == True{} : Bool},
   +subpart: List<&2, U32>) -> Type:
   is_prefix(subpart, b1 <> more) &
   {UTF8.is_valid_sequence_prefix(subpart) == True{} : Bool} &
@@ -420,19 +422,16 @@ def maximal_subpart.sequence_prefix(+b1: U32, +more: List<&2, U32>,
 # `not_valid_sequence_prefix_extended`, no longer prefix is a valid
 # sequence prefix, so only the one-byte case applies.
 
-def maximal_subpart.single_byte(+b1: U32, +more: List<&2, U32>,
-  -first: {UTF8.is_valid_sequence_prefix([b1]) == False{} : Bool},
-  +subpart: List<&2, U32>) -> Type:
+def maximal_subpart.single_byte(+b1: U32, +subpart: List<&2, U32>) -> Type:
   {subpart == [b1] : List<&2, U32>}
 
 def maximal_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
-  -checked: {UTF8.is_valid_sequence_prefix([b1]) == begins : Bool},
   +subpart: List<&2, U32>) -> Type:
   match begins:
     case True{}:
-      maximal_subpart.sequence_prefix(b1, more, checked, subpart)
+      maximal_subpart.sequence_prefix(b1, more, subpart)
     case False{}:
-      maximal_subpart.single_byte(b1, more, checked, subpart)
+      maximal_subpart.single_byte(b1, subpart)
 
 # `subpart` is the maximal subpart at the front of the non-empty bytes
 # `b1 <> more`, as the Unicode Standard defines it (§3.9): the longest
@@ -441,7 +440,7 @@ def maximal_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
 
 def maximal_subpart(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
-  maximal_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), {==}, subpart)
+  maximal_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), subpart)
 
 # Now we check our definition of "maximal subpart".
 #
@@ -586,9 +585,6 @@ law decodes_first_nonempty:
   for result: Maybe<&1, U32 & List<&2, U32>>
   for decoded: decodes_first(b1 <> more, result)
   {Maybe.is_some(&1, U32 & List<&2, U32>, result) == True{} : Bool}
-
-# Decoding a complete buffer
-# --------------------------
 
 # Decoding the complete buffer `bytes` gives the string `text`: empty if
 # there is nothing to decode, otherwise the code point that
@@ -802,7 +798,7 @@ law utf8_decode_buffer_safe:
   for -valid: all_buffers_bytes(buffers)
   for +rest: List<&2, U32>
   for +full: String
-  for decoded: decodes(List.append(&2, U32, List.concat(&2, U32, buffers), rest), full)
+  for decodes_full: decodes(List.append(&2, U32, List.concat(&2, U32, buffers), rest), full)
   is_text_prefix(decoded_so_far(buffers, valid), full)
 
 # Prompt: nothing is held back.  No longer text is safe: for any code
