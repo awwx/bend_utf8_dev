@@ -676,14 +676,22 @@ def all_bytes(bytes: List<&2, U32>) -> Bool:
   List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
 
 
-# Running the decoder
-# -------------------
+## Running the decoder
 
-# Every value in `bytes` is a byte, 0..255.
+# We define a function `decode`:
+#
+# `decoded(buffers: List<&2, List<&2, U32>>) -> Maybe<&2, String>`
+#
+# It takes a list of buffers, where each buffer is a list of bytes.
+# It returns None if it encounters a buffer which contains a non-byte
+# value.  Otherwise it returns the output text, the concatenation of
+# the text returned by the calls to `decode_buffer` and the final call
+# to `decode_done`.
 
-# The decoder state and the text so far, or None if `UTF8.decode_buffer`
-# returned None for some buffer (which it does when the buffer holds a
-# value above 255).  No buffers are given to the decoder after that.
+# `Fed` is a type we use to keep track of our state running the
+# decoder.  It contains the decoder state that we need to pass to the
+# decoder functions and the cocatenated text returned so far.  We use
+# None when we've encountered a buffer that contains a non-byte value.
 
 def Fed() -> Type:
   Maybe<&1, UTF8.DecodeState() & String>
@@ -733,6 +741,7 @@ def decoded.text(result: Fed()) -> Maybe<&2, String>:
 
 def decoded(buffers: List<&2, List<&2, U32>>) -> Maybe<&2, String>:
   decoded.text(feed(buffers, UTF8.decode_start()))
+
 
 # Running the decoder satisfies `decodes`
 # ---------------------------------------
