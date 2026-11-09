@@ -2854,99 +2854,46 @@ def utf8_proof.go_append(+xs: List<&2, U32>, +ys: List<&2, U32>, +pending: List<
       utf8_proof.go_append.then(t, ys, UTF8.decode_buffer.step(pending, h),
         q => utf8_proof.go_append(t, ys, q))
 
-def utf8_proof.all_bytes_cons(+h: U32, ok: Bool, -checked: {U32.is_le(h, 255) == ok : Bool},
-  -x: Bool, -y: Bool, -z: Bool, same: {x == Bool.and(y, z) : Bool}) ->
-  {List.all.if(u => x, ok) == Bool.and(List.all.if(u => y, ok), z) : Bool}:
-  match ok:
-    case False{}: {==}
-    case True{}: same
+# What feeding should give: the byte loop's state and text.
+def utf8_proof.fed_step(step: UTF8.decode_buffer.Step()) -> UTF8.DecodeState() & String:
+  UTF8.decode_buffer.result(step)
 
-def utf8_proof.all_bytes_append(+xs: List<&2, U32>, +ys: List<&2, U32>) ->
-  {Laws.all_bytes(List.append(&2, U32, xs, ys)) ==
-    Bool.and(Laws.all_bytes(xs), Laws.all_bytes(ys)) : Bool}:
-  match xs:
-    case Nil{}: {==}
-    case +h <> +t:
-      utf8_proof.all_bytes_cons(h, U32.is_le(h, 255), {==},
-        Laws.all_bytes(List.append(&2, U32, t, ys)), Laws.all_bytes(t), Laws.all_bytes(ys),
-        utf8_proof.all_bytes_append(t, ys))
+def utf8_proof.fed_prepend(+text: String, step: UTF8.decode_buffer.Step()) ->
+  {Laws.feed.prepend(text, utf8_proof.fed_step(step)) ==
+    utf8_proof.fed_step(UTF8.decode_buffer.prepend(text, step)) : UTF8.DecodeState() & String}:
+  (more, pending) = step
+  {==}
 
-# Feeding buffers
-# ---------------
-
-# What feeding should give: None if some value is above 255, otherwise
-# the byte loop's state and text.
-def utf8_proof.fed_step(step: UTF8.decode_buffer.Step()) -> Laws.Fed():
-  (text, pending) = step
-  Some{(pending, text)}
-
-def utf8_proof.expected_fed(ok: Bool, step: UTF8.decode_buffer.Step()) -> Laws.Fed():
-  match ok:
-    case False{}: None{}
-    case True{}: utf8_proof.fed_step(step)
-
-def utf8_proof.fed_prepend(+text: String, ok: Bool, step: UTF8.decode_buffer.Step()) ->
-  {Laws.feed.prepend(text, utf8_proof.expected_fed(ok, step)) ==
-    utf8_proof.expected_fed(ok, UTF8.decode_buffer.prepend(text, step)) : Laws.Fed()}:
-  match ok:
-    case False{}: {==}
-    case True{}:
-      (more, pending) = step
-      {==}
-
-def utf8_proof.feed_step(+rest: List<&2, List<&2, U32>>, stepped: UTF8.decode_buffer.Step(),
+def utf8_proof.feed_step(+rest: List<&2, List<&2, U32>>, -valid: Laws.all_buffers_bytes(rest),
+  stepped: UTF8.decode_buffer.Step(),
   same: @q: List<&2, U32> ->
-    {Laws.feed(rest, q) == utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-      UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)) : Laws.Fed()}) ->
-  {Laws.feed.then(UTF8.decode_buffer.result(stepped), s => Laws.feed(rest, s)) ==
-    utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-      UTF8.decode_buffer.then(stepped, q => UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : Laws.Fed()}:
+    {Laws.feed(rest, valid, q) ==
+      utf8_proof.fed_step(UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)) : UTF8.DecodeState() & String}) ->
+  {Laws.feed.then(UTF8.decode_buffer.result(stepped), s => Laws.feed(rest, valid, s)) ==
+    utf8_proof.fed_step(UTF8.decode_buffer.then(stepped,
+      q => UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : UTF8.DecodeState() & String}:
   (+text, +q) = stepped
-  %Equal.sym(Laws.Fed(), Laws.feed(rest, q),
-      utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)), UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)),
-      same(q)) :
+  %Equal.sym(UTF8.DecodeState() & String, Laws.feed(rest, valid, q),
+      utf8_proof.fed_step(UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)), same(q)) :
     {Laws.feed.prepend(text, _) ==
-      utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-        UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : Laws.Fed()}
-  utf8_proof.fed_prepend(text, Laws.all_bytes(List.concat(&2, U32, rest)),
-    UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))
-
-def utf8_proof.feed_cons(+buffer: List<&2, U32>, +rest: List<&2, List<&2, U32>>,
-  +pending: List<&2, U32>, ok: Bool,
-  same: @q: List<&2, U32> ->
-    {Laws.feed(rest, q) == utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, rest)),
-      UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)) : Laws.Fed()}) ->
-  {Laws.feed.then(UTF8.decode_buffer.if(pending, buffer, ok), s => Laws.feed(rest, s)) ==
-    utf8_proof.expected_fed(Bool.and(ok, Laws.all_bytes(List.concat(&2, U32, rest))),
-      UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(buffer, pending),
-        q => UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : Laws.Fed()}:
-  match ok:
-    case False{}: {==}
-    case True{}:
-      utf8_proof.feed_step(rest, UTF8.decode_buffer.bytes(buffer, pending), same)
+      utf8_proof.fed_step(UTF8.decode_buffer.prepend(text, UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))) : UTF8.DecodeState() & String}
+  utf8_proof.fed_prepend(text, UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q))
 
 # Feeding any list of buffers gives what the byte loop gives for their
 # concatenation.
-def utf8_proof.feed_agrees(+buffers: List<&2, List<&2, U32>>, +pending: List<&2, U32>) ->
-  {Laws.feed(buffers, pending) ==
-    utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, buffers)),
-      UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), pending)) : Laws.Fed()}:
+def utf8_proof.feed_agrees(+buffers: List<&2, List<&2, U32>>, -valid: Laws.all_buffers_bytes(buffers),
+  +pending: List<&2, U32>) ->
+  {Laws.feed(buffers, valid, pending) ==
+    utf8_proof.fed_step(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), pending)) : UTF8.DecodeState() & String}:
   match buffers:
     case Nil{}: {==}
     case +buffer <> +rest:
-      %Equal.sym(Bool, Laws.all_bytes(List.append(&2, U32, buffer, List.concat(&2, U32, rest))),
-          Bool.and(Laws.all_bytes(buffer), Laws.all_bytes(List.concat(&2, U32, rest))),
-          utf8_proof.all_bytes_append(buffer, List.concat(&2, U32, rest))) :
-        {Laws.feed(buffer <> rest, pending) ==
-          utf8_proof.expected_fed(_,
-            UTF8.decode_buffer.bytes(List.append(&2, U32, buffer, List.concat(&2, U32, rest)), pending)) : Laws.Fed()}
       %Equal.sym(UTF8.decode_buffer.Step(), UTF8.decode_buffer.bytes(List.append(&2, U32, buffer, List.concat(&2, U32, rest)), pending),
           UTF8.decode_buffer.then(UTF8.decode_buffer.bytes(buffer, pending), q => UTF8.decode_buffer.bytes(List.concat(&2, U32, rest), q)),
           utf8_proof.go_append(buffer, List.concat(&2, U32, rest), pending)) :
-        {Laws.feed(buffer <> rest, pending) ==
-          utf8_proof.expected_fed(Bool.and(Laws.all_bytes(buffer), Laws.all_bytes(List.concat(&2, U32, rest))), _) : Laws.Fed()}
-      utf8_proof.feed_cons(buffer, rest, pending, Laws.all_bytes(buffer),
-        q => utf8_proof.feed_agrees(rest, q))
+        {Laws.feed(buffer <> rest, valid, pending) == utf8_proof.fed_step(_) : UTF8.DecodeState() & String}
+      utf8_proof.feed_step(rest, Laws.all_buffers_bytes.tail(buffer, rest, valid), UTF8.decode_buffer.bytes(buffer, pending),
+        q => utf8_proof.feed_agrees(rest, Laws.all_buffers_bytes.tail(buffer, rest, valid), q))
 
 # Uniqueness of maximal subparts and of decoding the first code point
 # --------------------------------------------------------------------
@@ -4726,24 +4673,21 @@ def utf8_proof.bytes_ok(+bytes: List<&2, U32>, +pending: List<&2, U32>,
         utf8_proof.step_ok(pending, b, rest, invariant),
         q => q_ok => utf8_proof.bytes_ok(rest, q, q_ok))
 
-def utf8_proof.decodes_result(ok: Bool, +bytes: List<&2, U32>, step: UTF8.decode_buffer.Step(),
-  decoded: Laws.decodes(bytes, utf8_proof.final_text(step))) ->
-  Laws.decodes_result.if(ok, bytes, Laws.decoded.text(utf8_proof.expected_fed(ok, step))):
-  match ok:
-    case False{}:
-      {==}
-    case True{}:
-      (+text, +pending) = step
-      (text ++ UTF8.decode_done(pending), ({==}, decoded))
+def utf8_proof.decoded_text(step: UTF8.decode_buffer.Step()) ->
+  {Laws.decoded.text(utf8_proof.fed_step(step)) == utf8_proof.final_text(step) : String}:
+  (text, pending) = step
+  {==}
 
-def Laws.utf8_decodes(buffers):
-  +bytes = List.concat(&2, U32, buffers)
-  %Equal.sym(Laws.Fed(), Laws.feed(buffers, Nil{}),
-      utf8_proof.expected_fed(Laws.all_bytes(bytes), UTF8.decode_buffer.bytes(bytes, Nil{})),
-      utf8_proof.feed_agrees(buffers, Nil{})) :
-    Laws.decodes_result.if(Laws.all_bytes(bytes), bytes, Laws.decoded.text(_))
-  utf8_proof.decodes_result(Laws.all_bytes(bytes), bytes, UTF8.decode_buffer.bytes(bytes, Nil{}),
-    utf8_proof.bytes_ok(bytes, Nil{}, Unit{}))
+def utf8_proof.decoded_is(+buffers: List<&2, List<&2, U32>>, -valid: Laws.all_buffers_bytes(buffers)) ->
+  {Laws.decoded(buffers, valid) ==
+    utf8_proof.final_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})) : String}:
+  %Equal.sym(UTF8.DecodeState() & String, Laws.feed(buffers, valid, Nil{}), utf8_proof.fed_step(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})), utf8_proof.feed_agrees(buffers, valid, Nil{})) : {Laws.decoded.text(_) ==
+    utf8_proof.final_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})) : String}
+  utf8_proof.decoded_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}))
+
+def Laws.utf8_decodes(buffers, valid):
+  %Equal.sym(String, Laws.decoded(buffers, valid), utf8_proof.final_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})), utf8_proof.decoded_is(buffers, valid)) : Laws.decodes(List.concat(&2, U32, buffers), _)
+  utf8_proof.bytes_ok(List.concat(&2, U32, buffers), Nil{}, Unit{})
 
 # Safe and prompt
 # ---------------
@@ -4809,30 +4753,19 @@ def utf8_proof.pending_ok(+bytes: List<&2, U32>, +pending: List<&2, U32>,
         q => q_ok => utf8_proof.pending_ok(rest, q, q_ok))
 
 # The text so far is the text of the byte loop's result.
-def utf8_proof.string_or(d: String, m: Maybe<&2, String>) -> String:
-  match m:
-    case None{}: d
-    case Some{x}: x
+def utf8_proof.so_far_text(step: UTF8.decode_buffer.Step()) ->
+  {Laws.decoded_so_far.text(utf8_proof.fed_step(step)) == utf8_proof.step_text(step) : String}:
+  (text, pending) = step
+  {==}
 
-def utf8_proof.text_so_far(ok: Bool, step: UTF8.decode_buffer.Step(), +text: String,
-  e: {Laws.decoded_so_far.text(utf8_proof.expected_fed(ok, step)) == Some{text} : Maybe<&2, String>}) ->
-  {utf8_proof.step_text(step) == text : String}:
-  match ok:
-    case False{}:
-      Empty.absurd({utf8_proof.step_text(step) == text : String},
-        H.hex_u32.false_true(Equal.cong(Maybe<&2, String>, Bool, m => Maybe.is_some(&2, String, m),
-          None{}, Some{text}, e)))
-    case True{}:
-      (+t, +q) = step
-      Equal.cong(Maybe<&2, String>, String, m => utf8_proof.string_or(t, m), Some{t}, Some{text}, e)
-
-def utf8_proof.so_far_at(+buffers: List<&2, List<&2, U32>>, +text: String,
-  so_far: {Laws.decoded_so_far(buffers) == Some{text} : Maybe<&2, String>}) ->
-  {Laws.decoded_so_far.text(utf8_proof.expected_fed(Laws.all_bytes(List.concat(&2, U32, buffers)),
-    UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}))) == Some{text} : Maybe<&2, String>}:
-  %utf8_proof.feed_agrees(buffers, Nil{}) :
-    {Laws.decoded_so_far.text(_) == Some{text} : Maybe<&2, String>}
-  so_far
+def utf8_proof.so_far_is(+buffers: List<&2, List<&2, U32>>, -valid: Laws.all_buffers_bytes(buffers)) ->
+  {utf8_proof.step_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})) ==
+    Laws.decoded_so_far(buffers, valid) : String}:
+  %Equal.sym(UTF8.DecodeState() & String, Laws.feed(buffers, valid, Nil{}), utf8_proof.fed_step(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})), utf8_proof.feed_agrees(buffers, valid, Nil{})) : {utf8_proof.step_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})) ==
+    Laws.decoded_so_far.text(_) : String}
+  Equal.sym(String, Laws.decoded_so_far.text(utf8_proof.fed_step(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}))),
+    utf8_proof.step_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})),
+    utf8_proof.so_far_text(UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{})))
 
 # Safe.
 def utf8_proof.prefix_from.eq(+t: String, +text: String, +more: String, +full: String,
@@ -4859,12 +4792,10 @@ def utf8_proof.safe.step(+bytes: List<&2, U32>, +rest: List<&2, U32>, +text: Str
     Laws.decodes_unique(List.append(&2, U32, bytes, rest), full,
       t ++ utf8_proof.final_text(UTF8.decode_buffer.bytes(rest, q)), decoded, split))
 
-def Laws.utf8_decode_buffer_safe(buffers, text, so_far, rest, full, decoded):
-  utf8_proof.safe.step(List.concat(&2, U32, buffers), rest, text, full,
+def Laws.utf8_decode_buffer_safe(buffers, valid, rest, full, decoded):
+  utf8_proof.safe.step(List.concat(&2, U32, buffers), rest, Laws.decoded_so_far(buffers, valid), full,
     UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}),
-    utf8_proof.text_so_far(Laws.all_bytes(List.concat(&2, U32, buffers)),
-      UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}), text,
-      utf8_proof.so_far_at(buffers, text, so_far)),
+    utf8_proof.so_far_is(buffers, valid),
     utf8_proof.decodes_split(List.concat(&2, U32, buffers), rest), decoded)
 
 # Prompt.
@@ -5070,11 +5001,9 @@ def utf8_proof.prompt.step(+bytes: List<&2, U32>, +text: String, +c: U32,
   (+t, +q) = step
   utf8_proof.prompt.pending(bytes, text, c, t, q, text_is, pending, split)
 
-def Laws.utf8_decode_buffer_prompt(buffers, text, so_far, c):
-  utf8_proof.prompt.step(List.concat(&2, U32, buffers), text, c,
+def Laws.utf8_decode_buffer_prompt(buffers, valid, c):
+  utf8_proof.prompt.step(List.concat(&2, U32, buffers), Laws.decoded_so_far(buffers, valid), c,
     UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}),
-    utf8_proof.text_so_far(Laws.all_bytes(List.concat(&2, U32, buffers)),
-      UTF8.decode_buffer.bytes(List.concat(&2, U32, buffers), Nil{}), text,
-      utf8_proof.so_far_at(buffers, text, so_far)),
+    utf8_proof.so_far_is(buffers, valid),
     utf8_proof.pending_ok(List.concat(&2, U32, buffers), Nil{}, Unit{}),
     rest => utf8_proof.decodes_split(List.concat(&2, U32, buffers), rest))

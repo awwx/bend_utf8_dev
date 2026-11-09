@@ -211,23 +211,15 @@ def decode_buffer.bytes(bytes: List<&2, U32>, pending: List<&2, U32>) ->
 def decode_buffer.all_bytes(bytes: List<&2, U32>) -> Bool:
   List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
 
-def decode_buffer.result(step: decode_buffer.Step()) ->
-  Maybe<&1, DecodeState() & String>:
+def decode_buffer.result(step: decode_buffer.Step()) -> DecodeState() & String:
   (text, pending) = step
-  Some{(pending, text)}
+  (pending, text)
 
-def decode_buffer.if(state: DecodeState(), +buffer: List<&2, U32>, ok: Bool) ->
-  Maybe<&1, DecodeState() & String>:
-  match ok:
-    case False{}:
-      None{}
-    case True{}:
-      decode_buffer.result(decode_buffer.bytes(buffer, state))
-
-# Decode the next buffer, or None if it holds a value above 255.
-def decode_buffer(state: DecodeState(), +buffer: List<&2, U32>) ->
-  Maybe<&1, DecodeState() & String>:
-  decode_buffer.if(state, buffer, decode_buffer.all_bytes(buffer))
+# Decode the next buffer, whose values must all be bytes.
+def decode_buffer(state: DecodeState(), +buffer: List<&2, U32>,
+  -valid: {decode_buffer.all_bytes(buffer) == True{} : Bool}) ->
+  DecodeState() & String:
+  decode_buffer.result(decode_buffer.bytes(buffer, state))
 
 # An unfinished sequence at the end of the input is replaced.
 def decode_done(state: DecodeState()) -> String:
