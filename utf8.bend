@@ -63,7 +63,7 @@ def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
 def DecodeState() -> Type:
   List<&2, U32>
 
-def decode_start() -> DecodeState():
+def decode_start_state() -> DecodeState():
   Nil{}
 
 def code_point_to_string(cp: U32) -> String:

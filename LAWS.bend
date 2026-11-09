@@ -644,7 +644,7 @@ law decodes_examples:
 
 ### Stream decoding
 
-# `UTF8.decode_start()` is the decoder state before any input.
+# `UTF8.decode_start_state()` is the decoder state before any input.
 #
 # `UTF8.decode_buffer(state, buffer, valid)` takes the next buffer of
 # bytes, with an erased proof `valid` that its values are bytes, and
@@ -745,7 +745,7 @@ def decoded_so_far.text(fed: UTF8.DecodeState() & String) -> String:
 
 def decoded_so_far(+buffers: List<&2, List<&2, U32>>,
   -valid: all_buffers_bytes(buffers)) -> String:
-  decoded_so_far.text(feed(buffers, valid, UTF8.decode_start()))
+  decoded_so_far.text(feed(buffers, valid, UTF8.decode_start_state()))
 
 def decoded.text(fed: UTF8.DecodeState() & String) -> String:
   (state, text) = fed
@@ -753,7 +753,7 @@ def decoded.text(fed: UTF8.DecodeState() & String) -> String:
 
 def decoded(+buffers: List<&2, List<&2, U32>>,
   -valid: all_buffers_bytes(buffers)) -> String:
-  decoded.text(feed(buffers, valid, UTF8.decode_start()))
+  decoded.text(feed(buffers, valid, UTF8.decode_start_state()))
 
 
 ## Running the decoder satisfies `decodes`
