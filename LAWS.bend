@@ -5,6 +5,7 @@ import ./utf8.bend as UTF8
 import ./binary_LAWS.bend as BinaryLaws
 import ./func_LAWS.bend as Func
 
+### UTF-8 encoding specification
 
 ## Surrogate code points
 
@@ -455,6 +456,12 @@ law maximal_subpart_unique:
   {s1 == s2 : List<&2, U32>}
 
 
+### Decoding a complete buffer.
+
+# We start by specifying how a complete buffer is decoded, and later
+# we'll require that stream decoding must have the same result.
+
+
 ## Unicode replacement character
 
 # Ill-formed input is replaced as the Unicode Standard recommends (§3.9,
@@ -635,24 +642,44 @@ law decodes_examples:
     "H" ++ code_point_to_string(169) ++ replacement_char_string())
 
 
-# Streaming decoding
-# ==================
-#
+### Stream decoding
+
 # `UTF8.decode_start()` is the decoder state before any input.
+#
 # `UTF8.decode_buffer(state, buffer)` takes the next buffer of bytes and
 # returns the new state and the text that is now fully resolved.
-# `UTF8.decode_done(state)` returns the text that ends the input.  The
-# state type, `UTF8.DecodeState()`, is the implementation's choice: the
-# laws below only describe the text that comes out.
+#
+# `UTF8.decode_done(state)` returns the text that ends the input.
+#
+# The state type, `UTF8.DecodeState()`, is the implementation's
+# choice: the laws below only describe the text that comes out.
+
+# We'll show that regardless of how the input is split into buffers,
+# the result of the stream decoding (all of the text returned by
+# `UTF8.decode_buffer` and `UTF8.decode_done`, concatenated together)
+# satisfies our specification for decoding a complete input (all the
+# buffers concatenated together).
+
+# We'll also show that each call to `decode_buffer` returns all of the
+# text that *can* be returned based on the input buffers seen so far.
+# (Otherwise, for example, an implementation could keep all the input
+# buffers in the state and then deliver the entire decoded text from
+# the call to `decode_done`.)
+
+## all_bytes
+
+# As of Bend 2.0.40 byte buffers are delivered by base.bend as lists
+# of U32, but they are not type restricted to a byte value of 0..255.
+# `all_bytes` checks that all the U32 values in a list are 0..255.
+
+def all_bytes(bytes: List<&2, U32>) -> Bool:
+  List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
 
 
 # Running the decoder
 # -------------------
 
 # Every value in `bytes` is a byte, 0..255.
-
-def all_bytes(bytes: List<&2, U32>) -> Bool:
-  List.all(~&2, ~U32, ~(b => U32.is_le(b, 255)), bytes)
 
 # The decoder state and the text so far, or None if `UTF8.decode_buffer`
 # returned None for some buffer (which it does when the buffer holds a
