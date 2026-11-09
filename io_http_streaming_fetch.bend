@@ -1,10 +1,11 @@
 # HTTP client: a GET to ip-api.com (208.95.112.1: the TCP kit has no
 # DNS) that prints the body of the answer: the status, country, city
 # and IP of the caller. Read until EOF (Connection: close), up to
-# 65536 bytes including headers. Each buffer received goes through the
-# streaming UTF-8 decoder and its body text goes at once to a callback.
-# `main` prints it, so a slow connection shows the text as it arrives.
-# Try it:
+# 65536 bytes including headers. `fetch_next` receives one buffer,
+# runs it through the streaming UTF-8 decoder, and returns its body
+# text along with the connection. The client decides what to do with
+# the text and when to ask for more; here it prints the text at once,
+# so a slow connection shows the text as it arrives. Try it:
 #
 #   bend io_http_streaming_fetch.bend
 import Base
@@ -38,129 +39,147 @@ def http_body(scan: BodyScan(), s: String) -> BodyScan() & String:
   (e, w) = scan
   http_body.go(s, e, w)
 
-# Give the body text in `s` to `on_text`.
-def deliver_body.write(~on_text: String -> IO(Unit), result: BodyScan() & String) -> IO(BodyScan()):
-  (next, body) = result
-  do IO<BodyScan()>:
-    on_text(body)
-    return next
+# The most bytes a response may have, including headers.
+def fetch_limit() -> U32:
+  65536
 
-def deliver_body(~on_text: String -> IO(Unit), scan: BodyScan(), s: String) -> IO(BodyScan()):
-  deliver_body.write(~on_text, http_body(scan, s))
+# An open connection, between buffers: the socket, how many more bytes
+# may be read, the decoder's state, and the search for the body.
+type Connection is Type:
+  Connection{socket: Socket, remaining: U32, state: UTF8.DecodeState(), scan: BodyScan()}
 
-# The decoder's state and the search for the body, between buffers.
-def Progress() -> Type:
-  UTF8.DecodeState() & BodyScan()
+# What receiving a buffer produced: body text and the connection to
+# read more from, or the last body text with the connection closed.
+type FetchStep is Type:
+  FetchMore{text: String, connection: Connection}
+  FetchLast{text: String}
 
-def fetch_fail(s: Socket, code: U32, message: String) -> IO(Unit):
-  do IO<Unit>:
+def fetch_fail(-A: Type, s: Socket, code: U32, message: String) -> IO(A):
+  do IO<A>:
     Socket.close(s)
-    IO.die(Unit, code, message)
+    IO.die(A, code, message)
 
-# Deliver what the decoder was still holding: a replacement character
-# if the response ended inside a sequence.
-def fetch_done(~on_text: String -> IO(Unit), s: Socket, progress: Progress()) -> IO(Unit):
-  (state, scan) = progress
-  do IO<Unit>:
+def fetch_last(result: BodyScan() & String) -> FetchStep:
+  (scan, body) = result
+  FetchLast{body}
+
+# Give what the decoder was still holding: a replacement character if
+# the response ended inside a sequence.
+def fetch_done(s: Socket, state: UTF8.DecodeState(), scan: BodyScan()) -> IO(FetchStep):
+  do IO<FetchStep>:
     Socket.close(s)
-    last : BodyScan() <- deliver_body(~on_text, scan, UTF8.decode_done(state))
-    return Unit{}
+    return fetch_last(http_body(scan, UTF8.decode_done(state)))
 
-def fetch_deliver.decoded(
-  ~on_text: String -> IO(Unit),
-  s: Socket,
-  decoded: UTF8.DecodeState() & String,
-  scan: BodyScan(),
-  next: Socket -> Progress() -> IO(Unit)
-) -> IO(Unit):
+def fetch_more.scanned(s: Socket, left: U32, state: UTF8.DecodeState(),
+  result: BodyScan() & String) -> FetchStep:
+  (scan, body) = result
+  FetchMore{body, Connection{s, left, state, scan}}
+
+def fetch_more(s: Socket, left: U32, decoded: UTF8.DecodeState() & String,
+  scan: BodyScan()) -> FetchStep:
   (state, text) = decoded
-  do IO<Unit>:
-    scan2 : BodyScan() <- deliver_body(~on_text, scan, text)
-    next(s, (state, scan2))
+  fetch_more.scanned(s, left, state, http_body(scan, text))
 
-# Decode a buffer, deliver its text, then go on to `next`. The decoder requires
-# every value to be a byte, and the type of TCP.recv_bytes doesn't say
-# so, which `ok` tests.
-def fetch_deliver(
-  ~on_text: String -> IO(Unit),
+# The decoder requires every value to be a byte, and the type of
+# TCP.recv_bytes doesn't say so, which `ok` tests.
+def fetch_decode(
   s: Socket,
   +buffer: List<&2, U32>,
   ok: Bool,
   -checked: {UTF8.decode_buffer.all_bytes(buffer) == ok : Bool},
-  progress: Progress(),
-  next: Socket -> Progress() -> IO(Unit)
-) -> IO(Unit):
+  left: U32,
+  state: UTF8.DecodeState(),
+  scan: BodyScan()
+) -> IO(FetchStep):
   match ok:
     case False{}:
-      fetch_fail(s, 1, "TCP.recv_bytes returned a value that is not a byte")
+      fetch_fail(FetchStep, s, 1, "TCP.recv_bytes returned a value that is not a byte")
     case True{}:
-      (state, scan) = progress
-      fetch_deliver.decoded(~on_text, s, UTF8.decode_buffer(state, buffer, checked), scan, next)
+      do IO<FetchStep>:
+        return fetch_more(s, left, UTF8.decode_buffer(state, buffer, checked), scan)
 
 # At the exact limit, the one-byte probe must be EOF.
 def fetch_end(
-  ~on_text: String -> IO(Unit),
   m: Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>,
-  progress: Progress()
-) -> IO(Unit):
+  state: UTF8.DecodeState(),
+  scan: BodyScan()
+) -> IO(FetchStep):
   (s, r) = m
   match r:
     case Fail{(code, message)}:
-      fetch_fail(s, code, message)
-    case Done{chunk}:
-      match chunk:
-        case None{}:
-          fetch_done(~on_text, s, progress)
-        case Some{bytes}:
-          fetch_fail(s, 1, "HTTP response exceeds 65536 bytes")
+      fetch_fail(FetchStep, s, code, message)
+    case Done{None{}}:
+      fetch_done(s, state, scan)
+    case Done{Some{bytes}}:
+      fetch_fail(FetchStep, s, 1, "HTTP response exceeds " ++ U32.show(fetch_limit()) ++ " bytes")
 
-def fetch_read(
-  ~on_text: String -> IO(Unit),
-  fuel: Nat,
+def fetch_received(
   remaining: U32,
   m: Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>,
-  progress: Progress()
-) -> IO(Unit):
-  match fuel remaining:
-    case 0n _:
-      fetch_end(~on_text, m, progress)
-    case _ 0:
-      fetch_end(~on_text, m, progress)
-    case 1n+fuel2 _:
+  state: UTF8.DecodeState(),
+  scan: BodyScan()
+) -> IO(FetchStep):
+  match remaining:
+    case 0:
+      fetch_end(m, state, scan)
+    case _:
       (s, r) = m
       match r:
         case Fail{(code, message)}:
-          fetch_fail(s, code, message)
+          fetch_fail(FetchStep, s, code, message)
         case Done{None{}}:
-          fetch_done(~on_text, s, progress)
+          fetch_done(s, state, scan)
         case Done{Some{chunk}}:
           match chunk:
             case Nil{}:
-              fetch_done(~on_text, s, progress)
+              fetch_done(s, state, scan)
             case +h <> +t:
               +left = U32.sub(remaining, U32.from_nat(List.length(&2, U32, chunk)))
-              fetch_deliver(~on_text, s, chunk, UTF8.decode_buffer.all_bytes(chunk), {==}, progress,
-                s2 => progress2 =>
-                  do IO<Unit>:
-                    next : Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>> <-
-                      TCP.recv_bytes(s2, U32.max(U32.min(left, 8192), 1))
-                    fetch_read(~on_text, fuel2, left, next, progress2))
+              fetch_decode(s, chunk, UTF8.decode_buffer.all_bytes(chunk), {==}, left, state, scan)
 
-def fetch_sent(~on_text: String -> IO(Unit), m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>) -> IO(Unit):
+# Receive the next buffer.
+def fetch_next(connection: Connection) -> IO(FetchStep):
+  match connection:
+    case Connection{s, +remaining, state, scan}:
+      do IO<FetchStep>:
+        m : Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>> <-
+          TCP.recv_bytes(s, U32.max(U32.min(remaining, 8192), 1))
+        fetch_received(remaining, m, state, scan)
+
+def fetch_close(connection: Connection) -> IO(Unit):
+  match connection:
+    case Connection{s, remaining, state, scan}:
+      Socket.close(s)
+
+def fetch_start(m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>) -> IO(Connection):
   (s, r) = m
   match r:
     case Fail{((code, message), rest)}:
-      fetch_fail(s, code, message)
+      fetch_fail(Connection, s, code, message)
     case Done{u}:
+      do IO<Connection>:
+        return Connection{s, fetch_limit(), UTF8.decode_start_state(), body_scan_start()}
+
+# The client's loop. `fuel` satisfies Bend's termination check: every
+# FetchMore has used up at least one of the allowed bytes, so fuel equal
+# to `fetch_limit()` is enough and the 0n case can't happen. IO.write
+# adds no newline, so a line split across two buffers prints as one line.
+def print_steps(fuel: Nat, step: FetchStep) -> IO(Unit):
+  match fuel step:
+    case _ FetchLast{text}:
+      IO.write(text)
+    case 0n FetchMore{text, connection}:
+      fetch_close(connection)
+    case 1n+fuel2 FetchMore{text, connection}:
       do IO<Unit>:
-        first : Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>> <-
-          TCP.recv_bytes(s, 8192)
-        fetch_read(~on_text, 65536n, 65536, first, (UTF8.decode_start_state(), body_scan_start()))
+        IO.write(text)
+        next : FetchStep <- fetch_next(connection)
+        print_steps(fuel2, next)
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    c    : Socket <- IO.try(Socket, TCP.connect("208.95.112.1", 80))
-    sent : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(c, "GET /line/?fields=status,country,city,query HTTP/1.1\r\nHost: ip-api.com\r\nConnection: close\r\n\r\n")
-    # IO.write adds no newline, so a line split across two buffers
-    # prints as one line.
-    fetch_sent(~(text => IO.write(text)), sent)
+    c          : Socket <- IO.try(Socket, TCP.connect("208.95.112.1", 80))
+    sent       : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(c, "GET /line/?fields=status,country,city,query HTTP/1.1\r\nHost: ip-api.com\r\nConnection: close\r\n\r\n")
+    connection : Connection <- fetch_start(sent)
+    first      : FetchStep <- fetch_next(connection)
+    print_steps(U32.to_nat(fetch_limit()), first)
