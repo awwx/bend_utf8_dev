@@ -659,15 +659,20 @@ that matches on the Bool, and pass `{==}` as evidence of what was matched,
 so that each branch knows the condition's value:
 
 ```bend
-def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
-  -checked: {has_two_byte_shape(b1, b2) == shape : Bool}) -> Bool:
+def two_byte_scalar.if(+b1: U32, +b2: U32, shape: Bool,
+  -checked: {has_two_byte_shape(b1, b2) == shape : Bool}) -> Maybe<&2, U32>:
   match shape:
-    case False{}: False{}
-    case True{}: Bool.not(overlong_two_bytes(b1, b2, checked))
+    case False{}:
+      None{}
+    case True{}:
+      two_byte_scalar.of(decode_two_bytes(b1, b2, checked))
 
-def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
-  valid_two_bytes.if(b1, b2, has_two_byte_shape(b1, b2), {==})
+def two_byte_scalar(+b1: U32, +b2: U32) -> Maybe<&2, U32>:
+  two_byte_scalar.if(b1, b2, has_two_byte_shape(b1, b2), {==})
 ```
+
+Here `decode_two_bytes` requires a proof of the shape, which only the
+`True{}` branch has.
 
 Put a short comment on version-specific idioms ("As of Bend 2.0.40 'if'
 statements are written this way.") so they're easy to revisit.
