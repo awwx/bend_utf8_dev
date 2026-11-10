@@ -4,37 +4,7 @@ import ./binary.bend as B
 import ./utf8.bend as UTF8
 import ./func_LAWS.bend as Func
 
-### UTF-8 encoding specification
-
-## Surrogate code points
-
-# Surrogate code points are U+D800..U+DFFF.
-
-def is_surrogate_code_point(+cp: U32) -> Bool:
-  U32.is_ge(cp, Char.to_u32('\u{D800}')) &&
-  U32.is_le(cp, Char.to_u32('\u{DFFF}'))
-
-law is_surrogate_code_point_examples:
-  {is_surrogate_code_point(Char.to_u32('\u{0000}')) == False{} : Bool} &
-  {is_surrogate_code_point(Char.to_u32('\u{D7FF}')) == False{} : Bool} &
-  {is_surrogate_code_point(Char.to_u32('\u{D800}')) == True{} : Bool} &
-  {is_surrogate_code_point(Char.to_u32('\u{DC00}')) == True{} : Bool} &
-  {is_surrogate_code_point(Char.to_u32('\u{DFFF}')) == True{} : Bool} &
-  {is_surrogate_code_point(Char.to_u32('\u{E000}')) == False{} : Bool}
-
-
-## Unicode scalars
-
-# A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
-# surrogate code points.
-
-def is_unicode_scalar(+cp: U32) -> Bool:
-  U32.is_ge(cp, Char.to_u32('\u{000000}')) &&
-  U32.is_le(cp, Char.to_u32('\u{10FFFF}')) &&
-  Bool.not(is_surrogate_code_point(cp))
-
-
-## Bits to bytes
+## Bits to bytes helper
 
 # Given a tuple of eight bools, return the U32 value of the binary
 # integer, most significant bit first.
@@ -80,6 +50,36 @@ law bit8_value_word:
   word = {WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WNil{}}}}}}}}} : Word(8n)}
   {bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
     U32.from_nat(Word.to_nat(8n, word)) : U32}
+
+
+### UTF-8 encoding specification
+
+## Surrogate code points
+
+# Surrogate code points are U+D800..U+DFFF.
+
+def is_surrogate_code_point(+cp: U32) -> Bool:
+  U32.is_ge(cp, Char.to_u32('\u{D800}')) &&
+  U32.is_le(cp, Char.to_u32('\u{DFFF}'))
+
+law is_surrogate_code_point_examples:
+  {is_surrogate_code_point(Char.to_u32('\u{0000}')) == False{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{D7FF}')) == False{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{D800}')) == True{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{DC00}')) == True{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{DFFF}')) == True{} : Bool} &
+  {is_surrogate_code_point(Char.to_u32('\u{E000}')) == False{} : Bool}
+
+
+## Unicode scalars
+
+# A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
+# surrogate code points.
+
+def is_unicode_scalar(+cp: U32) -> Bool:
+  U32.is_ge(cp, Char.to_u32('\u{000000}')) &&
+  U32.is_le(cp, Char.to_u32('\u{10FFFF}')) &&
+  Bool.not(is_surrogate_code_point(cp))
 
 
 ## Byte shapes
