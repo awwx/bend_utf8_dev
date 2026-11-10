@@ -70,6 +70,24 @@ def utf8_proof.bool.maximal_subpart(+b1: U32, +more: List<&2, U32>,
   utf8_proof.bool.maximal_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), subpart)
 
 
+# The one- and two-byte encoders, and the four-byte capacity test.  The
+# decoder doesn't use them, but the proofs do: for example, a two-byte
+# shape decodes to a scalar because re-encoding the decoded value gives
+# back the same bytes.
+
+def utf8_proof.can_encode_as_four_bytes(+cp: U32) -> Bool:
+  U32.is_le(cp, 2097151)
+
+def utf8_proof.encode_as_one_byte(+cp: U32,
+  -valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}) -> U32:
+  cp
+
+# Deliberately permits overlong encodings of code points 0..127.
+def utf8_proof.encode_as_two_bytes(+cp: U32,
+  -valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) -> U32 & U32:
+  ((192 + U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(cp)))))) : U32),
+   (128 + U32.and(cp, 63) : U32))
+
 # The bytes of a two-byte encoding.
 def utf8_proof.two_bytes.first(p: U32 & U32) -> U32:
   (a, b) = p
@@ -185,7 +203,7 @@ def utf8_proof.impl.can_encode_as_one_byte(+cp: U32) ->
 
 def Utf8EncodeOneSpec(+cp: U32,
   -valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}) -> Type:
-  {Some{UTF8.encode_as_one_byte(cp, valid)} == Laws.one_byte_shape(cp) : Maybe<&2, U32>}
+  {Some{utf8_proof.encode_as_one_byte(cp, valid)} == Laws.one_byte_shape(cp) : Maybe<&2, U32>}
 
 def utf8_proof.encode_as_one_byte_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
   valid: {UTF8.can_encode_as_one_byte(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0))) == True{} : Bool}
@@ -243,8 +261,8 @@ def utf8_proof.encode_as_one_byte_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28:
       Empty.absurd(Utf8EncodeOneSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}: {==}
 
-def utf8_proof.impl.encode_as_one_byte(+cp: U32, valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}) ->
-  {Some{UTF8.encode_as_one_byte(cp, valid)} == Laws.one_byte_shape(cp) : Maybe<&2, U32>}:
+def utf8_proof.encode_as_one_byte.shape(+cp: U32, valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}) ->
+  {Some{utf8_proof.encode_as_one_byte(cp, valid)} == Laws.one_byte_shape(cp) : Maybe<&2, U32>}:
   match cp:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       utf8_proof.encode_as_one_byte_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
@@ -438,7 +456,7 @@ def utf8_proof.mask_codepoint(+low: Word(6n), +high: Word(5n)) ->
 
 def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
   -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
-  {utf8_proof.two_bytes.first(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.first_byte(high) : U32}:
+  {utf8_proof.two_bytes.first(utf8_proof.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.first_byte(high) : U32}:
   match low high:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}:
       Equal.cong(Word(32n), U32, x => U32{x},
@@ -448,7 +466,7 @@ def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
 
 def utf8_proof.encode_second(+low: Word(6n), +high: Word(5n),
   -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
-  {utf8_proof.two_bytes.second(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.second_byte(low) : U32}:
+  {utf8_proof.two_bytes.second(utf8_proof.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.second_byte(low) : U32}:
   Equal.trans(U32,
     (128 + U32.and(utf8_proof.codepoint(low, high), 63) : U32),
     (128 + U32{word_join(6n, low, 26n, Word.zero(26n))} : U32), utf8_proof.second_byte(low),
@@ -615,18 +633,18 @@ def Laws.is_surrogate_code_point_examples():
 
 def Utf8EncodeTwoSpec(+cp: U32,
   -valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) -> Type:
-  {Some{UTF8.encode_as_two_bytes(cp, valid)} == Laws.two_byte_shape(cp) : Maybe<&1, U32 & U32>}
+  {Some{utf8_proof.encode_as_two_bytes(cp, valid)} == Laws.two_byte_shape(cp) : Maybe<&1, U32 & U32>}
 
 def utf8_proof.table_pair(+low: Word(6n), +high: Word(5n),
   -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
-  {UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) ==
+  {utf8_proof.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) ==
     (utf8_proof.first_byte(high), utf8_proof.second_byte(low)) : U32 & U32}:
   match low high:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}:
       %utf8_proof.encode_first(low, high, valid) :
-        {UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) == (_, utf8_proof.second_byte(low)) : U32 & U32}
+        {utf8_proof.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) == (_, utf8_proof.second_byte(low)) : U32 & U32}
       %utf8_proof.encode_second(low, high, valid) :
-        {UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) == (utf8_proof.two_bytes.first(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)), _) : U32 & U32}
+        {utf8_proof.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) == (utf8_proof.two_bytes.first(utf8_proof.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)), _) : U32 & U32}
       {==}
 
 def utf8_proof.encode_as_two_bytes_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
@@ -676,12 +694,12 @@ def utf8_proof.encode_as_two_bytes_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28
       Empty.absurd(Utf8EncodeTwoSpec(Char.to_u32(char_from_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)), valid), UTF8.false_true(valid))
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       Equal.cong(U32 & U32, Maybe<&1, U32 & U32>, bytes => Some{bytes},
-        UTF8.encode_as_two_bytes(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}), utf8_proof.capacity_bits(b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)),
+        utf8_proof.encode_as_two_bytes(utf8_proof.codepoint(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}), utf8_proof.capacity_bits(b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)),
         (utf8_proof.first_byte(WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}), utf8_proof.second_byte(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}})),
         utf8_proof.table_pair(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}, utf8_proof.capacity_bits(b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)))
 
-def utf8_proof.impl.encode_as_two_bytes(+cp: U32, valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) ->
-  {Some{UTF8.encode_as_two_bytes(cp, valid)} == Laws.two_byte_shape(cp) : Maybe<&1, U32 & U32>}:
+def utf8_proof.encode_as_two_bytes.shape(+cp: U32, valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) ->
+  {Some{utf8_proof.encode_as_two_bytes(cp, valid)} == Laws.two_byte_shape(cp) : Maybe<&1, U32 & U32>}:
   match cp:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       utf8_proof.encode_as_two_bytes_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
@@ -1041,7 +1059,7 @@ def utf8_proof.encode_decoded(+b1: U32, +b2: U32,
   -valid: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool},
   +produced: {Laws.two_byte_shape(UTF8.decode_two_bytes(b1, b2, valid)) == Some{(b1, b2)} : Maybe<&1, U32 & U32>}) ->
   Exists({UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, valid)) == True{} : Bool}, accepted =>
-    {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, valid), accepted) == (b1, b2) : U32 & U32}):
+    {utf8_proof.encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, valid), accepted) == (b1, b2) : U32 & U32}):
   +cp = UTF8.decode_two_bytes(b1, b2, valid)
   +accepted = Equal.trans(Bool, UTF8.can_encode_as_two_bytes(cp),
     Maybe.is_some(&1, U32 & U32, Laws.two_byte_shape(cp)), True{}, utf8_proof.impl.can_encode_as_two_bytes(cp),
@@ -1049,15 +1067,15 @@ def utf8_proof.encode_decoded(+b1: U32, +b2: U32,
       Laws.two_byte_shape(cp), Some{(b1, b2)}, produced))
   (accepted, Equal.cong(Maybe<&1, U32 & U32>, U32 & U32,
     shape => Maybe.default(&1, U32 & U32, shape, (0, 0)),
-    Some{UTF8.encode_as_two_bytes(cp, accepted)}, Some{(b1, b2)},
-    Equal.trans(Maybe<&1, U32 & U32>, Some{UTF8.encode_as_two_bytes(cp, accepted)},
-      Laws.two_byte_shape(cp), Some{(b1, b2)}, utf8_proof.impl.encode_as_two_bytes(cp, accepted), produced)))
+    Some{utf8_proof.encode_as_two_bytes(cp, accepted)}, Some{(b1, b2)},
+    Equal.trans(Maybe<&1, U32 & U32>, Some{utf8_proof.encode_as_two_bytes(cp, accepted)},
+      Laws.two_byte_shape(cp), Some{(b1, b2)}, utf8_proof.encode_as_two_bytes.shape(cp, accepted), produced)))
 
 # Matching the pair exposes its bytes to the two-byte lemmas.
 def utf8_proof.two_encode_decode(p: U32 & U32,
   +valid: {UTF8.has_two_byte_shape(utf8_proof.two_bytes.first(p), utf8_proof.two_bytes.second(p)) == True{} : Bool}) ->
   Exists({UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(utf8_proof.two_bytes.first(p), utf8_proof.two_bytes.second(p), valid)) == True{} : Bool}, accepted =>
-    {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(utf8_proof.two_bytes.first(p), utf8_proof.two_bytes.second(p), valid), accepted) == p : U32 & U32}):
+    {utf8_proof.encode_as_two_bytes(UTF8.decode_two_bytes(utf8_proof.two_bytes.first(p), utf8_proof.two_bytes.second(p), valid), accepted) == p : U32 & U32}):
   match p:
     case (+b1, +b2):
       utf8_proof.encode_decoded(b1, b2, valid,
@@ -1146,7 +1164,7 @@ def utf8_proof.two_decoded_scalar(+b1: U32, +b2: U32,
   utf8_proof.two_capacity_scalar(UTF8.decode_two_bytes(b1, b2, checked),
     utf8_proof.exists_witness(
       {UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, checked)) == True{} : Bool},
-      accepted => {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, checked), accepted) == (b1, b2) : U32 & U32},
+      accepted => {utf8_proof.encode_as_two_bytes(UTF8.decode_two_bytes(b1, b2, checked), accepted) == (b1, b2) : U32 & U32},
       utf8_proof.two_encode_decode((b1, b2), checked)))
 
 # With the scalar check proved True, the specification's conjunction
@@ -2012,7 +2030,7 @@ def utf8_proof.View4(+cp: U32) -> Type:
   Exists(Word(6n), z => Exists(Word(6n), y => Exists(Word(6n), x => Exists(Word(3n), t => {cp == utf8_proof.cp4(z, y, x, t) : U32}))))
 
 def utf8_proof.view4_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
-  valid: {UTF8.can_encode_as_four_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == True{} : Bool}) -> utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}):
+  valid: {utf8_proof.can_encode_as_four_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == True{} : Bool}) -> utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}):
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21:
     case True{} _ _ _ _ _ _ _ _ _ _:
       Empty.absurd(utf8_proof.View4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}), UTF8.false_true(valid))
@@ -2039,13 +2057,13 @@ def utf8_proof.view4_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: 
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       (WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, (WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WNil{}}}}}}}, (WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WNil{}}}}}}}, (WCon{b18, WCon{b19, WCon{b20, WNil{}}}}, {==}))))
 
-def utf8_proof.view4(+cp: U32, valid: {UTF8.can_encode_as_four_bytes(cp) == True{} : Bool}) -> utf8_proof.View4(cp):
+def utf8_proof.view4(+cp: U32, valid: {utf8_proof.can_encode_as_four_bytes(cp) == True{} : Bool}) -> utf8_proof.View4(cp):
   match cp:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       utf8_proof.view4_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
 
 def utf8_proof.can4_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) ->
-  {UTF8.can_encode_as_four_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}})) : Bool}:
+  {utf8_proof.can_encode_as_four_bytes(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) == Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}})) : Bool}:
   match b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21:
     case True{} _ _ _ _ _ _ _ _ _ _: {==}
     case False{} True{} _ _ _ _ _ _ _ _ _: {==}
@@ -2061,8 +2079,8 @@ def utf8_proof.can4_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: B
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} False{}:
       utf8_proof.word_le_ones(21n, WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WNil{}}}}}}}}}}}}}}}}}}}}}}, 11n, Word.zero(11n), Word.zero(11n))
 
-def utf8_proof.impl.can_encode_as_four_bytes(+cp: U32) ->
-  {UTF8.can_encode_as_four_bytes(cp) == Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(cp)) : Bool}:
+def utf8_proof.can_encode_as_four_bytes.shape(+cp: U32) ->
+  {utf8_proof.can_encode_as_four_bytes(cp) == Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(cp)) : Bool}:
   match cp:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       utf8_proof.can4_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
@@ -2156,8 +2174,8 @@ def utf8_proof.produced4.view(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32,
 
 def utf8_proof.produced4(+cp: U32, +b1: U32, +b2: U32, +b3: U32, +b4: U32,
   +produced: {Laws.four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>}) -> utf8_proof.Produced4(cp, b1, b2, b3, b4):
-  +accepted = Equal.trans(Bool, UTF8.can_encode_as_four_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(cp)), True{},
-    utf8_proof.impl.can_encode_as_four_bytes(cp),
+  +accepted = Equal.trans(Bool, utf8_proof.can_encode_as_four_bytes(cp), Maybe.is_some(&1, U32 & U32 & U32 & U32, Laws.four_byte_shape(cp)), True{},
+    utf8_proof.can_encode_as_four_bytes.shape(cp),
     Equal.cong(Maybe<&1, U32 & U32 & U32 & U32>, Bool, m => Maybe.is_some(&1, U32 & U32 & U32 & U32, m), Laws.four_byte_shape(cp), Some{(b1, b2, b3, b4)}, produced))
   utf8_proof.produced4.view(cp, b1, b2, b3, b4, produced, utf8_proof.view4(cp, accepted))
 
@@ -3819,7 +3837,7 @@ def utf8_proof.none_from_is_some(m: Maybe<&2, U32>,
 
 def utf8_proof.one_encoding(+b: U32, +shape: {UTF8.has_one_byte_shape(b) == True{} : Bool}) ->
   {Laws.encoding(b) == Some{[b]} : Maybe<&1, List<&2, U32>>}:
-  %utf8_proof.impl.encode_as_one_byte(b, shape) : {Laws.encoding.if(b, _) == Some{[b]} : Maybe<&1, List<&2, U32>>}
+  %utf8_proof.encode_as_one_byte.shape(b, shape) : {Laws.encoding.if(b, _) == Some{[b]} : Maybe<&1, List<&2, U32>>}
   {==}
 
 def utf8_proof.one_encodes(+b: U32, +valid: {UTF8.valid_one_byte(b) == True{} : Bool}) ->
@@ -4022,7 +4040,7 @@ def utf8_proof.one_decodes(+cp: U32, +b: U32,
     Equal.cong(Maybe<&2, U32>, Bool, m => Maybe.is_some(&2, U32, m), Laws.one_byte_shape(cp), Some{b}, produced))
   +same = utf8_proof.some_value(cp, b,
     Equal.trans(Maybe<&2, U32>, Some{cp}, Laws.one_byte_shape(cp), Some{b},
-      utf8_proof.impl.encode_as_one_byte(cp, accepted), produced))
+      utf8_proof.encode_as_one_byte.shape(cp, accepted), produced))
   %same : {utf8_proof.one_byte_scalar(_) == Some{cp} : Maybe<&2, U32>}
   utf8_proof.one_scalar_some(cp, UTF8.valid_one_byte(cp), {==}, accepted)
 

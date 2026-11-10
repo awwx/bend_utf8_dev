@@ -10,13 +10,6 @@ def can_encode_as_two_bytes(+cp: U32) -> Bool:
 def can_encode_as_three_bytes(+cp: U32) -> Bool:
   U32.is_le(cp, 65535)
 
-def can_encode_as_four_bytes(+cp: U32) -> Bool:
-  U32.is_le(cp, 2097151)
-
-def encode_as_one_byte(+cp: U32,
-  -valid: {can_encode_as_one_byte(cp) == True{} : Bool}) -> U32:
-  cp
-
 # A one-byte encoding has the same value as its code point (0..127).
 def has_one_byte_shape(byte: U32) -> Bool:
   can_encode_as_one_byte(byte)
@@ -29,12 +22,6 @@ def decode_one_byte(+byte: U32,
 # Every byte with the one-byte shape is a valid encoding.
 def valid_one_byte(+byte: U32) -> Bool:
   has_one_byte_shape(byte)
-
-# Deliberately permits overlong encodings of code points 0..127.
-def encode_as_two_bytes(+cp: U32,
-  -valid: {can_encode_as_two_bytes(cp) == True{} : Bool}) -> U32 & U32:
-  ((192 + U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(cp)))))) : U32),
-   (128 + U32.and(cp, 63) : U32))
 
 # The kinds of UTF-8 byte, by their high bits. Each test is one AND and
 # one comparison. The mask keeps every bit above the payload, so a value
@@ -79,21 +66,6 @@ def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
 
 def valid_two_bytes(+b1: U32, +b2: U32) -> Bool:
   valid_two_bytes.if(b1, b2, has_two_byte_shape(b1, b2), {==})
-
-# Deliberately permits overlong encodings and surrogate code points.
-def encode_as_three_bytes(+cp: U32,
-  -valid: {can_encode_as_three_bytes(cp) == True{} : Bool}) -> U32 & U32 & U32:
-  ((224 + U32.shrn(cp, 12n) : U32),
-   (128 + U32.and(U32.shrn(cp, 6n), 63) : U32),
-   (128 + U32.and(cp, 63) : U32))
-
-# Deliberately permits overlong encodings and values above U+10FFFF.
-def encode_as_four_bytes(+cp: U32,
-  -valid: {can_encode_as_four_bytes(cp) == True{} : Bool}) -> U32 & U32 & U32 & U32:
-  ((240 + U32.shrn(cp, 18n) : U32),
-   (128 + U32.and(U32.shrn(cp, 12n), 63) : U32),
-   (128 + U32.and(U32.shrn(cp, 6n), 63) : U32),
-   (128 + U32.and(cp, 63) : U32))
 
 def has_three_byte_shape(b1: U32, b2: U32, b3: U32) -> Bool:
   is_three_byte_lead(b1) && is_continuation_byte(b2) &&
