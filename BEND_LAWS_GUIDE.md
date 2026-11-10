@@ -5,9 +5,8 @@ any project that uses `LAWS.bend` / `PROOF.bend`. It was written against
 Bend 2.0.39 and checked against 2.0.40. Version-specific details are marked
 as such.
 
-The examples come from a UTF-8 encoding project. That project has two
-implementation modules, `binary_mask.bend` and `utf8.bend`, imported as `B`
-and `UTF8`. The examples are illustrations; the practices themselves are
+The examples come from a UTF-8 encoding project. That project has one
+implementation module, `utf8.bend`, imported as `UTF8`. The examples are illustrations; the practices themselves are
 general.
 
 The goal: the laws are a specification that a reader can trust. They state
@@ -135,8 +134,8 @@ of truth (§1.2). Don't choose one because it would run well.
 
 | File | Contents |
 |---|---|
-| `<module>.bend` | Implementation modules: only what runs, plus the minimum lemmas the code needs to type-check. *Example:* `binary_mask.bend`, `utf8.bend`. |
-| `<module>_LAWS.bend` | Laws for one module or subject, when `LAWS.bend` would otherwise grow too large. *Example:* `binary_mask_LAWS.bend`. |
+| `<module>.bend` | Implementation modules: only what runs, plus the minimum lemmas the code needs to type-check. *Example:* `utf8.bend`. |
+| `<module>_LAWS.bend` | Laws for one module or subject, when `LAWS.bend` would otherwise grow too large. *Example:* `func_LAWS.bend`, which defines the `Bijection` that the inverse laws use. |
 | `LAWS.bend` | Laws for the project's main subject. It imports the `*_LAWS.bend` files it builds on. |
 | `PROOF.bend` | Proofs of every law in every laws file, plus all proof-only helpers. |
 | `AGENTS.md` | Project rules for coding agents: the independence rule (§1.1), how to validate, and notes on the environment. |
@@ -147,13 +146,13 @@ How the files fit together:
   `--verdict` isn't needed for routine checks.
 - **`PROOF.bend` imports every laws file** under an alias, and supplies
   each proof as `def Alias.law_name(...)`. For example, after
-  `import ./binary_mask_LAWS.bend as BinaryLaws`, it defines
-  `def BinaryLaws.is_mask_digit(c): {==}`. Bend reports an unproved law, or
+  `import ./LAWS.bend as Laws`, it defines
+  `def Laws.u32_byte4_bits(b31, …, b0): {==}`. Bend reports an unproved law, or
   an unimplemented operation, as a TODO in any imported laws file, not only
   in `LAWS.bend`.
 - **`PROOF.bend` must import `./LAWS.bend`** when a `LAWS.bend` sits next to
   it. Bend enforces this.
-- **Laws files import the implementation** (`import ./binary_mask.bend as B`) and
+- **Laws files import the implementation** (`import ./utf8.bend as UTF8`) and
   name its functions directly. This is how the Bend demos do it; for
   example, `demos/proof_insertion_sort/LAWS.bend` constrains `Sort.sort`.
 - **Proof-only helpers go in `PROOF.bend`, not in the implementation.** This
@@ -279,7 +278,7 @@ A function with a precondition takes a proof of it as its **last** argument,
 **erased** with `-` so that it costs nothing at runtime.
 
 Callers with literal input pass `{==}`, so the precondition is checked when
-the proofs are checked: `B.byte_mask("01xxxxxx", byte, {==})`. Name the proof
+the proofs are checked: `UTF8.decode_two_bytes(194, 169, {==})`. Name the proof
 for what it proves. Use `valid` for a general precondition, a specific name
 such as `valid_shape` when there are several kinds, and `accepted` for the
 implementation-side proof in §5.6.
@@ -370,18 +369,16 @@ implementation's own validator, have the proof show that the implementation
 accepts the input, using `exs`:
 
 ```bend
-law byte_mask:
-  for +mask: String
-  for +byte: U32
-  for valid: {B.is_valid_byte_mask(mask) == True{} : Bool}
-  exs accepted: {B.is_valid_byte_mask(mask) == True{} : Bool}
-  {B.byte_mask(mask, byte, accepted) ==
-    (U32.is_le(byte, 255) && mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
+law decode:
+  for +x: T
+  for valid: {is_valid_spec(x) == True{} : Bool}
+  exs accepted: {M.is_valid(x) == True{} : Bool}
+  {M.decode(x, accepted) == decode_spec(x) : U}
 ```
 
 The law then quantifies over the *specified* inputs, and the proof must show
 that the implementation accepts each one. When the validator is itself fixed
-by a law, the two predicates can be the same (as here). Keeping the pattern
+by a law, the two predicates can be the same. Keeping the pattern
 lets the precondition change to a reference predicate without restructuring
 the law.
 

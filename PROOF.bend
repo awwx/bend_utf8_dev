@@ -1,7 +1,5 @@
 import Base
 import ./LAWS.bend as Laws
-import ./binary_mask_LAWS.bend as BinaryLaws
-import ./binary_mask.bend as B
 import ./utf8.bend as UTF8
 
 # Most-significant bits come first, matching Bend's binder order.
@@ -105,42 +103,6 @@ def Laws.utf8_can_encode_as_one_byte(cp):
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       utf8_proof.one_capacity_model_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0)
 
-
-def BinaryLaws.is_mask_digit(c):
-  {==}
-
-def BinaryLaws.is_valid_byte_mask(mask):
-  {==}
-
-def ByteMaskSpec(+mask: String, +byte: U32,
-  -valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> Type:
-  {B.byte_mask(mask, byte, valid) == (U32.is_le(byte, 255) && BinaryLaws.mask_positions(mask, [128, 64, 32, 16, 8, 4, 2, 1], byte)) : Bool}
-
-def byte_mask_agrees(+mask: String, +byte: U32, valid: {B.is_valid_byte_mask(mask) == True{} : Bool}) -> ByteMaskSpec(mask, byte, valid):
-  match mask:
-    case SNil{}:
-      Empty.absurd(ByteMaskSpec(SNil{}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SNil{}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SNil{}}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SCon{c2, SNil{}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SNil{}}}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SNil{}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SNil{}}}}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SNil{}}}}}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SNil{}}}}}}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SNil{}}}}}}}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SNil{}}}}}}}}, byte, valid), UTF8.false_true(valid))
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SNil{}}}}}}}}}:
-      {==}
-    case SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}:
-      Empty.absurd(ByteMaskSpec(SCon{c1, SCon{c2, SCon{c3, SCon{c4, SCon{c5, SCon{c6, SCon{c7, SCon{c8, SCon{c9, rest}}}}}}}}}, byte, valid), UTF8.false_true(valid))
-
-def BinaryLaws.byte_mask_examples():
-  ({==}, {==}, {==}, {==}, {==}, {==}, {==})
 
 def Utf8EncodeOneSpec(+cp: U32,
   -valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}) -> Type:
@@ -1196,10 +1158,6 @@ def Laws.utf8_valid_two_bytes(b1, b2):
 
 def Laws.u32_byte4_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
   {==}
-
-def BinaryLaws.byte_mask(mask, byte, valid):
-  +accepted = valid
-  (accepted, byte_mask_agrees(mask, byte, accepted))
 
 # The law's sum, added from the most significant bit down: after the
 # bits above k are added, the sum is those bits in place with zeros
