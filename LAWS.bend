@@ -1,6 +1,5 @@
 import Base
 import ./utf8.bend as UTF8
-import ./func_LAWS.bend as Func
 
 ## Bits to bytes helper
 
@@ -246,309 +245,6 @@ def four_byte_shape(cp: U32) -> Maybe<&1, U32 & U32 & U32 & U32>:
   four_byte_shape.bits(u32_byte4(cp))
 
 
-## Can encode
-
-# A code point can be encoded as a sequence of bytes iff the shape
-# matches.
-
-law utf8_can_encode_as_one_byte:
-  for +cp: U32
-  {UTF8.can_encode_as_one_byte(cp) == Maybe.is_some(&2, U32, one_byte_shape(cp)) : Bool}
-
-law utf8_can_encode_as_two_bytes:
-  for +cp: U32
-  {UTF8.can_encode_as_two_bytes(cp) == Maybe.is_some(&1, U32 & U32, two_byte_shape(cp)) : Bool}
-
-law utf8_can_encode_as_three_bytes:
-  for +cp: U32
-  {UTF8.can_encode_as_three_bytes(cp) == Maybe.is_some(&1, U32 & U32 & U32, three_byte_shape(cp)) : Bool}
-
-law utf8_can_encode_as_four_bytes:
-  for +cp: U32
-  {UTF8.can_encode_as_four_bytes(cp) == Maybe.is_some(&1, U32 & U32 & U32 & U32, four_byte_shape(cp)) : Bool}
-
-
-## Encode as
-
-# Given a code point and a supplied proof that the code point *can* be
-# encoded as a byte sequence, `encode_as_*` returns those bytes.
-# (Supplying the proof means that we don't have to return a Maybe.)
-
-law utf8_encode_as_one_byte:
-  for +cp: U32
-  for valid: {UTF8.can_encode_as_one_byte(cp) == True{} : Bool}
-  {Some{UTF8.encode_as_one_byte(cp, valid)} == one_byte_shape(cp) : Maybe<&2, U32>}
-
-law utf8_encode_as_two_bytes:
-  for +cp: U32
-  for valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}
-  {Some{UTF8.encode_as_two_bytes(cp, valid)} == two_byte_shape(cp) : Maybe<&1, U32 & U32>}
-
-law utf8_encode_as_three_bytes:
-  for +cp: U32
-  for valid: {UTF8.can_encode_as_three_bytes(cp) == True{} : Bool}
-  {Some{UTF8.encode_as_three_bytes(cp, valid)} == three_byte_shape(cp) : Maybe<&1, U32 & U32 & U32>}
-
-law utf8_encode_as_four_bytes:
-  for +cp: U32
-  for valid: {UTF8.can_encode_as_four_bytes(cp) == True{} : Bool}
-  {Some{UTF8.encode_as_four_bytes(cp, valid)} == four_byte_shape(cp) : Maybe<&1, U32 & U32 & U32 & U32>}
-
-
-## has_N_byte_shape(bytes) -> Bool
-
-# Return True if the bytes have the byte shape for that number of
-# bytes: that is, they are what some code point encodes to.  (At this
-# point we're still ignoring overlong encodings.)
-
-law utf8_has_one_byte_shape:
-  for +byte: U32
-  representation = Exists(U32, cp =>
-    {one_byte_shape(cp) == Some{byte} : Maybe<&2, U32>})
-  ({UTF8.has_one_byte_shape(byte) == True{} : Bool} -> representation) &
-  (representation -> {UTF8.has_one_byte_shape(byte) == True{} : Bool})
-
-law utf8_has_two_byte_shape:
-  for +b1: U32
-  for +b2: U32
-  representation = Exists(U32, cp =>
-    {two_byte_shape(cp) == Some{(b1, b2)} : Maybe<&1, U32 & U32>})
-  ({UTF8.has_two_byte_shape(b1, b2) == True{} : Bool} -> representation) &
-  (representation -> {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool})
-
-law utf8_has_three_byte_shape:
-  for +b1: U32
-  for +b2: U32
-  for +b3: U32
-  representation = Exists(U32, cp =>
-    {three_byte_shape(cp) == Some{(b1, b2, b3)} : Maybe<&1, U32 & U32 & U32>})
-  ({UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool} -> representation) &
-  (representation -> {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool})
-
-law utf8_has_four_byte_shape:
-  for +b1: U32
-  for +b2: U32
-  for +b3: U32
-  for +b4: U32
-  representation = Exists(U32, cp =>
-    {four_byte_shape(cp) == Some{(b1, b2, b3, b4)} : Maybe<&1, U32 & U32 & U32 & U32>})
-  ({UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool} -> representation) &
-  (representation -> {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool})
-
-
-## Encoding is bijective
-
-# Each encode_as_N_byte is bijective, and decode_N_byte is exactly its
-# inverse.
-#
-# For a code point which *can be* encoded as the specified number of
-# bytes, we can roundtrip `decode(encode(cp)) == cp` and vice versa.
-
-law utf8_one_byte_inverse:
-  Func.Bijection(U32, U32,
-    cp => UTF8.can_encode_as_one_byte(cp),
-    byte => UTF8.has_one_byte_shape(byte),
-    cp => valid => UTF8.encode_as_one_byte(cp, valid),
-    byte => valid => UTF8.decode_one_byte(byte, valid))
-
-# The bytes of a two-, three- or four-byte encoding.
-
-def two_bytes.first(p: U32 & U32) -> U32:
-  (a, b) = p
-  a
-
-def two_bytes.second(p: U32 & U32) -> U32:
-  (a, b) = p
-  b
-
-def three_bytes.first(p: U32 & U32 & U32) -> U32:
-  (a, b, c) = p
-  a
-
-def three_bytes.second(p: U32 & U32 & U32) -> U32:
-  (a, b, c) = p
-  b
-
-def three_bytes.third(p: U32 & U32 & U32) -> U32:
-  (a, b, c) = p
-  c
-
-def four_bytes.first(p: U32 & U32 & U32 & U32) -> U32:
-  (a, b, c, d) = p
-  a
-
-def four_bytes.second(p: U32 & U32 & U32 & U32) -> U32:
-  (a, b, c, d) = p
-  b
-
-def four_bytes.third(p: U32 & U32 & U32 & U32) -> U32:
-  (a, b, c, d) = p
-  c
-
-def four_bytes.fourth(p: U32 & U32 & U32 & U32) -> U32:
-  (a, b, c, d) = p
-  d
-
-law utf8_two_byte_inverse:
-  Func.Bijection(U32, U32 & U32,
-    cp => UTF8.can_encode_as_two_bytes(cp),
-    p => UTF8.has_two_byte_shape(two_bytes.first(p), two_bytes.second(p)),
-    cp => valid => UTF8.encode_as_two_bytes(cp, valid),
-    p => valid => UTF8.decode_two_bytes(two_bytes.first(p), two_bytes.second(p), valid))
-
-law utf8_three_byte_inverse:
-  Func.Bijection(U32, U32 & U32 & U32,
-    cp => UTF8.can_encode_as_three_bytes(cp),
-    p => UTF8.has_three_byte_shape(three_bytes.first(p), three_bytes.second(p), three_bytes.third(p)),
-    cp => valid => UTF8.encode_as_three_bytes(cp, valid),
-    p => valid => UTF8.decode_three_bytes(three_bytes.first(p), three_bytes.second(p), three_bytes.third(p), valid))
-
-law utf8_four_byte_inverse:
-  Func.Bijection(U32, U32 & U32 & U32 & U32,
-    cp => UTF8.can_encode_as_four_bytes(cp),
-    p => UTF8.has_four_byte_shape(four_bytes.first(p), four_bytes.second(p), four_bytes.third(p), four_bytes.fourth(p)),
-    cp => valid => UTF8.encode_as_four_bytes(cp, valid),
-    p => valid => UTF8.decode_four_bytes(four_bytes.first(p), four_bytes.second(p), four_bytes.third(p), four_bytes.fourth(p), valid))
-
-
-## Overlong encodings
-
-# In UTF-8, an "overlong" encoding is an encoding which is the correct
-# shape for encoding the code point, but a shorter encoding also
-# encodes the code point.  These are invalid in UTF-8.
-
-# No one-byte encoding is overlong.
-
-def overlong_one_byte(b1: U32) -> Bool:
-  False{}
-
-# A two-byte encoding is overlong if the code point it encodes could
-# be encoded as a one byte encoding.
-
-law utf8_overlong_two_bytes:
-  for +b1: U32
-  for +b2: U32
-  for -valid_shape: {UTF8.has_two_byte_shape(b1, b2) == True{} : Bool}
-  {UTF8.overlong_two_bytes(b1, b2, valid_shape) ==
-    UTF8.can_encode_as_one_byte(UTF8.decode_two_bytes(b1, b2, valid_shape)) : Bool}
-
-# A three-byte encoding is overlong if the code point it encodes could
-# be encoded in one or two bytes.
-
-law utf8_overlong_three_bytes:
-  for +b1: U32
-  for +b2: U32
-  for +b3: U32
-  for -valid_shape: {UTF8.has_three_byte_shape(b1, b2, b3) == True{} : Bool}
-  {UTF8.overlong_three_bytes(b1, b2, b3, valid_shape) ==
-    (UTF8.can_encode_as_one_byte(UTF8.decode_three_bytes(b1, b2, b3, valid_shape)) ||
-     UTF8.can_encode_as_two_bytes(UTF8.decode_three_bytes(b1, b2, b3, valid_shape))) : Bool}
-
-# A four-byte encoding is overlong if the code point it encodes could
-# be encoded in one, two or three bytes.
-
-law utf8_overlong_four_bytes:
-  for +b1: U32
-  for +b2: U32
-  for +b3: U32
-  for +b4: U32
-  for -valid_shape: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == True{} : Bool}
-  {UTF8.overlong_four_bytes(b1, b2, b3, b4, valid_shape) ==
-    (UTF8.can_encode_as_one_byte(UTF8.decode_four_bytes(b1, b2, b3, b4, valid_shape)) ||
-     UTF8.can_encode_as_two_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid_shape)) ||
-     UTF8.can_encode_as_three_bytes(UTF8.decode_four_bytes(b1, b2, b3, b4, valid_shape))) : Bool}
-
-
-## Valid sequences
-
-# A UTF-8 encoding is valid when:
-# * It has the correct byte shape, and
-# * It is not overlong, and
-# * the code point it encodes is a Unicode scalar (at most U+10FFFF
-#   and not a surrogate).
-#
-# A "valid sequence" is a sequence of bytes which are a valid UTF-8
-# encoding.
-
-# Testing the shape first supplies the proof that decoding needs.
-
-def valid_one_byte.if(+byte: U32, shape: Bool,
-  -checked: {UTF8.has_one_byte_shape(byte) == shape : Bool}) -> Bool:
-  match shape:
-    case False{}:
-      False{}
-    case True{}:
-      Bool.not(overlong_one_byte(byte)) &&
-      is_unicode_scalar(UTF8.decode_one_byte(byte, checked))
-
-law utf8_valid_one_byte:
-  for +byte: U32
-  {UTF8.valid_one_byte(byte) == valid_one_byte.if(byte, UTF8.has_one_byte_shape(byte), {==}) : Bool}
-
-def valid_two_bytes.if(+b1: U32, +b2: U32, shape: Bool,
-  -checked: {UTF8.has_two_byte_shape(b1, b2) == shape : Bool}) -> Bool:
-  match shape:
-    case False{}:
-      False{}
-    case True{}:
-      Bool.not(UTF8.overlong_two_bytes(b1, b2, checked)) &&
-      is_unicode_scalar(UTF8.decode_two_bytes(b1, b2, checked))
-
-law utf8_valid_two_bytes:
-  for +b1: U32
-  for +b2: U32
-  {UTF8.valid_two_bytes(b1, b2) == valid_two_bytes.if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==}) : Bool}
-
-def valid_three_bytes.if(+b1: U32, +b2: U32, +b3: U32, shape: Bool,
-  -checked: {UTF8.has_three_byte_shape(b1, b2, b3) == shape : Bool}) -> Bool:
-  match shape:
-    case False{}:
-      False{}
-    case True{}:
-      Bool.not(UTF8.overlong_three_bytes(b1, b2, b3, checked)) &&
-      is_unicode_scalar(UTF8.decode_three_bytes(b1, b2, b3, checked))
-
-law utf8_valid_three_bytes:
-  for +b1: U32
-  for +b2: U32
-  for +b3: U32
-  {UTF8.valid_three_bytes(b1, b2, b3) == valid_three_bytes.if(b1, b2, b3, UTF8.has_three_byte_shape(b1, b2, b3), {==}) : Bool}
-
-def valid_four_bytes.if(+b1: U32, +b2: U32, +b3: U32, +b4: U32, shape: Bool,
-  -checked: {UTF8.has_four_byte_shape(b1, b2, b3, b4) == shape : Bool}) -> Bool:
-  match shape:
-    case False{}:
-      False{}
-    case True{}:
-      Bool.not(UTF8.overlong_four_bytes(b1, b2, b3, b4, checked)) &&
-      is_unicode_scalar(UTF8.decode_four_bytes(b1, b2, b3, b4, checked))
-
-law utf8_valid_four_bytes:
-  for +b1: U32
-  for +b2: U32
-  for +b3: U32
-  for +b4: U32
-  {UTF8.valid_four_bytes(b1, b2, b3, b4) == valid_four_bytes.if(b1, b2, b3, b4, UTF8.has_four_byte_shape(b1, b2, b3, b4), {==}) : Bool}
-
-
-## is_valid_sequence
-
-# Returns True when the sequence is exactly a valid sequence.
-
-def is_valid_sequence(seq: List<&2, U32>) -> Bool:
-  match seq:
-    case +b1 <> Nil{}:
-      UTF8.valid_one_byte(b1)
-    case +b1 <> +b2 <> Nil{}:
-      UTF8.valid_two_bytes(b1, b2)
-    case +b1 <> +b2 <> +b3 <> Nil{}:
-      UTF8.valid_three_bytes(b1, b2, b3)
-    case +b1 <> +b2 <> +b3 <> +b4 <> Nil{}:
-      UTF8.valid_four_bytes(b1, b2, b3, b4)
-    case _:
-      False{}
-
-
 ## Encoding
 
 # The UTF-8 encoding of `cp` is its shortest byte shape: one byte when
@@ -593,13 +289,17 @@ def encodes(seq: List<&2, U32>, +cp: U32) -> Type:
   {is_unicode_scalar(cp) == True{} : Bool} &
   {encoding(cp) == Some{seq} : Maybe<&1, List<&2, U32>>}
 
-# The valid sequences are exactly the encodings of Unicode scalars.
 
-law valid_sequence_encodes:
-  for +seq: List<&2, U32>
-  encodes_some = Exists(U32, cp => encodes(seq, cp))
-  ({is_valid_sequence(seq) == True{} : Bool} -> encodes_some) &
-  (encodes_some -> {is_valid_sequence(seq) == True{} : Bool})
+## Valid sequences
+
+# A "valid sequence" is a sequence of bytes that is the UTF-8 encoding
+# of a Unicode scalar.  Since the encoding of a code point is its
+# shortest byte shape, an overlong encoding is not a valid sequence;
+# nor is the encoding of a surrogate code point or of a value above
+# U+10FFFF, since neither is a Unicode scalar.
+
+def is_valid_sequence(seq: List<&2, U32>) -> Type:
+  Exists(U32, cp => encodes(seq, cp))
 
 
 ## A valid sequence at the front of a buffer
@@ -645,20 +345,14 @@ law begins_with_scalar_unique:
 # sequence, so this says that if we've only seen these bytes so far,
 # they *could* be the start of a legal encoding (including being
 # themselves a complete valid sequence).
-#
-# `UTF8.is_valid_sequence_prefix(seq)` returns True iff `seq` is a
-# valid sequence prefix.
 
-law utf8_is_valid_sequence_prefix:
-  for +b1: U32
-  for +more: List<&2, U32>
-  completion = Exists(List<&2, U32>, rest =>
-    {is_valid_sequence(List.append(&2, U32, b1 <> more, rest)) == True{} : Bool})
-  ({UTF8.is_valid_sequence_prefix(b1 <> more) == True{} : Bool} -> completion) &
-  (completion -> {UTF8.is_valid_sequence_prefix(b1 <> more) == True{} : Bool})
-
-law utf8_empty_not_valid_sequence_prefix:
-  {UTF8.is_valid_sequence_prefix(Nil{}) == False{} : Bool}
+def is_valid_sequence_prefix(seq: List<&2, U32>) -> Type:
+  match seq:
+    case Nil{}:
+      Empty
+    case b1 <> more:
+      Exists(List<&2, U32>, rest =>
+        is_valid_sequence(List.append(&2, U32, b1 <> more, rest)))
 
 # While a non-valid sequence can sometimes become a valid sequence by
 # adding more bytes (i.e. to complete the sequence), a non-empty
@@ -673,8 +367,8 @@ law not_valid_sequence_prefix_extended:
   for +b1: U32
   for +more: List<&2, U32>
   for +extra: List<&2, U32>
-  for invalid: {UTF8.is_valid_sequence_prefix(b1 <> more) == False{} : Bool}
-  {UTF8.is_valid_sequence_prefix(List.append(&2, U32, b1 <> more, extra)) == False{} : Bool}
+  for invalid: is_valid_sequence_prefix(b1 <> more) -> Empty
+  is_valid_sequence_prefix(List.append(&2, U32, b1 <> more, extra)) -> Empty
 
 
 ## Byte prefix
@@ -691,9 +385,14 @@ def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
 
 # Where the bytes being decoded do not begin with a valid sequence,
 # the "maximal subpart" at their front is the run of bytes replaced by
-# one U+FFFD (Unicode §3.9).  It is either:
+# one U+FFFD.  The Unicode Standard (§3.9) defines it as the longest
+# prefix that is either a valid sequence prefix or a single byte.
 #
-# * the first byte alone, when it is not a valid sequence prefix; or,
+# So it is either:
+#
+# * the first byte alone, when it is not a valid sequence prefix (by
+#   `not_valid_sequence_prefix_extended`, no longer prefix is one
+#   either); or,
 #
 # * when the first byte is a valid sequence prefix, the longest run of
 #   bytes at the front that is also a valid sequence prefix.
@@ -713,45 +412,19 @@ def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
 def maximal_subpart.longer_not_valid_prefix(subpart: List<&2, U32>, bytes: List<&2, U32>) -> Type:
   @c: U32 -> @extra: List<&2, U32> ->
     is_prefix(List.append(&2, U32, subpart, c <> extra), bytes) ->
-    {UTF8.is_valid_sequence_prefix(List.append(&2, U32, subpart, c <> extra)) == False{} : Bool}
-
-# The maximal subpart when the first byte is a valid sequence prefix:
-# `subpart` is the longest prefix of `b1 <> more` that is a valid
-# sequence prefix.  (Unicode's "initial subsequence of a well-formed
-# code unit sequence".)
-
-def maximal_subpart.sequence_prefix(+b1: U32, +more: List<&2, U32>,
-  +subpart: List<&2, U32>) -> Type:
-  is_prefix(subpart, b1 <> more) &
-  {UTF8.is_valid_sequence_prefix(subpart) == True{} : Bool} &
-  maximal_subpart.longer_not_valid_prefix(subpart, b1 <> more)
-
-# The maximal subpart when the first byte is not a valid sequence
-# prefix: `subpart` is that byte alone.  (Unicode's "subsequence of
-# length one".)  Unicode takes the longest subsequence that is either
-# a valid sequence prefix or one byte long; here, by
-# `not_valid_sequence_prefix_extended`, no longer prefix is a valid
-# sequence prefix, so only the one-byte case applies.
-
-def maximal_subpart.single_byte(+b1: U32, +subpart: List<&2, U32>) -> Type:
-  {subpart == [b1] : List<&2, U32>}
-
-def maximal_subpart.if(+b1: U32, +more: List<&2, U32>, begins: Bool,
-  +subpart: List<&2, U32>) -> Type:
-  match begins:
-    case True{}:
-      maximal_subpart.sequence_prefix(b1, more, subpart)
-    case False{}:
-      maximal_subpart.single_byte(b1, subpart)
+    is_valid_sequence_prefix(List.append(&2, U32, subpart, c <> extra)) -> Empty
 
 # `subpart` is the maximal subpart at the front of the non-empty bytes
-# `b1 <> more`, as the Unicode Standard defines it (§3.9): the longest
-# prefix that is a valid sequence prefix, or else the first byte alone.
-# Meant for bytes that do not begin with a valid sequence.
+# `b1 <> more`: a prefix of them that is either a valid sequence prefix
+# or the first byte alone, such that no longer prefix is a valid
+# sequence prefix.  Meant for bytes that do not begin with a valid
+# sequence.
 
 def maximal_subpart(+b1: U32, +more: List<&2, U32>,
   +subpart: List<&2, U32>) -> Type:
-  maximal_subpart.if(b1, more, UTF8.is_valid_sequence_prefix([b1]), subpart)
+  is_prefix(subpart, b1 <> more) &
+  Or(is_valid_sequence_prefix(subpart), {subpart == [b1] : List<&2, U32>}) &
+  maximal_subpart.longer_not_valid_prefix(subpart, b1 <> more)
 
 # Now we check our definition of "maximal subpart".
 #
