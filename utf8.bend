@@ -1,5 +1,4 @@
 import Base
-import ./binary_mask.bend as B
 
 # Encoding capacity is separate from shortest-form validity.
 def can_encode_as_one_byte(+cp: U32) -> Bool:
@@ -37,8 +36,29 @@ def encode_as_two_bytes(+cp: U32,
   ((192 + U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(U32.shr(cp)))))) : U32),
    (128 + U32.and(cp, 63) : U32))
 
+# The kinds of UTF-8 byte, by their high bits. Each test is one AND and
+# one comparison. The mask keeps every bit above the payload, so a value
+# above 255 never matches. The mask comes first so that proofs can
+# compute the AND without knowing every bit of `b`.
+
+# 10xxxxxx: mask 0xFFFFFFC0, bits 0x80.
+def is_continuation_byte(+b: U32) -> Bool:
+  U32.is_eq(U32.and(4294967232, b), 128)
+
+# 110xxxxx: mask 0xFFFFFFE0, bits 0xC0.
+def is_two_byte_lead(+b: U32) -> Bool:
+  U32.is_eq(U32.and(4294967264, b), 192)
+
+# 1110xxxx: mask 0xFFFFFFF0, bits 0xE0.
+def is_three_byte_lead(+b: U32) -> Bool:
+  U32.is_eq(U32.and(4294967280, b), 224)
+
+# 11110xxx: mask 0xFFFFFFF8, bits 0xF0.
+def is_four_byte_lead(+b: U32) -> Bool:
+  U32.is_eq(U32.and(4294967288, b), 240)
+
 def has_two_byte_shape(b1: U32, b2: U32) -> Bool:
-  B.byte_mask("110xxxxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==})
+  is_two_byte_lead(b1) && is_continuation_byte(b2)
 
 # Decode only pairs with the two-byte shape, including overlong encodings.
 def decode_two_bytes(+b1: U32, +b2: U32,
@@ -76,12 +96,12 @@ def encode_as_four_bytes(+cp: U32,
    (128 + U32.and(cp, 63) : U32))
 
 def has_three_byte_shape(b1: U32, b2: U32, b3: U32) -> Bool:
-  B.byte_mask("1110xxxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==}) &&
-  B.byte_mask("10xxxxxx", b3, {==})
+  is_three_byte_lead(b1) && is_continuation_byte(b2) &&
+  is_continuation_byte(b3)
 
 def has_four_byte_shape(b1: U32, b2: U32, b3: U32, b4: U32) -> Bool:
-  B.byte_mask("11110xxx", b1, {==}) && B.byte_mask("10xxxxxx", b2, {==}) &&
-  B.byte_mask("10xxxxxx", b3, {==}) && B.byte_mask("10xxxxxx", b4, {==})
+  is_four_byte_lead(b1) && is_continuation_byte(b2) &&
+  is_continuation_byte(b3) && is_continuation_byte(b4)
 
 # Shift in the six payload bits of a continuation byte.
 def append_continuation(+acc: U32, +b: U32) -> U32:
