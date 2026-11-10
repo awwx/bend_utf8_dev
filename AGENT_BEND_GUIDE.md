@@ -1,9 +1,9 @@
-# Writing Specifications as Bend Laws
+# Writing Specified and Proved Bend
 
-This guide describes an approach to writing specifications as Bend laws, for
-any project that uses `LAWS.bend` / `PROOF.bend`. It was written against
-Bend 2.0.39 and checked against 2.0.40. Version-specific details are marked
-as such.
+This guide describes an approach to writing Bend code with specifications as
+laws and proofs of them, for any project that uses `LAWS.bend` /
+`PROOF.bend`. It was written against Bend 2.0.39 and checked against 2.0.40.
+Version-specific details are marked as such.
 
 The examples come from a UTF-8 encoding project. That project has one
 implementation module, `utf8.bend`, imported as `UTF8`. The examples are illustrations; the practices themselves are
