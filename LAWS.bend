@@ -1,14 +1,17 @@
 import Base
-import ./defs.bend as Defs
 import ./binary.bend as B
 import ./utf8.bend as UTF8
 import ./func_LAWS.bend as Func
 
 ## Bits to bytes helper
 
+# Type alias for a tuple of eight bools.
+def Bit8() -> Type:
+  Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool
+
 # Given a tuple of eight bools, return the U32 value of the binary
 # integer, most significant bit first.
-def bit8_value(bit8: Defs.Bit8()) -> U32:
+def bit8_value(bit8: Bit8()) -> U32:
   (b7, b6, b5, b4, b3, b2, b1, b0) = bit8
   U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, Word.zero(24n)}}}}}}}}}
 
@@ -54,9 +57,13 @@ law bit8_value_word:
 
 ## U32 to four bytes helper
 
+# Bits are grouped into bytes, most significant byte and bit first.
+def Byte4() -> Type:
+  Bit8() & Bit8() & Bit8() & Bit8()
+
 # Split a U32 into its four bytes, most significant byte first, each
 # as eight bools, most significant bit first.
-def u32_byte4(value: U32) -> Defs.Byte4():
+def u32_byte4(value: U32) -> Byte4():
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       ((b31, b30, b29, b28, b27, b26, b25, b24),
@@ -104,7 +111,7 @@ law u32_byte4_bits:
     ((b31, b30, b29, b28, b27, b26, b25, b24),
      (b23, b22, b21, b20, b19, b18, b17, b16),
      (b15, b14, b13, b12, b11, b10, b9, b8),
-     (b7, b6, b5, b4, b3, b2, b1, b0)) : Defs.Byte4()}
+     (b7, b6, b5, b4, b3, b2, b1, b0)) : Byte4()}
 
 
 ### UTF-8 encoding specification
@@ -151,7 +158,7 @@ def is_unicode_scalar(+cp: U32) -> Bool:
 # Returns Some U32 representing the byte if the shape matches, or None
 # if the shape doesn't match.
 
-def one_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&2, U32>:
+def one_byte_shape.bits(bits: Byte4()) -> Maybe<&2, U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
@@ -174,7 +181,7 @@ def one_byte_shape(cp: U32) -> Maybe<&2, U32>:
 # Capacity includes overlong encodings of 0..127; shortest-form
 # validity is separate.
 
-def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
+def two_byte_shape.bits(bits: Byte4()) -> Maybe<&1, U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
@@ -198,7 +205,7 @@ def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
 # Capacity includes overlong encodings of 0..2047 and encodings of
 # surrogate code points; validity is separate.
 
-def three_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32>:
+def three_byte_shape.bits(bits: Byte4()) -> Maybe<&1, U32 & U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
@@ -223,7 +230,7 @@ def three_byte_shape(cp: U32) -> Maybe<&1, U32 & U32 & U32>:
 # Capacity includes overlong encodings of 0..65535 and encodings of
 # code point values above U+10FFFF; validity is separate.
 
-def four_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32 & U32>:
+def four_byte_shape.bits(bits: Byte4()) -> Maybe<&1, U32 & U32 & U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, u, v1, v2, v3, v4),

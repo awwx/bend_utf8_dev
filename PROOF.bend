@@ -1,5 +1,4 @@
 import Base
-import ./defs.bend as Defs
 import ./LAWS.bend as Laws
 import ./binary_LAWS.bend as BinaryLaws
 import ./binary.bend as B
@@ -611,7 +610,7 @@ def Laws.is_surrogate_code_point_examples():
 # A byte's eight bits, most significant first: the proofs read a byte's
 # bits through this, and `bit8_value` turns them back into the byte.
 def bit8(+byte: U32,
-  -valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Defs.Bit8():
+  -valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Laws.Bit8():
   (U32.is_ne(U32.and(byte, 128), 0),
    U32.is_ne(U32.and(byte, 64), 0),
    U32.is_ne(U32.and(byte, 32), 0),
@@ -1079,7 +1078,7 @@ def utf8_proof.first_payload_bits(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: Boo
         Equal.sym(Bool, B.byte_mask("110xxxxx", utf8_proof.first_prefix(low, p7, p6, p5), {==}), Bool.and(U32.is_le(utf8_proof.first_prefix(low, p7, p6, p5), 255), Bool.and(p7, Bool.and(p6, Bool.not(p5)))),
           utf8_proof.first_prefix_mask(low, p7, p6, p5)), valid)))
 
-def utf8_proof.first_payload_tuple(bits: Defs.Bit8(),
+def utf8_proof.first_payload_tuple(bits: Laws.Bit8(),
   valid: {B.byte_mask("110xxxxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
   Exists(Word(5n), payload => {Laws.bit8_value(bits) == utf8_proof.first_byte(payload) : U32}):
   match bits:
@@ -1154,7 +1153,7 @@ def utf8_proof.second_payload_bits(+low: Word(6n), +p7: Bool, +p6: Bool,
         Equal.sym(Bool, B.byte_mask("10xxxxxx", utf8_proof.second_prefix(low, p7, p6), {==}), Bool.and(U32.is_le(utf8_proof.second_prefix(low, p7, p6), 255), Bool.and(p7, Bool.not(p6))),
           utf8_proof.second_prefix_mask(low, p7, p6)), valid)))
 
-def utf8_proof.second_payload_tuple(bits: Defs.Bit8(),
+def utf8_proof.second_payload_tuple(bits: Laws.Bit8(),
   valid: {B.byte_mask("10xxxxxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
   Exists(Word(6n), payload => {Laws.bit8_value(bits) == utf8_proof.second_byte(payload) : U32}):
   match bits:
@@ -2066,7 +2065,7 @@ def utf8_proof.lead3_payload_bits(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: Boo
       Equal.trans(Bool, Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))), B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}), True{},
         Equal.sym(Bool, B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}), Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))), utf8_proof.lead3_prefix_mask(low, p7, p6, p5, p4)), valid)))
 
-def utf8_proof.lead3_payload_tuple(bits: Defs.Bit8(),
+def utf8_proof.lead3_payload_tuple(bits: Laws.Bit8(),
   valid: {B.byte_mask("1110xxxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
   Exists(Word(4n), payload => {Laws.bit8_value(bits) == utf8_proof.lead3(payload) : U32}):
   match bits:
@@ -2578,7 +2577,7 @@ def utf8_proof.lead4_payload_bits(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: Boo
       Equal.trans(Bool, Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))), B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}), True{},
         Equal.sym(Bool, B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}), Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))), utf8_proof.lead4_prefix_mask(low, p7, p6, p5, p4, p3)), valid)))
 
-def utf8_proof.lead4_payload_tuple(bits: Defs.Bit8(),
+def utf8_proof.lead4_payload_tuple(bits: Laws.Bit8(),
   valid: {B.byte_mask("11110xxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
   Exists(Word(3n), payload => {Laws.bit8_value(bits) == utf8_proof.lead4(payload) : U32}):
   match bits:

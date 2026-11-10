@@ -138,7 +138,6 @@ of truth (§1.2). Don't choose one because it would run well.
 | `<module>.bend` | Implementation modules: only what runs, plus the minimum lemmas the code needs to type-check. *Example:* `binary.bend`, `utf8.bend`. |
 | `<module>_LAWS.bend` | Laws for one module or subject, when `LAWS.bend` would otherwise grow too large. *Example:* `binary_LAWS.bend`. |
 | `LAWS.bend` | Laws for the project's main subject. It imports the `*_LAWS.bend` files it builds on. |
-| `defs.bend` | Type aliases and definitions shared by several laws or implementation files. *Example:* `Bit8()`, a tuple of eight `Bool`. |
 | `PROOF.bend` | Proofs of every law in every laws file, plus all proof-only helpers. |
 | `AGENTS.md` | Project rules for coding agents: the independence rule (§1.1), how to validate, and notes on the environment. |
 
@@ -159,9 +158,9 @@ How the files fit together:
   example, `demos/proof_insertion_sort/LAWS.bend` constrains `Sort.sort`.
 - **Proof-only helpers go in `PROOF.bend`, not in the implementation.** This
   includes lemmas and lists of proofs that only a proof uses.
-- **Put a type where it belongs.** A type shared by several files goes in
-  `defs.bend`. A type that belongs to one subject goes at the top of that
-  subject's laws file.
+- **Put a type where it belongs.** A type shared by several files goes in a
+  file they all import. A type used by one file goes in that file, just
+  before its first use. *Example:* `Bit8()` and `Byte4()` are in `LAWS.bend`.
 - **Group related definitions together** within a laws file: a reference
   definition, then the laws that use it, then their examples.
 
@@ -192,7 +191,7 @@ The specification should read like the source it encodes.
 
 ```bend
 # 00000000 00000000 00000xxx yyyyzzzz -> 110xxxyy 10yyzzzz
-def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
+def two_byte_shape.bits(bits: Byte4()) -> Maybe<&1, U32 & U32>:
   match bits:
     case ((False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
