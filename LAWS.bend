@@ -400,6 +400,29 @@ def is_prefix(prefix: List<&2, U32>, bytes: List<&2, U32>) -> Type:
 # In the second case the prefix stops short of a whole sequence:
 # either the input ends after it, or the next byte cannot extend it.
 
+# Consider an example where we have input bytes F0 9F 98 41.
+#
+# First we see F0.  By itself it is not a valid sequence, but it
+# is a valid sequence prefix, so we can't tell yet whether the input
+# begins with a valid sequence or not.
+#
+# The same holds when we see F0 9F and then F0 9F 98: each is a valid
+# sequence prefix (F0 9F 98 80 would be U+1F600), but not yet a whole
+# sequence.
+#
+# The next byte, 41, cannot continue F0 9F 98, so only when we see the
+# 41 do we know that the input does not begin with a valid sequence.
+#
+# And yet because we don't know how the bad bytes came about, it's
+# possible that the 41 is valid input in its own right.  Thus Unicode
+# defines the "maximal subpart" to be *only* the longest valid sequence
+# prefix (when the first byte is a valid sequence prefix), not
+# including the byte that showed the prefix could not be completed.
+# The next byte, 41 in our example, is decoded fresh.
+#
+# This means that the result of our example is U+FFFD followed by "A"
+# (41).
+
 # `longer_not_valid_prefix` is a relation that states that if
 # `subpart` is a prefix of `bytes`, adding one or more of the following
 # bytes from `bytes` to the subpart will not produce a valid sequence
