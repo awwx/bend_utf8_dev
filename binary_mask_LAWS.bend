@@ -1,5 +1,5 @@
 import Base
-import ./binary.bend as B
+import ./binary_mask.bend as B
 
 # Byte masks
 #

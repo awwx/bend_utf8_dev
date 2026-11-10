@@ -1,5 +1,5 @@
 import Base
-import ./binary.bend as B
+import ./binary_mask.bend as B
 import ./utf8.bend as UTF8
 import ./func_LAWS.bend as Func
 

@@ -1,5 +1,5 @@
 import Base
-import ./binary.bend as B
+import ./binary_mask.bend as B
 
 # Encoding capacity is separate from shortest-form validity.
 def can_encode_as_one_byte(+cp: U32) -> Bool:

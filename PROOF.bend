@@ -1,7 +1,7 @@
 import Base
 import ./LAWS.bend as Laws
-import ./binary_LAWS.bend as BinaryLaws
-import ./binary.bend as B
+import ./binary_mask_LAWS.bend as BinaryLaws
+import ./binary_mask.bend as B
 import ./utf8.bend as UTF8
 
 # Most-significant bits come first, matching Bend's binder order.

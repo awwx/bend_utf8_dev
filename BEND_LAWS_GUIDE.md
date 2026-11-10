@@ -6,7 +6,7 @@ Bend 2.0.39 and checked against 2.0.40. Version-specific details are marked
 as such.
 
 The examples come from a UTF-8 encoding project. That project has two
-implementation modules, `binary.bend` and `utf8.bend`, imported as `B`
+implementation modules, `binary_mask.bend` and `utf8.bend`, imported as `B`
 and `UTF8`. The examples are illustrations; the practices themselves are
 general.
 
@@ -135,8 +135,8 @@ of truth (§1.2). Don't choose one because it would run well.
 
 | File | Contents |
 |---|---|
-| `<module>.bend` | Implementation modules: only what runs, plus the minimum lemmas the code needs to type-check. *Example:* `binary.bend`, `utf8.bend`. |
-| `<module>_LAWS.bend` | Laws for one module or subject, when `LAWS.bend` would otherwise grow too large. *Example:* `binary_LAWS.bend`. |
+| `<module>.bend` | Implementation modules: only what runs, plus the minimum lemmas the code needs to type-check. *Example:* `binary_mask.bend`, `utf8.bend`. |
+| `<module>_LAWS.bend` | Laws for one module or subject, when `LAWS.bend` would otherwise grow too large. *Example:* `binary_mask_LAWS.bend`. |
 | `LAWS.bend` | Laws for the project's main subject. It imports the `*_LAWS.bend` files it builds on. |
 | `PROOF.bend` | Proofs of every law in every laws file, plus all proof-only helpers. |
 | `AGENTS.md` | Project rules for coding agents: the independence rule (§1.1), how to validate, and notes on the environment. |
@@ -147,13 +147,13 @@ How the files fit together:
   `--verdict` isn't needed for routine checks.
 - **`PROOF.bend` imports every laws file** under an alias, and supplies
   each proof as `def Alias.law_name(...)`. For example, after
-  `import ./binary_LAWS.bend as BinaryLaws`, it defines
+  `import ./binary_mask_LAWS.bend as BinaryLaws`, it defines
   `def BinaryLaws.is_mask_digit(c): {==}`. Bend reports an unproved law, or
   an unimplemented operation, as a TODO in any imported laws file, not only
   in `LAWS.bend`.
 - **`PROOF.bend` must import `./LAWS.bend`** when a `LAWS.bend` sits next to
   it. Bend enforces this.
-- **Laws files import the implementation** (`import ./binary.bend as B`) and
+- **Laws files import the implementation** (`import ./binary_mask.bend as B`) and
   name its functions directly. This is how the Bend demos do it; for
   example, `demos/proof_insertion_sort/LAWS.bend` constrains `Sort.sort`.
 - **Proof-only helpers go in `PROOF.bend`, not in the implementation.** This
