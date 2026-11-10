@@ -37,11 +37,3 @@ def u32_byte4(value: U32) -> Defs.Byte4():
        (b23, b22, b21, b20, b19, b18, b17, b16),
        (b15, b14, b13, b12, b11, b10, b9, b8),
        (b7, b6, b5, b4, b3, b2, b1, b0))
-
-def first(pair: U32 & U32) -> U32:
-  (a, b) = pair
-  a
-
-def second(pair: U32 & U32) -> U32:
-  (a, b) = pair
-  b

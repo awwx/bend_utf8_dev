@@ -131,13 +131,3 @@ law u32_byte4:
      (b23, b22, b21, b20, b19, b18, b17, b16),
      (b15, b14, b13, b12, b11, b10, b9, b8),
      (b7, b6, b5, b4, b3, b2, b1, b0)) : Defs.Byte4()}
-
-law first:
-  for +high: U32
-  for low: U32
-  {B.first((high, low)) == high : U32}
-
-law second:
-  for high: U32
-  for +low: U32
-  {B.second((high, low)) == low : U32}

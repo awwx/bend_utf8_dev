@@ -242,14 +242,15 @@ law utf8_one_byte_inverse:
     cp => valid => UTF8.encode_as_one_byte(cp, valid),
     byte => valid => UTF8.decode_one_byte(byte, valid))
 
-law utf8_two_byte_inverse:
-  Func.Bijection(U32, U32 & U32,
-    cp => UTF8.can_encode_as_two_bytes(cp),
-    p => UTF8.has_two_byte_shape(B.first(p), B.second(p)),
-    cp => valid => UTF8.encode_as_two_bytes(cp, valid),
-    p => valid => UTF8.decode_two_bytes(B.first(p), B.second(p), valid))
+# The bytes of a two-, three- or four-byte encoding.
 
-# The bytes of a three-byte or four-byte encoding.
+def two_bytes.first(p: U32 & U32) -> U32:
+  (a, b) = p
+  a
+
+def two_bytes.second(p: U32 & U32) -> U32:
+  (a, b) = p
+  b
 
 def three_bytes.first(p: U32 & U32 & U32) -> U32:
   (a, b, c) = p
@@ -278,6 +279,13 @@ def four_bytes.third(p: U32 & U32 & U32 & U32) -> U32:
 def four_bytes.fourth(p: U32 & U32 & U32 & U32) -> U32:
   (a, b, c, d) = p
   d
+
+law utf8_two_byte_inverse:
+  Func.Bijection(U32, U32 & U32,
+    cp => UTF8.can_encode_as_two_bytes(cp),
+    p => UTF8.has_two_byte_shape(two_bytes.first(p), two_bytes.second(p)),
+    cp => valid => UTF8.encode_as_two_bytes(cp, valid),
+    p => valid => UTF8.decode_two_bytes(two_bytes.first(p), two_bytes.second(p), valid))
 
 law utf8_three_byte_inverse:
   Func.Bijection(U32, U32 & U32 & U32,

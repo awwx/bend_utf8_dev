@@ -149,7 +149,7 @@ How the files fit together:
 - **`PROOF.bend` imports every laws file** under an alias, and supplies
   each proof as `def Alias.law_name(...)`. For example, after
   `import ./binary_LAWS.bend as BinaryLaws`, it defines
-  `def BinaryLaws.first(high, low): {==}`. Bend reports an unproved law, or
+  `def BinaryLaws.is_mask_digit(c): {==}`. Bend reports an unproved law, or
   an unimplemented operation, as a TODO in any imported laws file, not only
   in `LAWS.bend`.
 - **`PROOF.bend` must import `./LAWS.bend`** when a `LAWS.bend` sits next to

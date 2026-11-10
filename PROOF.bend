@@ -433,7 +433,7 @@ def utf8_proof.mask_codepoint(+low: Word(6n), +high: Word(5n)) ->
 
 def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
   -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
-  {B.first(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.first_byte(high) : U32}:
+  {Laws.two_bytes.first(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.first_byte(high) : U32}:
   match low high:
     case WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}} WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WNil{}}}}}}:
       Equal.cong(Word(32n), U32, x => U32{x},
@@ -443,7 +443,7 @@ def utf8_proof.encode_first(+low: Word(6n), +high: Word(5n),
 
 def utf8_proof.encode_second(+low: Word(6n), +high: Word(5n),
   -valid: {UTF8.can_encode_as_two_bytes(utf8_proof.codepoint(low, high)) == True{} : Bool}) ->
-  {B.second(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.second_byte(low) : U32}:
+  {Laws.two_bytes.second(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)) == utf8_proof.second_byte(low) : U32}:
   Equal.trans(U32,
     (128 + U32.and(utf8_proof.codepoint(low, high), 63) : U32),
     (128 + U32{word_join(6n, low, 26n, Word.zero(26n))} : U32), utf8_proof.second_byte(low),
@@ -924,7 +924,7 @@ def utf8_proof.table_pair(+low: Word(6n), +high: Word(5n),
       %utf8_proof.encode_first(low, high, valid) :
         {UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) == (_, utf8_proof.second_byte(low)) : U32 & U32}
       %utf8_proof.encode_second(low, high, valid) :
-        {UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) == (B.first(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)), _) : U32 & U32}
+        {UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid) == (Laws.two_bytes.first(UTF8.encode_as_two_bytes(utf8_proof.codepoint(low, high), valid)), _) : U32 & U32}
       {==}
 
 def utf8_proof.encode_as_two_bytes_bits(+b31: Bool, +b30: Bool, +b29: Bool, +b28: Bool, +b27: Bool, +b26: Bool, +b25: Bool, +b24: Bool, +b23: Bool, +b22: Bool, +b21: Bool, +b20: Bool, +b19: Bool, +b18: Bool, +b17: Bool, +b16: Bool, +b15: Bool, +b14: Bool, +b13: Bool, +b12: Bool, +b11: Bool, +b10: Bool, +b9: Bool, +b8: Bool, +b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
@@ -1382,12 +1382,12 @@ def utf8_proof.decode_result_representation(+b1: U32, +b2: U32,
 
 def utf8_proof.two_decode_encode(+cp: U32,
   +valid: {UTF8.can_encode_as_two_bytes(cp) == True{} : Bool}) ->
-  Exists({UTF8.has_two_byte_shape(B.first(UTF8.encode_as_two_bytes(cp, valid)),
-      B.second(UTF8.encode_as_two_bytes(cp, valid))) == True{} : Bool}, shape =>
-    {UTF8.decode_two_bytes(B.first(UTF8.encode_as_two_bytes(cp, valid)),
-      B.second(UTF8.encode_as_two_bytes(cp, valid)), shape) == cp : U32}):
-  +b1 = B.first(UTF8.encode_as_two_bytes(cp, valid))
-  +b2 = B.second(UTF8.encode_as_two_bytes(cp, valid))
+  Exists({UTF8.has_two_byte_shape(Laws.two_bytes.first(UTF8.encode_as_two_bytes(cp, valid)),
+      Laws.two_bytes.second(UTF8.encode_as_two_bytes(cp, valid))) == True{} : Bool}, shape =>
+    {UTF8.decode_two_bytes(Laws.two_bytes.first(UTF8.encode_as_two_bytes(cp, valid)),
+      Laws.two_bytes.second(UTF8.encode_as_two_bytes(cp, valid)), shape) == cp : U32}):
+  +b1 = Laws.two_bytes.first(UTF8.encode_as_two_bytes(cp, valid))
+  +b2 = Laws.two_bytes.second(UTF8.encode_as_two_bytes(cp, valid))
   +produced = Equal.sym(Maybe<&1, U32 & U32>, Some{UTF8.encode_as_two_bytes(cp, valid)}, Laws.two_byte_shape(cp),
     Laws.utf8_encode_as_two_bytes(cp, valid))
   +shape = utf8_proof.model_pair_accepted(cp, b1, b2, produced)
@@ -1411,9 +1411,9 @@ def utf8_proof.encode_decoded(+b1: U32, +b2: U32,
 
 # Matching the pair exposes its bytes to the two-byte lemmas.
 def utf8_proof.two_encode_decode(p: U32 & U32,
-  +valid: {UTF8.has_two_byte_shape(B.first(p), B.second(p)) == True{} : Bool}) ->
-  Exists({UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(B.first(p), B.second(p), valid)) == True{} : Bool}, accepted =>
-    {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(B.first(p), B.second(p), valid), accepted) == p : U32 & U32}):
+  +valid: {UTF8.has_two_byte_shape(Laws.two_bytes.first(p), Laws.two_bytes.second(p)) == True{} : Bool}) ->
+  Exists({UTF8.can_encode_as_two_bytes(UTF8.decode_two_bytes(Laws.two_bytes.first(p), Laws.two_bytes.second(p), valid)) == True{} : Bool}, accepted =>
+    {UTF8.encode_as_two_bytes(UTF8.decode_two_bytes(Laws.two_bytes.first(p), Laws.two_bytes.second(p), valid), accepted) == p : U32 & U32}):
   match p:
     case (+b1, +b2):
       utf8_proof.encode_decoded(b1, b2, valid,
@@ -1778,12 +1778,6 @@ def BinaryLaws.bit8_value_word(b7, b6, b5, b4, b3, b2, b1, b0):
   word = {WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WNil{}}}}}}}}} : Word(8n)}
   Equal.sym(U32, U32.from_nat(Word.to_nat(8n, word)), word_to_u32(8n, word),
     word_to_u32_from_nat(8n, word))
-
-def BinaryLaws.first(high, low):
-  {==}
-
-def BinaryLaws.second(high, low):
-  {==}
 
 # Split on the shape: when the shape test fails, `valid_one_byte.if` is
 # False, contradicting `valid`.
