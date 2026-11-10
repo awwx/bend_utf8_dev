@@ -643,6 +643,8 @@ law decodes_examples:
   # Three bytes of an unfinished four-byte sequence are also one
   # maximal subpart.
   decodes([240, 159, 152], replacement_char_string()) &
+  # The same subpart when the next byte cannot continue it.
+  decodes([240, 159, 152, 65], replacement_char_string() ++ "A") &
   # E0 80 would be overlong: E0 must be followed by A0..BF.
   decodes([224, 128, 128],
     replacement_char_string() ++ replacement_char_string() ++ replacement_char_string()) &
