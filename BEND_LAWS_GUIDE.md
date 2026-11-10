@@ -235,7 +235,7 @@ A bit layout stated directly is easier to check than arithmetic that happens
 to produce it:
 
 - **Quantify over the individual bits** to state a layout. *Example:*
-  `law u32_byte4` takes `for +b31: Bool` … `for +b0: Bool`, builds
+  `law u32_byte4_bits` takes `for +b31: Bool` … `for +b0: Bool`, builds
   `U32{WCon{b0, …WCon{b31, WNil{}}}}`, and states which tuple of bytes comes
   out.
 - **Quantify over a fixed-width `Word(n)`** to state "any value in this

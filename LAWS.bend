@@ -52,6 +52,61 @@ law bit8_value_word:
     U32.from_nat(Word.to_nat(8n, word)) : U32}
 
 
+## U32 to four bytes helper
+
+# Split a U32 into its four bytes, most significant byte first, each
+# as eight bools, most significant bit first.
+def u32_byte4(value: U32) -> Defs.Byte4():
+  match value:
+    case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
+      ((b31, b30, b29, b28, b27, b26, b25, b24),
+       (b23, b22, b21, b20, b19, b18, b17, b16),
+       (b15, b14, b13, b12, b11, b10, b9, b8),
+       (b7, b6, b5, b4, b3, b2, b1, b0))
+
+# Bit 31 is the first bool of the first byte, and bit 0 the last bool
+# of the last byte.
+
+law u32_byte4_bits:
+  for +b31: Bool
+  for +b30: Bool
+  for +b29: Bool
+  for +b28: Bool
+  for +b27: Bool
+  for +b26: Bool
+  for +b25: Bool
+  for +b24: Bool
+  for +b23: Bool
+  for +b22: Bool
+  for +b21: Bool
+  for +b20: Bool
+  for +b19: Bool
+  for +b18: Bool
+  for +b17: Bool
+  for +b16: Bool
+  for +b15: Bool
+  for +b14: Bool
+  for +b13: Bool
+  for +b12: Bool
+  for +b11: Bool
+  for +b10: Bool
+  for +b9: Bool
+  for +b8: Bool
+  for +b7: Bool
+  for +b6: Bool
+  for +b5: Bool
+  for +b4: Bool
+  for +b3: Bool
+  for +b2: Bool
+  for +b1: Bool
+  for +b0: Bool
+  {u32_byte4(U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}) ==
+    ((b31, b30, b29, b28, b27, b26, b25, b24),
+     (b23, b22, b21, b20, b19, b18, b17, b16),
+     (b15, b14, b13, b12, b11, b10, b9, b8),
+     (b7, b6, b5, b4, b3, b2, b1, b0)) : Defs.Byte4()}
+
+
 ### UTF-8 encoding specification
 
 ## Surrogate code points
@@ -107,7 +162,7 @@ def one_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&2, U32>:
       None{}
 
 def one_byte_shape(cp: U32) -> Maybe<&2, U32>:
-  one_byte_shape.bits(B.u32_byte4(cp))
+  one_byte_shape.bits(u32_byte4(cp))
 
 # UTF-8 two-byte shape
 #
@@ -131,7 +186,7 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
       None{}
 
 def two_byte_shape(cp: U32) -> Maybe<&1, U32 & U32>:
-  two_byte_shape.bits(B.u32_byte4(cp))
+  two_byte_shape.bits(u32_byte4(cp))
 
 # UTF-8 three-byte shape
 #
@@ -156,7 +211,7 @@ def three_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32>:
       None{}
 
 def three_byte_shape(cp: U32) -> Maybe<&1, U32 & U32 & U32>:
-  three_byte_shape.bits(B.u32_byte4(cp))
+  three_byte_shape.bits(u32_byte4(cp))
 
 # UTF-8 four-byte shape
 #
@@ -182,7 +237,7 @@ def four_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32 & U32>
       None{}
 
 def four_byte_shape(cp: U32) -> Maybe<&1, U32 & U32 & U32 & U32>:
-  four_byte_shape.bits(B.u32_byte4(cp))
+  four_byte_shape.bits(u32_byte4(cp))
 
 
 ## Can encode

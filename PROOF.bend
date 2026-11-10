@@ -1536,7 +1536,7 @@ def utf8_proof.valid_two_bytes_if(+b1: U32, +b2: U32, shape: Bool,
 def Laws.utf8_valid_two_bytes(b1, b2):
   utf8_proof.valid_two_bytes_if(b1, b2, UTF8.has_two_byte_shape(b1, b2), {==})
 
-def BinaryLaws.u32_byte4(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
+def Laws.u32_byte4_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0):
   {==}
 
 def BinaryLaws.byte_mask(mask, byte, valid):
