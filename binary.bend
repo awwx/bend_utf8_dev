@@ -24,12 +24,6 @@ def byte_mask(+mask: String, +byte: U32,
     case _:
       False{}
 
-# Given a tuple of eight bools, return the U32 value of the binary
-# integer, most significant bit first.
-def bit8_value(bit8: Defs.Bit8()) -> U32:
-  (b7, b6, b5, b4, b3, b2, b1, b0) = bit8
-  U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, Word.zero(24n)}}}}}}}}}
-
 def u32_byte4(value: U32) -> Defs.Byte4():
   match value:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:

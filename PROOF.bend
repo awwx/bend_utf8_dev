@@ -623,7 +623,7 @@ def bit8(+byte: U32,
 
 def Bit8ValueRoundtripSpec(+byte: U32,
   -valid: {U32.is_le(byte, 255) == True{} : Bool}) -> Type:
-  {B.bit8_value(bit8(byte, valid)) == byte : U32}
+  {Laws.bit8_value(bit8(byte, valid)) == byte : U32}
 
 # A byte whose eight low bits are b7..b0, most significant first.
 def low_byte(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool) -> U32:
@@ -741,9 +741,9 @@ def low_byte_bit.b0(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: 
 # Replace each bit that `bit8` reads back by the bit itself.
 def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: Bool, +b1: Bool, +b0: Bool,
   -valid: {U32.is_le(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 255) == True{} : Bool}) ->
-  {B.bit8_value(bit8(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), valid)) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}:
+  {Laws.bit8_value(bit8(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), valid)) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}:
   %low_byte_bit.b7(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((_,
+    {Laws.bit8_value((_,
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 64), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 32), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 16), 0),
@@ -752,7 +752,7 @@ def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 2), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 1), 0))) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}
   %low_byte_bit.b6(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7,
+    {Laws.bit8_value((b7,
       _,
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 32), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 16), 0),
@@ -761,7 +761,7 @@ def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 2), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 1), 0))) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}
   %low_byte_bit.b5(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7,
+    {Laws.bit8_value((b7,
       b6,
       _,
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 16), 0),
@@ -770,7 +770,7 @@ def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 2), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 1), 0))) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}
   %low_byte_bit.b4(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7,
+    {Laws.bit8_value((b7,
       b6,
       b5,
       _,
@@ -779,7 +779,7 @@ def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 2), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 1), 0))) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}
   %low_byte_bit.b3(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7,
+    {Laws.bit8_value((b7,
       b6,
       b5,
       b4,
@@ -788,7 +788,7 @@ def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 2), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 1), 0))) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}
   %low_byte_bit.b2(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7,
+    {Laws.bit8_value((b7,
       b6,
       b5,
       b4,
@@ -797,7 +797,7 @@ def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 2), 0),
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 1), 0))) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}
   %low_byte_bit.b1(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7,
+    {Laws.bit8_value((b7,
       b6,
       b5,
       b4,
@@ -806,7 +806,7 @@ def bit8_low_roundtrip(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b
       _,
       U32.is_ne(U32.and(low_byte(b7, b6, b5, b4, b3, b2, b1, b0), 1), 0))) == low_byte(b7, b6, b5, b4, b3, b2, b1, b0) : U32}
   %low_byte_bit.b0(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7,
+    {Laws.bit8_value((b7,
       b6,
       b5,
       b4,
@@ -906,7 +906,7 @@ def bit8_value_roundtrip_bits(
       bit8_low_roundtrip(b7, b6, b5, b4, b3, b2, b1, b0, valid)
 
 def bit8_value_bit8_roundtrip(+byte: U32, valid: {U32.is_le(byte, 255) == True{} : Bool}) ->
-  {B.bit8_value(bit8(byte, valid)) == byte : U32}:
+  {Laws.bit8_value(bit8(byte, valid)) == byte : U32}:
   match byte:
     case U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WCon{b8, WCon{b9, WCon{b10, WCon{b11, WCon{b12, WCon{b13, WCon{b14, WCon{b15, WCon{b16, WCon{b17, WCon{b18, WCon{b19, WCon{b20, WCon{b21, WCon{b22, WCon{b23, WCon{b24, WCon{b25, WCon{b26, WCon{b27, WCon{b28, WCon{b29, WCon{b30, WCon{b31, WNil{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}:
       bit8_value_roundtrip_bits(b31, b30, b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, b0, valid)
@@ -1080,8 +1080,8 @@ def utf8_proof.first_payload_bits(+low: Word(5n), +p7: Bool, +p6: Bool, +p5: Boo
           utf8_proof.first_prefix_mask(low, p7, p6, p5)), valid)))
 
 def utf8_proof.first_payload_tuple(bits: Defs.Bit8(),
-  valid: {B.byte_mask("110xxxxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
-  Exists(Word(5n), payload => {B.bit8_value(bits) == utf8_proof.first_byte(payload) : U32}):
+  valid: {B.byte_mask("110xxxxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(5n), payload => {Laws.bit8_value(bits) == utf8_proof.first_byte(payload) : U32}):
   match bits:
     case (b7, b6, b5, b4, b3, b2, b1, b0):
       utf8_proof.first_payload_bits(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WNil{}}}}}}, b7, b6, b5, valid)
@@ -1100,11 +1100,11 @@ def utf8_proof.first_payload(+byte: U32,
   +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('1', byte, 64), Bool.and(B.byte_mask.bit('0', byte, 32), True{}))), valid)
   +equal = bit8_value_bit8_roundtrip(byte, bounded)
   result = utf8_proof.first_payload_tuple(bit8(byte, bounded),
-    Equal.trans(Bool, B.byte_mask("110xxxxx", B.bit8_value(bit8(byte, bounded)), {==}),
+    Equal.trans(Bool, B.byte_mask("110xxxxx", Laws.bit8_value(bit8(byte, bounded)), {==}),
       B.byte_mask("110xxxxx", byte, {==}), True{},
       Equal.cong(U32, Bool, x => B.byte_mask("110xxxxx", x, {==}),
-        B.bit8_value(bit8(byte, bounded)), byte, equal), valid))
-  utf8_proof.first_payload_finish(byte, B.bit8_value(bit8(byte, bounded)), equal, result)
+        Laws.bit8_value(bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.first_payload_finish(byte, Laws.bit8_value(bit8(byte, bounded)), equal, result)
 
 def utf8_proof.second_prefix(low: Word(6n), +p7: Bool, +p6: Bool) -> U32:
   U32{word_join(6n, low, 26n, WCon{p6, WCon{p7, Word.zero(24n)}})}
@@ -1155,8 +1155,8 @@ def utf8_proof.second_payload_bits(+low: Word(6n), +p7: Bool, +p6: Bool,
           utf8_proof.second_prefix_mask(low, p7, p6)), valid)))
 
 def utf8_proof.second_payload_tuple(bits: Defs.Bit8(),
-  valid: {B.byte_mask("10xxxxxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
-  Exists(Word(6n), payload => {B.bit8_value(bits) == utf8_proof.second_byte(payload) : U32}):
+  valid: {B.byte_mask("10xxxxxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(6n), payload => {Laws.bit8_value(bits) == utf8_proof.second_byte(payload) : U32}):
   match bits:
     case (b7, b6, b5, b4, b3, b2, b1, b0):
       utf8_proof.second_payload_bits(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WNil{}}}}}}}, b7, b6, valid)
@@ -1175,11 +1175,11 @@ def utf8_proof.second_payload(+byte: U32,
   +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('0', byte, 64), True{})), valid)
   +equal = bit8_value_bit8_roundtrip(byte, bounded)
   result = utf8_proof.second_payload_tuple(bit8(byte, bounded),
-    Equal.trans(Bool, B.byte_mask("10xxxxxx", B.bit8_value(bit8(byte, bounded)), {==}),
+    Equal.trans(Bool, B.byte_mask("10xxxxxx", Laws.bit8_value(bit8(byte, bounded)), {==}),
       B.byte_mask("10xxxxxx", byte, {==}), True{},
       Equal.cong(U32, Bool, x => B.byte_mask("10xxxxxx", x, {==}),
-        B.bit8_value(bit8(byte, bounded)), byte, equal), valid))
-  utf8_proof.second_payload_finish(byte, B.bit8_value(bit8(byte, bounded)), equal, result)
+        Laws.bit8_value(bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.second_payload_finish(byte, Laws.bit8_value(bit8(byte, bounded)), equal, result)
 
 # Reassemble the eleven payload bits into a code-point witness.
 def utf8_proof.table_shape(+low: Word(6n), +high: Word(5n)) ->
@@ -1650,30 +1650,30 @@ def bit8_value.add0(+b7: Bool, +b6: Bool, +b5: Bool, +b4: Bool, +b3: Bool, +b2: 
         Equal.sym(Word(32n), Word.add(32n, word_join(1n, Word.zero(1n), 31n, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, Word.zero(24n)}}}}}}}), word_join(1n, WCon{True{}, WNil{}}, 31n, Word.zero(31n))), word_join(1n, WCon{True{}, WNil{}}, 31n, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, Word.zero(24n)}}}}}}}),
           word_add_fields(1n, WCon{True{}, WNil{}}, 31n, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, Word.zero(24n)}}}}}}})))
 
-def BinaryLaws.bit8_value(b7, b6, b5, b4, b3, b2, b1, b0):
+def Laws.bit8_value_sum(b7, b6, b5, b4, b3, b2, b1, b0):
   %bit8_value.top(b7) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       U32.add(U32.add(U32.add(U32.add(U32.add(U32.add(U32.add(_, U32.mul(Bool.to_u32(b6), 64)), U32.mul(Bool.to_u32(b5), 32)), U32.mul(Bool.to_u32(b4), 16)), U32.mul(Bool.to_u32(b3), 8)), U32.mul(Bool.to_u32(b2), 4)), U32.mul(Bool.to_u32(b1), 2)), U32.mul(Bool.to_u32(b0), 1)) : U32}
   %bit8_value.add6(b7, b6) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       U32.add(U32.add(U32.add(U32.add(U32.add(U32.add(_, U32.mul(Bool.to_u32(b5), 32)), U32.mul(Bool.to_u32(b4), 16)), U32.mul(Bool.to_u32(b3), 8)), U32.mul(Bool.to_u32(b2), 4)), U32.mul(Bool.to_u32(b1), 2)), U32.mul(Bool.to_u32(b0), 1)) : U32}
   %bit8_value.add5(b7, b6, b5) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       U32.add(U32.add(U32.add(U32.add(U32.add(_, U32.mul(Bool.to_u32(b4), 16)), U32.mul(Bool.to_u32(b3), 8)), U32.mul(Bool.to_u32(b2), 4)), U32.mul(Bool.to_u32(b1), 2)), U32.mul(Bool.to_u32(b0), 1)) : U32}
   %bit8_value.add4(b7, b6, b5, b4) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       U32.add(U32.add(U32.add(U32.add(_, U32.mul(Bool.to_u32(b3), 8)), U32.mul(Bool.to_u32(b2), 4)), U32.mul(Bool.to_u32(b1), 2)), U32.mul(Bool.to_u32(b0), 1)) : U32}
   %bit8_value.add3(b7, b6, b5, b4, b3) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       U32.add(U32.add(U32.add(_, U32.mul(Bool.to_u32(b2), 4)), U32.mul(Bool.to_u32(b1), 2)), U32.mul(Bool.to_u32(b0), 1)) : U32}
   %bit8_value.add2(b7, b6, b5, b4, b3, b2) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       U32.add(U32.add(_, U32.mul(Bool.to_u32(b1), 2)), U32.mul(Bool.to_u32(b0), 1)) : U32}
   %bit8_value.add1(b7, b6, b5, b4, b3, b2, b1) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       U32.add(_, U32.mul(Bool.to_u32(b0), 1)) : U32}
   %bit8_value.add0(b7, b6, b5, b4, b3, b2, b1, b0) :
-    {B.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    {Laws.bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
       _ : U32}
   {==}
 
@@ -1774,7 +1774,7 @@ def word_to_u32_from_nat(+n: Nat, +bits: Word(n)) ->
             U32.from_nat(Nat.double(Word.to_nat(p, rest))), U32.shl(U32.from_nat(Word.to_nat(p, rest))),
             u32_from_nat_double(Word.to_nat(p, rest)))
 
-def BinaryLaws.bit8_value_word(b7, b6, b5, b4, b3, b2, b1, b0):
+def Laws.bit8_value_word(b7, b6, b5, b4, b3, b2, b1, b0):
   word = {WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WNil{}}}}}}}}} : Word(8n)}
   Equal.sym(U32, U32.from_nat(Word.to_nat(8n, word)), word_to_u32(8n, word),
     word_to_u32_from_nat(8n, word))
@@ -2067,8 +2067,8 @@ def utf8_proof.lead3_payload_bits(+low: Word(4n), +p7: Bool, +p6: Bool, +p5: Boo
         Equal.sym(Bool, B.byte_mask("1110xxxx", utf8_proof.lead3_prefix(low, p7, p6, p5, p4), {==}), Bool.and(U32.is_le(utf8_proof.lead3_prefix(low, p7, p6, p5, p4), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.not(p4))))), utf8_proof.lead3_prefix_mask(low, p7, p6, p5, p4)), valid)))
 
 def utf8_proof.lead3_payload_tuple(bits: Defs.Bit8(),
-  valid: {B.byte_mask("1110xxxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
-  Exists(Word(4n), payload => {B.bit8_value(bits) == utf8_proof.lead3(payload) : U32}):
+  valid: {B.byte_mask("1110xxxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(4n), payload => {Laws.bit8_value(bits) == utf8_proof.lead3(payload) : U32}):
   match bits:
     case (b7, b6, b5, b4, b3, b2, b1, b0):
       utf8_proof.lead3_payload_bits(WCon{b0, WCon{b1, WCon{b2, WCon{b3, WNil{}}}}}, b7, b6, b5, b4, valid)
@@ -2087,11 +2087,11 @@ def utf8_proof.lead3_payload(+byte: U32,
   +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('1', byte, 64), Bool.and(B.byte_mask.bit('1', byte, 32), Bool.and(B.byte_mask.bit('0', byte, 16), True{})))), valid)
   +equal = bit8_value_bit8_roundtrip(byte, bounded)
   result = utf8_proof.lead3_payload_tuple(bit8(byte, bounded),
-    Equal.trans(Bool, B.byte_mask("1110xxxx", B.bit8_value(bit8(byte, bounded)), {==}),
+    Equal.trans(Bool, B.byte_mask("1110xxxx", Laws.bit8_value(bit8(byte, bounded)), {==}),
       B.byte_mask("1110xxxx", byte, {==}), True{},
       Equal.cong(U32, Bool, x => B.byte_mask("1110xxxx", x, {==}),
-        B.bit8_value(bit8(byte, bounded)), byte, equal), valid))
-  utf8_proof.lead3_payload_finish(byte, B.bit8_value(bit8(byte, bounded)), equal, result)
+        Laws.bit8_value(bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.lead3_payload_finish(byte, Laws.bit8_value(bit8(byte, bounded)), equal, result)
 
 def utf8_proof.raw3(+cp: U32) -> U32 & U32 & U32:
   ((224 + U32.shrn(cp, 12n) : U32), (128 + U32.and(U32.shrn(cp, 6n), 63) : U32), (128 + U32.and(cp, 63) : U32))
@@ -2579,8 +2579,8 @@ def utf8_proof.lead4_payload_bits(+low: Word(3n), +p7: Bool, +p6: Bool, +p5: Boo
         Equal.sym(Bool, B.byte_mask("11110xxx", utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), {==}), Bool.and(U32.is_le(utf8_proof.lead4_prefix(low, p7, p6, p5, p4, p3), 255), Bool.and(p7, Bool.and(p6, Bool.and(p5, Bool.and(p4, Bool.not(p3)))))), utf8_proof.lead4_prefix_mask(low, p7, p6, p5, p4, p3)), valid)))
 
 def utf8_proof.lead4_payload_tuple(bits: Defs.Bit8(),
-  valid: {B.byte_mask("11110xxx", B.bit8_value(bits), {==}) == True{} : Bool}) ->
-  Exists(Word(3n), payload => {B.bit8_value(bits) == utf8_proof.lead4(payload) : U32}):
+  valid: {B.byte_mask("11110xxx", Laws.bit8_value(bits), {==}) == True{} : Bool}) ->
+  Exists(Word(3n), payload => {Laws.bit8_value(bits) == utf8_proof.lead4(payload) : U32}):
   match bits:
     case (b7, b6, b5, b4, b3, b2, b1, b0):
       utf8_proof.lead4_payload_bits(WCon{b0, WCon{b1, WCon{b2, WNil{}}}}, b7, b6, b5, b4, b3, valid)
@@ -2599,11 +2599,11 @@ def utf8_proof.lead4_payload(+byte: U32,
   +bounded = bool_and_left_true(U32.is_le(byte, 255), Bool.and(B.byte_mask.bit('1', byte, 128), Bool.and(B.byte_mask.bit('1', byte, 64), Bool.and(B.byte_mask.bit('1', byte, 32), Bool.and(B.byte_mask.bit('1', byte, 16), Bool.and(B.byte_mask.bit('0', byte, 8), True{}))))), valid)
   +equal = bit8_value_bit8_roundtrip(byte, bounded)
   result = utf8_proof.lead4_payload_tuple(bit8(byte, bounded),
-    Equal.trans(Bool, B.byte_mask("11110xxx", B.bit8_value(bit8(byte, bounded)), {==}),
+    Equal.trans(Bool, B.byte_mask("11110xxx", Laws.bit8_value(bit8(byte, bounded)), {==}),
       B.byte_mask("11110xxx", byte, {==}), True{},
       Equal.cong(U32, Bool, x => B.byte_mask("11110xxx", x, {==}),
-        B.bit8_value(bit8(byte, bounded)), byte, equal), valid))
-  utf8_proof.lead4_payload_finish(byte, B.bit8_value(bit8(byte, bounded)), equal, result)
+        Laws.bit8_value(bit8(byte, bounded)), byte, equal), valid))
+  utf8_proof.lead4_payload_finish(byte, Laws.bit8_value(bit8(byte, bounded)), equal, result)
 
 def utf8_proof.raw4(+cp: U32) -> U32 & U32 & U32 & U32:
   ((240 + U32.shrn(cp, 18n) : U32), (128 + U32.and(U32.shrn(cp, 12n), 63) : U32), (128 + U32.and(U32.shrn(cp, 6n), 63) : U32), (128 + U32.and(cp, 63) : U32))

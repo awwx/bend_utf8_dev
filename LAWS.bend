@@ -34,6 +34,54 @@ def is_unicode_scalar(+cp: U32) -> Bool:
   Bool.not(is_surrogate_code_point(cp))
 
 
+## Bits to bytes
+
+# Given a tuple of eight bools, return the U32 value of the binary
+# integer, most significant bit first.
+def bit8_value(bit8: Defs.Bit8()) -> U32:
+  (b7, b6, b5, b4, b3, b2, b1, b0) = bit8
+  U32{WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, Word.zero(24n)}}}}}}}}}
+
+# Given 8 booleans used as bits, most significant bit first, convert
+# to its U32 value 0..255.  Higher U32 bits are zero.
+
+law bit8_value_sum:
+  for +b7: Bool
+  for +b6: Bool
+  for +b5: Bool
+  for +b4: Bool
+  for +b3: Bool
+  for +b2: Bool
+  for +b1: Bool
+  for +b0: Bool
+  {bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    (Bool.to_u32(b7) * 128 +
+     Bool.to_u32(b6) * 64 +
+     Bool.to_u32(b5) * 32 +
+     Bool.to_u32(b4) * 16 +
+     Bool.to_u32(b3) * 8 +
+     Bool.to_u32(b2) * 4 +
+     Bool.to_u32(b1) * 2 +
+     Bool.to_u32(b0) * 1 : U32) : U32}
+
+# Provide an independent check of `bit8_value`: convert the booleans
+# to a Word(8n), then to a Nat, and then to a U32.
+
+law bit8_value_word:
+  for +b7: Bool
+  for +b6: Bool
+  for +b5: Bool
+  for +b4: Bool
+  for +b3: Bool
+  for +b2: Bool
+  for +b1: Bool
+  for +b0: Bool
+  # Word stores its least significant bit first.
+  word = {WCon{b0, WCon{b1, WCon{b2, WCon{b3, WCon{b4, WCon{b5, WCon{b6, WCon{b7, WNil{}}}}}}}}} : Word(8n)}
+  {bit8_value((b7, b6, b5, b4, b3, b2, b1, b0)) ==
+    U32.from_nat(Word.to_nat(8n, word)) : U32}
+
+
 ## Byte shapes
 
 # By a "byte shape" we mean a series of bytes that has the correct bit
@@ -54,7 +102,7 @@ def one_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&2, U32>:
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, y1, y2, y3, z1, z2, z3, z4)):
-      Some{B.bit8_value((False{}, y1, y2, y3, z1, z2, z3, z4))}
+      Some{bit8_value((False{}, y1, y2, y3, z1, z2, z3, z4))}
     case _:
       None{}
 
@@ -77,8 +125,8 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, x1, x2, x3),
           (y1, y2, y3, y4, z1, z2, z3, z4)):
-      Some{(B.bit8_value((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
-            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+      Some{(bit8_value((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
+            bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
     case _:
       None{}
 
@@ -101,9 +149,9 @@ def three_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32>:
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (w1, w2, w3, w4, x1, x2, x3, x4),
           (y1, y2, y3, y4, z1, z2, z3, z4)):
-      Some{(B.bit8_value((True{}, True{}, True{}, False{}, w1, w2, w3, w4)),
-            B.bit8_value((True{}, False{}, x1, x2, x3, x4, y1, y2)),
-            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+      Some{(bit8_value((True{}, True{}, True{}, False{}, w1, w2, w3, w4)),
+            bit8_value((True{}, False{}, x1, x2, x3, x4, y1, y2)),
+            bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
     case _:
       None{}
 
@@ -126,10 +174,10 @@ def four_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32 & U32 & U32>
           (False{}, False{}, False{}, u, v1, v2, v3, v4),
           (w1, w2, w3, w4, x1, x2, x3, x4),
           (y1, y2, y3, y4, z1, z2, z3, z4)):
-      Some{(B.bit8_value((True{}, True{}, True{}, True{}, False{}, u, v1, v2)),
-            B.bit8_value((True{}, False{}, v3, v4, w1, w2, w3, w4)),
-            B.bit8_value((True{}, False{}, x1, x2, x3, x4, y1, y2)),
-            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+      Some{(bit8_value((True{}, True{}, True{}, True{}, False{}, u, v1, v2)),
+            bit8_value((True{}, False{}, v3, v4, w1, w2, w3, w4)),
+            bit8_value((True{}, False{}, x1, x2, x3, x4, y1, y2)),
+            bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
     case _:
       None{}
 

@@ -45,8 +45,8 @@ would then come from independent `*_spec` definitions. That works, but it
 produces many parallel definitions that duplicate laws already present (see
 §1.2). The rule above allows a law to call an implementation function `foo`
 as long as it relies only on behavior that `foo`'s own laws pin down. For
-example, once `law bit8_value` fixes exactly what `B.bit8_value` returns for
-every input, other definitions can call `B.bit8_value` instead of keeping a
+example, once `law bit8_value_sum` fixes exactly what `bit8_value` returns for
+every input, other definitions can call `bit8_value` instead of keeping a
 duplicate `bit8_value_spec`.
 
 **The test to apply.** For each implementation call that appears in a law,
@@ -198,8 +198,8 @@ def two_byte_shape.bits(bits: Defs.Byte4()) -> Maybe<&1, U32 & U32>:
           (False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}),
           (False{}, False{}, False{}, False{}, False{}, x1, x2, x3),
           (y1, y2, y3, y4, z1, z2, z3, z4)):
-      Some{(B.bit8_value((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
-            B.bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
+      Some{(bit8_value((True{}, True{}, False{}, x1, x2, x3, y1, y2)),
+            bit8_value((True{}, False{}, y3, y4, z1, z2, z3, z4)))}
     case _:
       None{}
 ```
