@@ -1,0 +1,65 @@
+== pure Utf8Laws
+== pure Utf8Bits
+Utf8Bits.lean:42:48: warning: This simp argument is unused:
+  Bool.toNat_true
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [getLsbD_toNat, Bool.toNat_false, UInt8.toNat_ofNat']
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+== pure Utf8Ref
+== pure Utf8Table
+Utf8Table.lean:33:56: warning: This simp argument is unused:
+  and_mask_15
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:33:69: warning: This simp argument is unused:
+  and_mask_7
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:42:43: warning: This simp argument is unused:
+  and_mask_31
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_15, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:42:69: warning: This simp argument is unused:
+  and_mask_7
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:53:43: warning: This simp argument is unused:
+  and_mask_31
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_15, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:53:56: warning: This simp argument is unused:
+  and_mask_15
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+== pure Utf8Proofs
+Utf8Proofs.lean:341:33: warning: This simp argument is unused:
+  List.singleton_append
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [h1, ↓reduceIte, List.cons_append]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+
+real	3m45.348s
+user	4m30.121s
+sys	0m9.350s

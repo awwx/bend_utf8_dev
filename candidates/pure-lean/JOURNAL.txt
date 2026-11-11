@@ -1,0 +1,41 @@
+13:44 start
+13:48 bit8_value_sum/word by decide over 256 cases; u32_byte4_bits by simp only+rfl. bv_decide can't handle BitVec.concat or Option goals; fixed with bit8_value_eq (ofBool ++ form, by decide) and split+manual Option handling. one_byte_shape lemma works.
+13:50 Utf8Bits.lean (shape lemmas, encoding_eq) compiles on 4.35 and (checking) 4.36; needed (0xC0 : UInt8) ascriptions.
+13:53 Utf8Ref.lean defined + evaluated (all decodes_examples cases, many splits: OK). Utf8Table.lean: encodes_iff and table facts proved by rcases + bv_decide; only hiccups: is_unicode_scalar iff needed bv_decide instead of simp; completion length-4 case not split far enough.
+14:01 All laws + RefDecoder_correct + supporting lemmas proved, check.sh green on both toolchains (52 s). But #print axioms shows hundreds of *._native.bv_decide.ax_* axioms (bv_decide = native trust). Trying to eliminate bv_decide in WIP files with remaining time.
+14:02 Recorded: elapsed ~18 min for the complete bv_decide-based development
+      (all 15 laws, RefDecoder_correct, supporting lemmas, check.sh green).
+      Per-law time was dominated by shared infrastructure; individual laws
+      took 1-3 compile iterations each:
+        bit8_value_sum/word, is_surrogate examples: `decide`, first try.
+        u32_byte4_bits: simp only [u32_byte4, getLsbD_ofBoolListLE]; rfl (2nd try;
+          plain simp normalised getLsbD to getElem and got stuck).
+        begins_with_scalar_unique, maximal_subpart_unique,
+          not_valid_sequence_prefix_extended: pure list reasoning, 2 iterations
+          (fixing destructuring names).
+        decodes_first_*: via four "how the first code point is decided" lemmas
+          (df_scalar/df_fresh_bad/df_pending_bad/df_pending_end), 2 iterations.
+        decodes_exists/unique, decodes_examples (simp [decodes_iff]; decide): 1-2.
+        streaming laws: 3 iterations (feed_eq needed the RefDecoder structure
+          unfolded inside the IH; run_complete simp unfolded too much; prompt
+          proof had conjunction-order slips).
+14:03 Decided to try removing bv_decide (its axioms are per-call native
+      `_native.bv_decide.ax_*`, ~870 lines of #print axioms output).
+      Dead end 1: bv_decide has no kernel mode.
+      Dead end 2: omega does not understand UInt8/UInt32 directly; everything
+        must go through toNat (UIntX.le_iff_toNat_le, toNat_inj, toNat_ofNat').
+      Worked: shape lemmas restated in Nat arithmetic on cp.toNat; bits via
+        getLsbD -> toNat.testBit -> cp.toNat / 2^i % 2 (Nat.testBit_eq_decide_div_mod_eq;
+        Nat.testBit_to_div_mod does not exist); omega handles 25 div/mod atoms
+        (one_shape ~10 s, Utf8Bits ~40 s total).
+      cpOf (shift/mask) -> arithmetic: needed Nat.and_two_pow_sub_one_eq_mod,
+        Nat.two_pow_add_eq_or_of_lt; `rw` picked the outer `|||` first, fixed by
+        giving explicit arguments; simp re-folded 31 into `2^5-1` badly, fixed with
+        dedicated and_mask_31 etc. lemmas.
+      secondOk_iff: omega cannot use implications / `True → _` produced by simp;
+        restated as a disjunction of cases; 4 attempts.
+      completion_spec: `first | simp_all | ...` "succeeded" leaving goals; fixed
+        combinator order; needed maxHeartbeats 2000000; Utf8Table now ~2 min.
+14:11 Kernel-only versions swapped in; Utf8Proofs needed only encodes_two reproved.
+      Backup of the bv_decide version kept outside the project (scratchpad).
+14:18 check.sh (kernel-only version) passes on v4.35.0 and v4.36.0-rc2: ALL CHECKS PASSED, 6m22s wall. Axioms: subsets of propext, Classical.choice, Quot.sound. STATUS.txt written. Elapsed 34 min. Stop.

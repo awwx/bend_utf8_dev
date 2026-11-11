@@ -1,0 +1,99 @@
+REPORT: WasmCert-Coq candidate (streaming UTF-8 decoder)
+
+OUTCOME
+  Running implementation: yes.  decoder.wasm (643 bytes) printed from the Rocq term
+  decoder_module by WasmCert-Coq 2.2.1's binary printer; parse-back lemma by vm_compute.
+  Harness: node ../../difftest/run.mjs ./decoder.mjs -> RESULT: PASS (full corpus, 97 s).
+  Boundary statement: Boundary.v (131 non-blank lines).
+  Proved: start and done exports unconditionally; decode export and the top-level
+  claim CONDITIONALLY on one stated lemma, step_spec (the per-byte refinement).
+  Not proved: step_spec; determinism.  Nothing Admitted in the build.
+
+FINAL THEOREM (Theorems.v)
+  decoder_module_correct_if_step : (forall hs, step_spec hs) -> decoder_module_correct
+  where (Boundary.v)
+  decoder_module_correct := exists D : Decoder, Decoder_correct D /\ forall hs, Realizes hs D
+  Realizes hs D := exists R s0 inst a_start a_dec a_done a_mem,
+     instantiate empty_store decoder_module [] (s0, frame [] inst, [])   (relational spec,
+        includes module validation) /\ the four exports are named in inst_exports /\
+     forall store s with s_funcs = s0's funcs, memory m at a_mem of >= 327684 bytes:
+       start:  call returns some v with R start v, store unchanged;
+       decode: for R st v, input bs (|bs| <= 65536) in memory at 0, the call
+               (v, |bs|) reduces to (v', nbytes) with R st' v', where
+               (st', t) = decode_buffer D st bs; memory now holds utf16le t at 65536,
+               nbytes = |utf16le t|, memory changed only in [65536, 65536+4|bs|+4),
+               memory type and length unchanged, rest of the store unchanged;
+       done:   similarly, utf16le (decode_done D st) at 65536, writes only 4 bytes.
+  utf16le, mem_holds, mem_frame, byte_as_mem are defined in Boundary.v (10 lines).
+  "Call reduces to" = reduce_trans of WasmCert's small-step reduce from
+  v_to_e_list args ++ [AI_invoke a] under ANY caller frame, to a list of constants.
+  Every later store reachable through these calls (plus host writes to memory) again
+  satisfies the store precondition, so the statements compose over call sequences.
+  Changes to the recommended shape: (1) Realizes takes the host state hs (needed because
+  WasmCert's executable instantiation, used to prove `instantiate`, takes one; the claim
+  is for all hs); (2) the "later store" clause is expressed as "any store with the same
+  function list and a large enough memory", as in the spike, which covers every store
+  the calls produce.
+
+WHAT IS TRUSTED / UNVERIFIED BETWEEN THE THEOREM AND NODE
+  1. step_spec (unproved premise) -- the biggest gap today.
+  2. No determinism theorem in WasmCert-Coq 2.2.1: "reduces to C" does not exclude
+     another path (e.g. a trap).  A determinism lemma for the fragment used (no host
+     calls, no tables, no SIMD) would make the result the only outcome; cost: the
+     opsem has ~70 reduce rules plus label/frame contexts; a full determinism proof is
+     a known multi-week item (Iris-Wasm/WasmCert authors discuss it); a fragment-specific
+     one via the verified interpreter (interpreter_func soundness+completeness) might
+     be a few days.
+  3. WasmCert-Coq's semantics as a faithful model of Wasm 2.0 / V8 (instantiation from
+     the EMPTY store; Node instantiates in its own store -- the proof does not say
+     anything about other modules).
+  4. The binary printer and parser (unverified); the parse-back check only shows they
+     agree on these bytes.
+  5. The Rocq kernel, CompCert integers library, and library axioms listed by
+     Print Assumptions (classical logic, funext, Dedekind reals, 5 opaque SIMD functions).
+  6. decoder.mjs (unverified, ~35 lines).  Logic: instantiates once; decode_buffer splits
+     input into 64 KiB chunks (justified by split-independence, decoded output is the
+     concatenation of per-chunk outputs, which is exactly what the spec's feed computes),
+     copies each chunk to memory offset 0, calls decode(state, len), converts the
+     returned byte count of UTF-16LE at 65536 with TextDecoder('utf-16le', ignoreBOM),
+     joins strings; decode_done calls done(state) and decodes the same way.
+     The state is the i32 itself, so state values stay valid after reuse.
+  7. TextDecoder's UTF-16LE decoding equals Boundary's utf16le reading (standard).
+
+DESIGN
+  State: one i32 = b1 | b2<<8 | b3<<16 | n<<24, n = number of pending bytes (0..3);
+  this is RefDecoder's pending list packed (Repr.v enc), so R is simply
+  "Inv st /\ v = repr (enc st)" and the loop mirrors RefDecoder.step case by case
+  (empty / lead / bad; pending: range check against lo2/hi2, complete -> code point,
+  extend, or reject -> FFFD then step_empty).  No module state: memory is a scratch
+  area only.  Output: UTF-16 code units, little endian, at 65536; at most 2 units per
+  input byte, so the output area is 4*len+4 bytes.  Results via multi-value (i32 i32).
+
+PROOF SIZE (non-blank lines)
+  Reusable infrastructure: Steps.v 285 (spike, unchanged), Control.v 66 (block/if rules),
+    Wp.v 85 (wp layer + wp_step tactic), Mem.v 73 (16-bit store spec, block-update length
+    lemma), WpMem.v 50 (wp store rule)  = 559 (274 new).
+  Decoder-specific: Instance.v 45, Repr.v 32, Exports.v 127 (start, done, call wrapper),
+    Decode.v 312 (step_spec statement, loop invariant, loop, decode export),
+    Theorems.v 33  = 549.
+  Spec side: Boundary.v 131, Module.v 138 (term; 251 instructions).
+  Lines per Wasm instruction: start+done (10 instructions) ~60 proof lines;
+  loop skeleton/glue (~20 instructions) ~250 lines; the ~200 step instructions are unproved.
+BUILD TIMES: whole build against the real pure layer 47 s (-j2; Instance.v and Binary.v
+  vm_compute a few s each); difftest full corpus 97 s; check.sh ~2.5 min total.
+
+SCALING / DIFFICULTY
+  - The control-flow and memory framing layers were quick to write and generic.  The
+    loop invariant style (block_loop_rule) scaled fine to the real loop.
+  - The cost is concentrated in symbolic i32 arithmetic through branching code: every
+    `if` doubles paths; each path needs CompCert Int32 lemmas (repr/unsigned/mod 2^32)
+    and range side conditions.  For a larger component, a reflective symbolic evaluator
+    (or proving against WasmCert's verified interpreter) would be needed; per-instruction
+    tactics alone will be slow.
+  - Tooling friction (see JOURNAL): mathcomp vs Stdlib notations (`[]`, `++`=cat, `%N`=nat,
+    `*` on nat = muln in some scopes), `/=` evaluating unary nats of 65536 (rocq hangs),
+    lia failing on large nat literals and in large contexts, ssreflect side-goal order.
+  - Pressure toward inefficiency: none on the Wasm side so far (the code is the natural
+    one).  For provability I kept branch structure parallel to RefDecoder rather than a
+    table-driven DFA, and stored the code point per byte (no batching).  The 64 KiB chunk
+    limit in the boundary is a proof convenience (fixed memory, no memory.grow).

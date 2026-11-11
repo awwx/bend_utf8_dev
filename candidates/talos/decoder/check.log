@@ -1,0 +1,55 @@
+== wasm
+3ff6d962abb9778874dd44e40afa13bf91243f6798f1a20bde02210191d7781c  decoder.wasm
+640925bf7fc60d4950c5a55fa9ad98b78990539ffe301f606884bf85df61a3de  decoder.printed.wat
+== spec and pure layer copies (unmodified)
+byte-identical
+== forbidden constructs
+none
+== lean (Lean Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release))
+Utf8Laws.lean: 1 s
+Utf8Bits.lean: 42 s
+Utf8Ref.lean: 1 s
+Utf8Table.lean: 127 s
+Utf8Proofs.lean: 3 s
+DecoderModule.lean: 43 s
+Boundary.lean: 1 s
+ProofMach.lean: 2 s
+ProofFuncs.lean: 131 s
+ProofStep.lean: 50 s
+ProofLoop.lean: 2 s
+ProofBuffer.lean: 1 s
+ProofDone.lean: 3 s
+ProofModel.lean: 2 s
+'Utf8Wasm.decoderModule_decodes' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Wasm.start_ok' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Wasm.done_runs' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Wasm.buffer_runs' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Wasm.call_step' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Wasm.loop_correct' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Wasm.stepM_nil' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Pure.RefDecoder_correct' depends on axioms: [propext, Classical.choice, Quot.sound]
+== difftest
+decoder: /root/bend/utf8/candidates/talos/decoder/decoder.mjs
+       2 ms          2 runs          3 calls  ok  exhaustive len=0 alphabet=25 cuts=all
+      16 ms        150 runs        350 calls  ok  exhaustive len=1 alphabet=25 cuts=all
+     394 ms      12500 runs      40625 calls  ok  exhaustive len=2 alphabet=25 cuts=all
+    2501 ms     250000 runs     750000 calls  ok  exhaustive len=3 alphabet=25 cuts=subsets+ends
+   17137 ms    3125000 runs    7812500 calls  ok  exhaustive len=4 alphabet=25 cuts=subsets
+    9833 ms    1600000 runs    4800000 calls  ok  exhaustive len=5 alphabet=10 cuts=subsets
+    9860 ms    1492992 runs    5225472 calls  ok  exhaustive len=6 alphabet=6 cuts=subsets
+    5009 ms     446488 runs    1744344 calls  ok  scalar-boundaries (+truncations, contexts, pairs)
+     747 ms       2400 runs     177175 calls  ok  random seed=1 count=600 maxLen=3000 corruption=mixed
+      12 ms        400 runs       3976 calls  ok  random seed=2 count=100 maxLen=40 corruption=mixed
+    1674 ms         40 runs       3866 calls  ok  random long (100KB..1MB), seed=777
+   27565 ms         66 runs        176 calls  ok  huge buffers (multi-MB in one call, seed=4242)
+
+inputs 564671, (input,split) runs 6930038, decode_buffer calls 20558487, 74.8 s
+P1 total output: PASS
+P2 per-call output (safe and prompt): PASS
+P3 state persistence / buffer hygiene: PASS
+RESULT: PASS
+CHECK PASSED (see STATUS.txt for what is and is not proved)
+
+real	8m8.490s
+user	9m20.699s
+sys	0m13.189s

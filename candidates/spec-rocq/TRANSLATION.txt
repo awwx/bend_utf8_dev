@@ -1,0 +1,281 @@
+TRANSLATION RECORD: LAWS.bend -> Utf8Laws.v (Rocq 9.2.0, standard library only)
+
+Build: eval $(opam env --switch=wasmcert); rocq compile Utf8Laws.v
+Imports: Stdlib List, NArith, Bool; Stdlib.Strings.Byte (Byte.to_N, Byte.of_N);
+Stdlib.Strings.Ascii (only for Ascii.N_of_digits, a list-of-bits -> N
+function; the ascii type is not used); Corelib.Init.Byte (the byte type, its
+constructors x00..xff and Byte.of_bits).
+The file contains no Axiom, Parameter, Variable, Admitted, Lemma, Theorem,
+Program or proof term.
+
+======================================================================
+1. TYPES CHOSEN
+======================================================================
+
+Byte: `byte` from Corelib.Init.Byte (the standard library's native byte type,
+256 constructors x00..xff).
+  - Replaces "U32 plus a proof that it is <= 255" (agreed deviation).
+  - Comes with the standard bit view (Byte.of_bits/to_bits, least
+    significant bit first) used by bit8_value, and with the standard numeric
+    view (Byte.to_N, Byte.of_N with library lemmas of_to_N, to_of_N,
+    to_N_bounded), so a bridge file can relate it to WasmCert linear-memory
+    bytes (CompCert Byte.int: Z with a range proof) by
+    Byte.repr (Z.of_N (Byte.to_N b)) and back, without the spec importing
+    WasmCert or CompCert.
+  - Decidable, structural equality (Byte.eqb, or destruct): no proof
+    irrelevance needed when comparing byte lists.
+
+Code point: `U32`, an inductive with one constructor `U32_bits` of 32 bool
+fields b0..b31, least significant first.
+  - This is exactly Bend's representation U32{Word(32n)} (Word stores the
+    least significant bit first), so u32_byte4 is a plain pattern match,
+    u32_byte4_bits is a verbatim translation, and there are exactly 2^32
+    values (encoding of a value above U+1FFFFF is None; nothing above 2^32
+    exists).
+  - No range proof inside the type: U32 constants and the 32-bool
+    constructor need no proof terms, and equality of code points and of
+    Text is structural (no proof irrelevance).
+  - For later use: U32_to_N gives the unsigned value, U32_of_N gives the
+    value mod 2^32.  A bridge to WasmCert i32 values (CompCert Int.int) can
+    use U32_of_N (Z.to_N (Int32.unsigned v)), or compare bits with
+    Z.testbit, both outside this file.
+  Rejected: N with no bound (u32_byte4 would have to truncate, so encoding
+  of 2^32 + 0x41 would be Some [x41]); a record {n : N; n < 2^32} (every
+  constant, and the 32-bool construction in u32_byte4_bits, would need
+  proof terms in the spec, and equality would need proof irrelevance);
+  Vector.t bool 32 (awkward to pattern match).
+
+Text: `Text := list U32`.  Bend's String is SNil/SCon of Chr{U32}: a list of
+code points with no scalar-value restriction.  The Chr wrapper is dropped
+(Text is a list of U32 directly).  Rocq's string/ascii types are not used.
+Bend string `++` is list `++`; "" is []; a string literal such as "AB" is
+written [U32_of_N 65; U32_of_N 66].
+
+Propositions: Bend's Type-valued propositions become Prop.
+  Exists(T, x => P) -> exists x : T, P
+  Or(A, B)          -> A \/ B
+  A & B (props)     -> A /\ B
+  A -> Empty        -> A -> False
+  Empty             -> False
+  Unit              -> (only in all_buffers_bytes, dropped)
+  {a == b : T}      -> a = b
+  law with `for x: T` premises -> Definition name : Prop := forall x : T, ...
+  (+/- quantities, &1/&2 levels: no counterpart, ignored.)
+Maybe<.., A> -> option A.  List<&2, A> -> list A.  Data tuples (A & B) of
+values -> Rocq products A * B.
+
+Names: Bend `f.g` -> Rocq `f_g`.  One clash: the def decodes_first.nonempty
+and the law decodes_first_nonempty; the def is named
+decodes_first_nonempty_case (the law keeps its name).
+
+======================================================================
+2. ADDED COUNTERPARTS OF BEND BASE DEFINITIONS (needed to translate)
+======================================================================
+
+Utf8Laws.v line  name             stands for (Bend Base)
+  43   U32              U32 = U32{Word(32n)} (bits, least significant first)
+  52   U32_to_N         U32.to_nat / Word.to_nat (N instead of Nat)
+  74   U32_of_N         U32 numeric literals and Char.to_u32('\u{...}') of a
+                        character literal (value mod 2^32; only used on
+                        values below 2^32)
+  88   U32_is_le        U32.is_le (unsigned compare)
+  90   U32_is_ge        U32.is_ge (unsigned compare)
+  94   Maybe_is_some    Maybe.is_some (no option->bool function in the
+                        Rocq stdlib prelude)
+  104  Text             String
+Other Base functions map to the stdlib: Bool.to_u32 -> N.b2n (in N);
+Bool.not -> negb; && -> &&; List.append -> ++; List.concat -> concat.
+
+======================================================================
+3. DEFINITION / LAW TABLE
+======================================================================
+
+LAWS.bend line  Bend name                               Rocq (line)
+  1   import Base                                       stdlib Require/Import
+  2   import ./utf8.bend as UTF8                        dropped: replaced by the
+                                                        abstract Decoder record
+  7   Bit8                                              Bit8 (111)
+  12  bit8_value                                        bit8_value (118)  [D1]
+  19  law bit8_value_sum                                bit8_value_sum (125)  [D2]
+  41  law bit8_value_word                               bit8_value_word (140)  [D3]
+  59  Byte4                                             Byte4 (153)
+  64  u32_byte4                                         u32_byte4 (158)
+  75  law u32_byte4_bits                                u32_byte4_bits (173)
+  121 is_surrogate_code_point                           is_surrogate_code_point (194)
+  125 law is_surrogate_code_point_examples              is_surrogate_code_point_examples (198)
+  139 is_unicode_scalar                                 is_unicode_scalar (212)
+  159 one_byte_shape.bits                               one_byte_shape_bits (232)  [D4]
+  169 one_byte_shape                                    one_byte_shape (243)
+  182 two_byte_shape.bits                               two_byte_shape_bits (256)
+  193 two_byte_shape                                    two_byte_shape (268)
+  206 three_byte_shape.bits                             three_byte_shape_bits (281)
+  218 three_byte_shape                                  three_byte_shape (294)
+  231 four_byte_shape.bits                              four_byte_shape_bits (307)
+  244 four_byte_shape                                   four_byte_shape (321)
+  255 encoding.four                                     encoding_four (332)
+  262 encoding.three                                    encoding_three (340)
+  269 encoding.two                                      encoding_two (348)
+  276 encoding.if                                       encoding_if (356)
+  283 encoding                                          encoding (364)
+  288 encodes                                           encodes (369)
+  301 is_valid_sequence                                 is_valid_sequence (382)
+  310 begins_with_scalar                                begins_with_scalar (391)
+  317 no_valid_sequence                                 no_valid_sequence (398)
+  324 law begins_with_scalar_unique                     begins_with_scalar_unique (405)
+  349 is_valid_sequence_prefix                          is_valid_sequence_prefix (428)
+  366 law not_valid_sequence_prefix_extended            not_valid_sequence_prefix_extended (446)
+  379 is_prefix                                         is_prefix (457)
+  435 maximal_subpart.longer_not_valid_prefix           maximal_subpart_longer_not_valid_prefix (513)
+  446 maximal_subpart                                   maximal_subpart (524)
+  457 law maximal_subpart_exists                        maximal_subpart_exists (535)
+  463 law maximal_subpart_unique                        maximal_subpart_unique (540)
+  486 code_point_to_string                              code_point_to_string (560)
+  491 replacement_char                                  replacement_char (565)
+  496 replacement_char_string                           replacement_char_string (570)
+  516 decodes_first.replaced                            decodes_first_replaced (590)
+  526 decodes_first.scalar                              decodes_first_scalar (600)
+  537 decodes_first.nonempty                            decodes_first_nonempty_case (614)  [renamed: clash]
+  546 decodes_first                                     decodes_first (623)
+  562 law decodes_first_exists                          decodes_first_exists (640)
+  569 law decodes_first_unique                          decodes_first_unique (647)
+  581 law decodes_first_empty                           decodes_first_empty (657)
+  589 law decodes_first_nonempty                        decodes_first_nonempty (665)
+  604 decodes.go                                        decodes_go (678, Fixpoint on text)
+  612 decodes                                           decodes (687)
+  617 law decodes_exists                                decodes_exists (692)
+  623 law decodes_unique                                decodes_unique (698)
+  637 law decodes_examples                              decodes_examples (713)  [D5]
+  685-706 (comments on UTF8.decode_start_state etc.)    Decoder record (775) + comments  [D6]
+  714 all_bytes                                         dropped (bytes are `byte`; a comment
+                                                        at the old place says so)
+  720 law utf8_decode_buffer_all_bytes                  dropped (same reason; it only tied
+                                                        UTF8.decode_buffer.all_bytes to all_bytes)
+  739 all_buffers_bytes                                 dropped (same reason)
+  749 all_buffers_bytes.head                            dropped (helper of the erased proof)
+  754 all_buffers_bytes.tail                            dropped (helper of the erased proof)
+  763 feed.prepend                                      feed_prepend (814)  [D7]
+  768 feed.then                                         feed_then (819)
+  777 feed                                              feed (828, Fixpoint; `valid` dropped)
+  788 decoded_so_far.text                               decoded_so_far_text (840)
+  792 decoded_so_far                                    decoded_so_far (844; `valid` dropped)
+  798 decoded.text                                      decoded_text (849)
+  802 decoded                                           decoded (853; `valid` dropped)
+  813 law utf8_decodes                                  utf8_decodes (D) (863)  [D6]
+  820 is_text_prefix                                    is_text_prefix (869)
+  830 law utf8_decode_buffer_safe                       utf8_decode_buffer_safe (D) (879)
+  843 law utf8_decode_buffer_prompt                     utf8_decode_buffer_prompt (D) (889)
+                                                        (the `all_bytes(rest)` conjunct dropped)
+  --  (not in LAWS.bend)                                Decoder_correct (D) (902): conjunction
+                                                        of the three streaming laws, as the
+                                                        brief asks
+
+======================================================================
+4. DEVIATIONS AND JUDGEMENT CALLS
+======================================================================
+
+Agreed deviations applied: native byte type (and the drops it implies);
+Text as a list of code points; Prop connectives; streaming laws over an
+abstract Decoder; Decoder_correct added.
+
+[D1] bit8_value returns `byte` (Bend: a U32 0..255 with higher bits zero).
+  It is built with Byte.of_bits from the bits, least significant first,
+  mirroring Bend building the Word directly from the bits.  The shape
+  functions consequently return bytes (option byte, option (byte * byte),
+  ...) and encoding returns option (list byte).
+
+[D2] bit8_value_sum: Bend compares U32 values using U32 arithmetic; the
+  Rocq law compares Byte.to_N (bit8_value ...) with the same sum computed
+  in N (with N.b2n for Bool.to_u32).  No overflow is possible in either
+  (the sum is at most 255), so the meaning is the same.
+
+[D3] bit8_value_word: Bend's independent check goes bits -> Word(8n)
+  (least significant bit first) -> Nat (Word.to_nat) -> U32
+  (U32.from_nat).  Rocq: bits -> list bool [b0; ...; b7] (least
+  significant first) -> N (Ascii.N_of_digits, the stdlib's
+  least-significant-first binary reading, same recursion as Word.to_nat)
+  -> byte (Byte.of_N).  Since Byte.of_N is partial, the law reads
+  Some (bit8_value ...) = Byte.of_N (Ascii.N_of_digits word).  The check
+  stays independent of bit8_value's definition (Byte.of_bits and
+  Byte.of_N are separate tables in the stdlib).
+
+[D4] Comments "Returns Some U32 representing the byte" / "Returns two U32
+  representing the two bytes" etc. reworded to "Returns Some byte" / "the
+  two bytes".
+
+[D5] decodes_examples: byte lists are written with the byte constructors
+  in hex (x41, xc2, ...) instead of decimals; the "Bytes in hex" comment is
+  reworded into a hex = decimal table for the same values.  Text literals:
+  "" -> [], "AB" -> [U32_of_N 65; U32_of_N 66], "A" -> [U32_of_N 65],
+  "H" -> [U32_of_N 72]; code points in code_point_to_string(...) keep the
+  decimals of LAWS.bend (169, 8364, 128512) via U32_of_N.
+
+[D6] Decoder record fields keep the Bend names: DecodeState,
+  decode_start_state, decode_buffer (State -> list byte -> State * Text,
+  no `valid` argument), decode_done.  All streaming definitions and laws
+  take the decoder D as an explicit first argument.  The comments that
+  described UTF8.decode_buffer(state, buffer, valid) and `decoded`'s
+  signature are reworded accordingly.
+
+[D7] The comment "`feed` can't match on its erased proof, so it takes the
+  proof apart with these." is dropped with all_buffers_bytes.head/.tail.
+
+[D8] Character literals: Char.to_u32('\u{D800}') etc. become
+  U32_of_N 0xD800 (hex N literals), and Char.to_u32('\u{FFFD}') becomes
+  U32_of_N 0xFFFD.
+
+[D9] Section headers: Bend `###` -> (** * ... *), `##` -> (** ** ... *).
+  A header comment at the top of the file explains the conventions; a
+  comment at the old "all_bytes" location says why it is absent.
+
+[D10] is_unicode_scalar keeps the vacuous lower-bound test
+  U32_is_ge cp (U32_of_N 0x000000), as in the original.
+
+======================================================================
+5. NOTES ON LAWS.bend (not fixed, reported)
+======================================================================
+
+- utf8_decode_buffer_safe quantifies `rest` over all U32 lists with no
+  all_bytes condition, while utf8_decode_buffer_prompt requires
+  all_bytes(rest).  In Bend the safe law therefore also covers
+  continuations with values > 255 (a slightly stronger law).  With the
+  native byte type the asymmetry disappears; the Rocq safe law only
+  covers byte continuations.  Since a value > 255 can never extend a
+  valid sequence prefix, this should not change what decoders satisfy it.
+- maximal_subpart is meaningful only for bytes that do not begin with a
+  valid sequence (as its comment says); it is only used under
+  no_valid_sequence, so this is not a gap.
+- Bend literal semantics above 2^32 are not exercised; U32_of_N wraps
+  modulo 2^32, and every literal in the file is below 2^32.
+
+======================================================================
+6. SELF-CHECK (scratch file, not delivered; Compute on the definitions)
+======================================================================
+
+encoding (bytes in decimal), all as expected:
+  U+0000   [0]                 U+007F   [127]
+  U+0080   [194;128] C2 80     U+07FF   [223;191] DF BF
+  U+0800   [224;160;128] E0 A0 80
+  U+20AC   [226;130;172] E2 82 AC
+  U+D800   [237;160;128] ED A0 80 (shape exists; not a scalar, so not `encodes`)
+  U+DFFF   [237;191;191]       U+FFFF   [239;191;191] EF BF BF
+  U+10000  [240;144;128;128] F0 90 80 80
+  U+1F600  [240;159;152;128] F0 9F 98 80
+  U+10FFFF [244;143;191;191] F4 8F BF BF
+  U+110000 [244;144;128;128] F4 90 80 80 (shape; not a scalar)
+  U+1FFFFF [247;191;191;191] F7 BF BF BF (shape; not a scalar)
+  U+200000 None                0xFFFFFFFF None
+Shapes: U+0000 has all four shapes (00 / C0 80 / E0 80 80 / F0 80 80 80);
+  U+007F: 7F / C1 BF / E0 81 BF / F0 80 81 BF; U+0080: no one-byte shape;
+  U+0800: no one- or two-byte shape; U+10000: four-byte only; U+200000:
+  none.  Overlong shapes are present as the comments state.
+is_unicode_scalar / is_surrogate_code_point:
+  0: T/F, D7FF: T/F, D800: F/T, DBFF: F/T, DC00: F/T, DFFF: F/T,
+  E000: T/F, FFFD: T/F, FFFF: T/F, 10FFFF: T/F, 110000: F/F,
+  1FFFFF: F/F, FFFFFFFF: F/F.
+U32_to_N (U32_of_N n): 0, 1, 65533, 4294967295 round-trip; 2^32 -> 0 (wrap).
+u32_byte4 (U32_of_N 0x80000001): first bool of first byte true, last bool
+  of last byte true, rest false.  bit8_value 10000010 = 130.
+The computable laws is_surrogate_code_point_examples, bit8_value_sum,
+bit8_value_word and u32_byte4_bits were also checked by computation in
+the scratch file (as sanity checks of the statements; no proof file is
+delivered).

@@ -1,0 +1,147 @@
+[WARNING] Running as root is not recommended
+== build (time)
+rocq makefile -f _CoqProject -o Makefile.coq
+Warning: No common logical root.
+Warning: In this case the -docroot option should be given.
+Warning: Otherwise the install-doc target is going to install files
+Warning: in orphan_Decoder_Utf8
+make -f Makefile.coq -j 2 all
+make[1]: Entering directory '/root/bend/utf8/candidates/wasmcert-coq/decoder'
+ROCQ DEP VFILES
+ROCQ compile Module.v
+ROCQ compile Steps.v
+ROCQ compile Mem.v
+ROCQ compile Instance.v
+ROCQ compile Boundary.v
+ROCQ compile Repr.v
+ROCQ compile Binary.v
+ROCQ compile Control.v
+ROCQ compile Wp.v
+ROCQ compile WpMem.v
+ROCQ compile Exports.v
+ROCQ compile Decode.v
+ROCQ compile Theorems.v
+make[1]: Leaving directory '/root/bend/utf8/candidates/wasmcert-coq/decoder'
+52.56user 5.03system 0:47.53elapsed 121%CPU (0avgtext+0avgdata 900192maxresident)k
+6336inputs+1880outputs (5major+1858650minor)pagefaults 0swaps
+== decoder.wasm from the term (parse-back lemma decoder_bytes_parse_back is in Binary.v)
+make -f Makefile.coq -j 2 all
+make[1]: Entering directory '/root/bend/utf8/candidates/wasmcert-coq/decoder'
+make[2]: Nothing to be done for 'real-all'.
+make[1]: Leaving directory '/root/bend/utf8/candidates/wasmcert-coq/decoder'
+rocq c -w -default-output-directory -Q . Decoder EmitHex.v
+node -e 'const fs=require("fs");const t=fs.readFileSync("decoder_hex.out","utf8");const h=t.match(/"([0-9a-f]*)"/)[1];fs.writeFileSync("decoder.wasm",Buffer.from(h,"hex"))'
+-rw-r--r-- 1 root root 643 Nov 11 15:27 decoder.wasm
+== checking for holes
+no Admitted/admit/Axiom/Parameter/Abort in the build files
+== Print Assumptions
+decoder_module_correct_if_step
+     : (forall hs : host.host_state, step_spec hs) -> decoder_module_correct
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+== difftest harness
+decoder: ./decoder.mjs
+       3 ms          2 runs          3 calls  ok  exhaustive len=0 alphabet=25 cuts=all
+      28 ms        150 runs        350 calls  ok  exhaustive len=1 alphabet=25 cuts=all
+     987 ms      12500 runs      40625 calls  ok  exhaustive len=2 alphabet=25 cuts=all
+    3579 ms     250000 runs     750000 calls  ok  exhaustive len=3 alphabet=25 cuts=subsets+ends
+   34096 ms    3125000 runs    7812500 calls  ok  exhaustive len=4 alphabet=25 cuts=subsets
+   14308 ms    1600000 runs    4800000 calls  ok  exhaustive len=5 alphabet=10 cuts=subsets
+   21401 ms    1492992 runs    5225472 calls  ok  exhaustive len=6 alphabet=6 cuts=subsets
+   10760 ms     446488 runs    1744344 calls  ok  scalar-boundaries (+truncations, contexts, pairs)
+     997 ms       2400 runs     177175 calls  ok  random seed=1 count=600 maxLen=3000 corruption=mixed
+      23 ms        400 runs       3976 calls  ok  random seed=2 count=100 maxLen=40 corruption=mixed
+    1342 ms         40 runs       3866 calls  ok  random long (100KB..1MB), seed=777
+   17706 ms         66 runs        176 calls  ok  huge buffers (multi-MB in one call, seed=4242)
+
+inputs 564671, (input,split) runs 6930038, decode_buffer calls 20558487, 105.3 s
+P1 total output: PASS
+P2 per-call output (safe and prompt): PASS
+P3 state persistence / buffer hygiene: PASS
+RESULT: PASS

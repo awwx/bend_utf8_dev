@@ -1,0 +1,53 @@
+STATUS (WasmCert-Coq decoder candidate; time box 14:49-15:49 +07)
+
+Run: ./check.sh  (builds against the REAL pure layer ../../pure-rocq, which finished
+building at 15:04 and whose check.sh reports no holes / "Closed under the global context";
+prints decoder.wasm from the term; parse-back lemma; hole grep; Print Assumptions; difftest).
+
+DONE
+  - Module.v: decoder_module, the WasmCert AST term (3 functions, 251 instructions,
+    5 fixed pages).  decoder.wasm (643 bytes) is printed from it by WasmCert's printer;
+    Binary.v proves run_parse_module decoder_bytes = Some decoder_module (vm_compute).
+  - decoder.mjs: difftest harness, FULL corpus incl. 3-8 MB single calls: PASS (97 s).
+  - Boundary.v: reviewable statement (definitions + Props only):
+      decoder_module_correct :=
+        exists D, Decoder_correct D /\ forall hs, Realizes hs D.
+  - Proved, no Admitted/admit/Axiom in the build (check.sh greps):
+      start_correct, done_correct   (Exports.v)  -- the start and done exports, exactly the
+                                      corresponding conjuncts of Realizes
+      decode_correct                (Decode.v)   -- the decode export: loop, termination,
+                                      input reading, output accumulation, memory framing,
+                                      result values -- PREMISED on step_spec (see below)
+      decoder_module_correct_if_step (Theorems.v):
+        (forall hs, step_spec hs) -> decoder_module_correct
+      Assumptions: only WasmCert-Coq's own library axioms (classical logic, functional
+      extensionality, Dedekind reals, 5 opaque SIMD string functions) -- same as the spike.
+
+NOT DONE (exactly one statement)
+  - step_spec (Decode.v, a Definition ... : Prop): one run of step_code (the loop body
+    minus the bounds test and i++; ~200 instructions, nested ifs, no branches) on byte b
+    in packed state enc st writes utf16le (snd (step st b)) at o, sets st to
+    enc (fst (step st b)), o += its length, writes nothing outside [o, o+4).
+    So the top-level theorem is CONDITIONAL on this lemma.  It is the whole per-byte
+    refinement: i32 bit arithmetic (and/or/shl/shr_u/add/sub/compare on small values)
+    plus the bridge to RefDecoder.step via the pure layer's range lemmas (seq_len_cases,
+    vp_cons2, vs_vp_len, step_empty_*, step_pending, seq_cp_value2..4).
+  - Determinism (not attempted; see REPORT.txt).
+
+WORK IN PROGRESS (outside the build, wip/StepWIP.v, compile command in its header)
+  Proved there: emit_fffd_ok, empty_ascii_ok (one of the 3 paths of empty_code), i32
+  compare/or lemmas.  empty_lead_ok is Admitted (unfinished).  These are the first
+  building blocks of step_spec; they took ~1-2 min each once the infrastructure existed.
+
+NEXT STEPS (estimate)
+  1. i32 lemma set on repr of small Z (land/lor/shl/shru/ltu/leu/eq, isub wrap for
+     b - 0xC2): ~1 h.
+  2. Sub-block lemmas, each with a functional post: empty_code, range_code, len_code,
+     cp_code, emit_cp, emit_fffd (each 2-16 paths through wp_if; run wp_step + rewrite
+     arithmetic): ~2-3 h.  Note wp_step must not `cbv` across large definitions;
+     use Section-local `clear` before lia (lia was confused by unrelated hyps here).
+  3. pending_code / step_code composition and the bridge to step (case split on
+     seq_len_cases of b1 and on length st = 1,2,3; enc arithmetic): ~2-3 h.
+  Total remaining: roughly 3-6 agent-hours (revised down after the WIP path lemmas went
+  quickly), less with better automation (a symbolic evaluator returning a normalized
+  frame; byte-indexed arithmetic facts by 256-case vm_compute checks).

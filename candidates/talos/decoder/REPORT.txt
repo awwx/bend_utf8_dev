@@ -1,0 +1,117 @@
+Talos candidate: report (facts for the evaluation)
+
+OUTCOME
+  Partial, inside the 60-minute box.  Running module + wrapper pass the full
+  difftest.  Boundary.lean written.  All Wasm-semantics work is proved: every
+  export terminates without trapping and computes a Wasm-level model (fold of a
+  per-byte model function, plus explicit memory writes).  NOT proved: the pure
+  refinement of those models to RefDecoder and the memory-layout lemmas, so the
+  top-level statement `ShippedModuleCorrect` (Boundary.lean) is NOT proved.
+  See STATUS.txt for the exact missing statements.
+
+1. THE THEOREMS
+  Target (Boundary.lean, unproved):
+    ShippedModuleCorrect : ∀ m, Decoder.Wat.decodeForVerification printedWat = .ok m →
+                             ∃ D : Decoder, D.Correct ∧ Realizes m D
+    printedWat := include_str "decoder.printed.wat" (= wasm-tools print decoder.wasm,
+    re-derived by check.sh).  Realizes m D := ∃ R, StartOk ∧ BufferOk ∧ DoneOk;
+    each is a Talos `RunsExportWith` (total correctness in the small-step `Step`
+    relation: a finite trace to `.done`, so no trap and no divergence) from
+    `storeWith m mem` = Talos `Module.initialStore` with an arbitrary memory
+    (any bytes, pages <= 65536), with i32 arguments/results, input bytes read by
+    `bytesAt`, text written as little-endian u32 code points (`textBytes`), and
+    the final store = storeWith m mem' where mem' differs from mem only inside the
+    written output (`sameOutside`).  Because the module has no globals/tables/
+    imports and every export leaves the store in this form, this covers every
+    sequence of calls on one instance, including JS writes and memory.grow.
+  Proved (for the literal `decoderModule`; decoderModule_decodes links it to the
+  printed text):
+    start_ok    : StartOk with R := Rel (already the boundary shape).
+    stepM_nil   : per-byte model = RefDecoder.step when nothing is pending.
+    done_runs   : decode_done(v,out) returns out / writes 0xFFFD and returns 4+out.
+    buffer_runs : decode_buffer(v,inp,len,out) under inp+len <= out,
+                  out + 8*len <= pages*65536, out + 8*len < 2^32: returns
+                  [(runM ..).1, (runM ..).2.1], final store storeWith (runM ..).2.2,
+                  runM = left fold of the model `stepM` over bytesAt mem inp len.
+  #print axioms (Axioms.lean): propext, Classical.choice, Quot.sound for all.
+
+2. TRUSTED / UNVERIFIED BETWEEN THE (TARGET) THEOREM AND NODE
+  a. wasm-tools 1.251.0 `print` (bytes -> text).  The .wat source and `parse`
+     are not trusted; check.sh re-prints the shipped bytes and compares.
+  b. The meaning of Talos's WAT decoder (its execution is kernel-checked by
+     decoderModule_decodes; that it implements the text format is not proved).
+  c. Talos semantics = Wasm spec = V8 (hand-written, test-suite and V8
+     differential tested, no theorem).
+  d. Module.initialStore + "arbitrary memory" = JS-API instantiation of this
+     module (no start function, no data/elem segments, no globals, so little to
+     get wrong); startExportConfig? = the JS-to-Wasm call (ToInt32 on the JS
+     number state, etc.).  Multi-value results returned to JS as an array.
+  e. No validation in the theorem (wasm-tools validate and V8 do it).
+  f. decoder.mjs (unverified, 56 lines): keeps the i32 state as a JS number;
+     splits the input into chunks of <= 1 MiB (justified by split independence,
+     a property of RefDecoder, not of the wrapper); copies each chunk to address
+     0; calls decode_buffer(state, 0, len, 1 MiB); reads Uint32Array [1 MiB, end)
+     and converts with String.fromCodePoint in slices of 8192 (relies on every
+     output code point being a scalar: pure-lean decoded_scalar); decode_done
+     uses the same output area.  Memory is declared 160 pages (10 MiB) in the
+     module so the wrapper never grows it; the layout contract
+     (1 MiB + 8 * 1 MiB <= 160 pages) is satisfied by construction.
+  g. Lean kernel, include_str, the copied `decoderWat%` elaborator (not trusted:
+     its output is re-derived in the kernel).
+  h. Until the missing pure lemmas are proved: the claim that stepM/runM/enc
+     refine RefDecoder is tested only (difftest), not proved.
+
+3. SIZE
+  decoder.wat 160 lines; printed module 385 instructions (excluding end/else),
+  9 functions.  Proof files (excluding the copied pure layer and the 80-line
+  DecoderModule boilerplate): ProofMach 92, ProofFuncs 91, ProofStep 71,
+  ProofLoop 183, ProofBuffer 34, ProofDone 100 = 571 lines, about 1.5 lines per
+  Wasm instruction for the Wasm-semantics part (spike: about 7 per loop
+  instruction).  ProofModel (partial refinement) 85 lines.  Boundary.lean 150 lines (mostly comments).  The unfinished pure
+  refinement is not counted; I estimate another 300-600 lines.
+
+4. BUILD AND RE-CHECK TIMES (4 cores, another proof agent running)
+  - Talos framework (pre-built in setup): 14 min, 3.9 GB.
+  - Kernel-checked decode (DecoderModule.lean) for the 7,654-byte printed text
+    (880-byte .wasm): 37 s wall when the machine was otherwise quiet (check.sh),
+    89.8 s and 2.19 GB RSS when run next to the pure-layer build and difftest.
+    Spike: 20.5 s for 925 bytes of text.  So 8.3x the text cost 1.8x (quiet) the
+    time: the fixed cost (loading the Talos decoder, ~15-20 s) dominates at this
+    size; the marginal cost is roughly 2-3 s per KB of WAT text, so a 50 KB module
+    would be a few minutes (not measured; memory growth not measured either).
+    It is one file, rebuilt only when the module changes.
+  - ProofFuncs (5 helper call lemmas): 2 min; ProofStep: about 1 min;
+    ProofLoop/ProofBuffer/ProofDone: a few seconds each (they use call lemmas).
+  - Pure layer copy: about 3 min (Utf8Table dominates).
+  - difftest full run: about 2 min.
+  - check.sh total: 8 min 05 s wall (Lean part about 6 min, difftest 110 s).
+
+5. SCALING
+  - What made it scale: (i) `Reach` hides traces; (ii) a symbolic-execution
+    tactic (`wauto`: try every instruction rule, normalize if-encoded booleans,
+    `split` on symbolic `if`s, apply call lemmas) proves a function's call lemma
+    in 2-4 lines whatever its number of paths; (iii) call lemmas stated for an
+    arbitrary caller context make functions compose without re-tracing, so cost
+    is per function path, not per program path.  Talos's own Wp layer was not
+    usable (it targets the old big-step `exec` and needs Mathlib).
+  - Costs: elaboration time grows with the number of paths and with the size of
+    the goal (callee bodies are carried in control frames); 30-50 s for a
+    function with ~5 paths.  maxHeartbeats had to be disabled.
+  - Loops still need a hand-written loop-head configuration and an induction
+    (as in the spike), about 100 lines for this loop.
+  - For a larger component the Wasm side looks manageable with this machinery;
+    the kernel-checked decode and the per-function elaboration time are the
+    limits.  The model-to-spec refinement is ordinary Lean and is where most of
+    the remaining effort is.
+  - Licence: Talos is AGPL-3.0 (proof artefacts depend on it; the .wasm does not).
+
+6. WHAT PUSHED THE IMPLEMENTATION
+  - Mirroring Utf8Ref function by function ($vs/$vsp/$cp re-extract bytes and
+    re-check ranges on every byte, $step calls both $vs and $vsp) is slower than
+    a DFA but keeps the refinement proof shallow.  A table-driven decoder was
+    avoided because tables in memory would have to be framed in every lemma.
+  - Output as UTF-32 rather than UTF-16 keeps the Wasm and the layout statement
+    simple but moves the UTF-16 conversion (String.fromCodePoint) into the
+    unverified wrapper and costs 4 bytes per code point.
+  - No pressure from Talos itself: every instruction used (multi-value results,
+    recursion, early return inside if) is modelled.

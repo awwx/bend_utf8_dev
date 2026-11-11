@@ -1,0 +1,16 @@
+[package]
+name = "spike"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+path = "spike.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+vstd = { version = "=0.0.0-2026-11-01-0251", default-features = false }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"

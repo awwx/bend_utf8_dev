@@ -1,0 +1,10 @@
+-arg -w -arg -notation-overridden,-notation-for-abbreviation,-deprecated-reference-since-mathcomp-2.3.0
+-Q . Spike
+Spec.v
+Module.v
+Steps.v
+Instance.v
+Surrogate.v
+Count.v
+Binary.v
+Theorems.v

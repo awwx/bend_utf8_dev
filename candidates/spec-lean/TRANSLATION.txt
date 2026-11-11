@@ -1,0 +1,193 @@
+Translation record: /root/bend/utf8/LAWS.bend (Bend 2.0.40)
+                 -> /root/bend/utf8/candidates/spec-lean/Utf8Laws.lean (Lean 4, core only)
+
+Compiles with leanprover/lean4:v4.35.0 and leanprover/lean4:v4.36.0-rc2.
+No theorem, sorry or axiom.  Each Bend `law` is a `def NAME : Prop`
+(or `def NAME (D : Decoder) : Prop` for the streaming laws).
+
+TYPES
+  Byte        U32 + proof of 0..255   -> UInt8
+  Code point  U32                     -> UInt32
+  String      list of Chr{U32}        -> Text := List UInt32 (abbrev)
+  Bool        Bool                    -> Bool
+  A & B       product / conjunction   -> A × B (data) / A ∧ B (Prop)
+  Maybe<A>                            -> Option A
+  List<A>                             -> List A
+  Exists(T, x => P)                   -> ∃ x : T, P
+  Or(P, Q)                            -> P ∨ Q
+  P -> Empty                          -> ¬ P
+  {a == b : T}                        -> a = b
+  `for x: T` / `for +x` / `for -x`    -> ∀ (x : T), ...   (erasure is irrelevant in Prop)
+  List.append(xs, ys)                 -> xs ++ ys
+  List.concat(xss) (Bend)             -> List.flatten xss  (NOT Lean's List.concat,
+                                         which appends one element; Lean's flatten has
+                                         the same two equations as Bend's List.concat)
+  String ++ String                    -> Text ++ Text (list append)
+  Char.to_u32('\u{XXXX}')             -> (0xXXXX : UInt32)
+  string literals "AB", "A", "H", ""  -> [65, 66], [65], [72], []  (commented with the literal)
+  Maybe.is_some(m)                    -> m.isSome
+  U32.is_ge / U32.is_le (unsigned)    -> decide (a ≥ b) / decide (a ≤ b) on UInt32 (unsigned)
+  Bool.not / &&                       -> ! / &&
+  Bool.to_u32(b)                      -> b.toUInt8  (core: if b then 1 else 0)
+
+Why UInt8 for bytes: it is the native byte type, makes the 0..255
+restriction part of the type (the agreed deviation), has literals and
+decidable equality, and every value produced by bit8_value fits it
+exactly.  Why UInt32 for code points: it is exactly Bend's U32 (32-bit,
+unsigned order), so u32_byte4 still splits 32 bits and encoding still
+returns none above U+1FFFFF; UInt32.toBitVec gives the bit view.
+Neither Lean String nor Char is used (Char is restricted to scalars).
+
+Bits: Bend's Word stores the least significant bit first (WCon{b0, ...}).
+Lean's BitVec.ofBoolListLE [b0, b1, ...] likewise takes the least
+significant bit first, and BitVec.getLsbD w i is bit i counted from the
+least significant bit.  These replace Bend's WCon pattern match and
+construction; no shifts or masks are used.
+
+DEFINITION / LAW MAP (Bend line -> Lean name)
+  7    def Bit8                          -> abbrev Bit8 (abbrev so tuple patterns elaborate)
+  12   def bit8_value                    -> def bit8_value : Bit8 → UInt8  (returns the byte
+                                            type; built with UInt8.ofBitVec (BitVec.ofBoolListLE
+                                            [b0..b7]), mirroring the WCon chain; the 24 zero high
+                                            bits of Bend's U32 have no counterpart)
+  19   law bit8_value_sum                -> def bit8_value_sum : Prop  (sum in UInt8; max 255,
+                                            so no wraparound, like Bend's U32 sum)
+  41   law bit8_value_word               -> def bit8_value_word : Prop  (Word(8n) -> BitVec 8 via
+                                            ofBoolListLE, Word.to_nat -> BitVec.toNat,
+                                            U32.from_nat -> UInt8.ofNat)
+  59   def Byte4                         -> abbrev Byte4
+  64   def u32_byte4                     -> def u32_byte4 : UInt32 → Byte4  (getLsbD on toBitVec)
+  75   law u32_byte4_bits                -> def u32_byte4_bits : Prop  (U32{WCon...} ->
+                                            UInt32.ofBitVec (BitVec.ofBoolListLE [b0..b31]))
+  121  def is_surrogate_code_point       -> def is_surrogate_code_point
+  125  law is_surrogate_code_point_examples -> def is_surrogate_code_point_examples : Prop
+  139  def is_unicode_scalar             -> def is_unicode_scalar  (the vacuous cp ≥ 0 conjunct kept)
+  159  def one_byte_shape.bits           -> def one_byte_shape.bits : Byte4 → Option UInt8
+  169  def one_byte_shape                -> def one_byte_shape
+  182  def two_byte_shape.bits           -> def two_byte_shape.bits : Byte4 → Option (UInt8 × UInt8)
+  193  def two_byte_shape                -> def two_byte_shape
+  206  def three_byte_shape.bits         -> def three_byte_shape.bits
+  218  def three_byte_shape              -> def three_byte_shape
+  231  def four_byte_shape.bits          -> def four_byte_shape.bits
+  244  def four_byte_shape               -> def four_byte_shape
+  255  def encoding.four                 -> def encoding.four
+  262  def encoding.three                -> def encoding.three
+  269  def encoding.two                  -> def encoding.two
+  276  def encoding.if                   -> def encoding.«if»  (`if` is a Lean keyword; the
+                                            guillemets keep the name encoding.if)
+  283  def encoding                      -> def encoding : UInt32 → Option (List UInt8)
+  288  def encodes                       -> def encodes : List UInt8 → UInt32 → Prop
+  301  def is_valid_sequence             -> def is_valid_sequence
+  310  def begins_with_scalar            -> def begins_with_scalar
+  317  def no_valid_sequence             -> def no_valid_sequence
+  324  law begins_with_scalar_unique     -> def begins_with_scalar_unique : Prop
+  349  def is_valid_sequence_prefix      -> def is_valid_sequence_prefix  (by pattern matching)
+  366  law not_valid_sequence_prefix_extended -> def not_valid_sequence_prefix_extended : Prop
+  379  def is_prefix                     -> def is_prefix  (parameter `prefix` renamed `pre`:
+                                            `prefix` is a Lean keyword)
+  435  def maximal_subpart.longer_not_valid_prefix -> same name
+  446  def maximal_subpart               -> def maximal_subpart
+  457  law maximal_subpart_exists        -> def maximal_subpart_exists : Prop
+  463  law maximal_subpart_unique        -> def maximal_subpart_unique : Prop
+  486  def code_point_to_string          -> def code_point_to_string : UInt32 → Text  ([cp])
+  491  def replacement_char              -> def replacement_char : UInt32  (0xFFFD)
+  496  def replacement_char_string       -> def replacement_char_string : Text
+  516  def decodes_first.replaced        -> def decodes_first.replaced
+  526  def decodes_first.scalar          -> def decodes_first.scalar
+  537  def decodes_first.nonempty        -> def decodes_first.nonempty
+  546  def decodes_first                 -> def decodes_first  (by pattern matching)
+  562  law decodes_first_exists          -> def decodes_first_exists : Prop
+  569  law decodes_first_unique          -> def decodes_first_unique : Prop
+  581  law decodes_first_empty           -> def decodes_first_empty : Prop
+  589  law decodes_first_nonempty        -> def decodes_first_nonempty : Prop
+  604  def decodes.go                    -> def decodes.go : Text → List UInt8 → Prop
+                                            (structural recursion on the text)
+  612  def decodes                       -> def decodes
+  617  law decodes_exists                -> def decodes_exists : Prop
+  623  law decodes_unique                -> def decodes_unique : Prop
+  637  law decodes_examples              -> def decodes_examples : Prop  (all 17 conjuncts,
+                                            same order, same byte lists in decimal)
+  685-694 (comments on UTF8.decode_start_state / decode_buffer / decode_done / DecodeState)
+                                         -> structure Decoder (State, start, decode_buffer,
+                                            decode_done); comment reworded to name D.* with the
+                                            UTF8.* originals in parentheses
+  714  def all_bytes                     -> dropped (UInt8 makes it vacuous); a comment marks the place
+  720  law utf8_decode_buffer_all_bytes  -> dropped (same reason; also it is about UTF8.*)
+  739  def all_buffers_bytes             -> dropped (same reason)
+  749  def all_buffers_bytes.head        -> dropped (only took apart the erased proof)
+  754  def all_buffers_bytes.tail        -> dropped (same)
+  763  def feed.prepend                  -> def feed.prepend (D : Decoder)
+  768  def feed.then                     -> def feed.then (D : Decoder)
+  777  def feed                          -> def feed (D : Decoder)  (`-valid` dropped)
+  788  def decoded_so_far.text           -> def decoded_so_far.text (D : Decoder)
+  792  def decoded_so_far                -> def decoded_so_far (D : Decoder)  (`-valid` dropped)
+  798  def decoded.text                  -> def decoded.text (D : Decoder)
+  802  def decoded                       -> def decoded (D : Decoder)  (`-valid` dropped)
+  813  law utf8_decodes                  -> def utf8_decodes (D : Decoder) : Prop
+  820  def is_text_prefix                -> def is_text_prefix  (independent of D; parameter
+                                            `prefix` renamed `pre`)
+  830  law utf8_decode_buffer_safe       -> def utf8_decode_buffer_safe (D : Decoder) : Prop
+  843  law utf8_decode_buffer_prompt     -> def utf8_decode_buffer_prompt (D : Decoder) : Prop
+                                            (the `{all_bytes(rest) == True}` conjunct dropped)
+  --   (none)                            -> def Decoder.Correct (D : Decoder) : Prop, the
+                                            conjunction of the three streaming laws (requested)
+  --   (none)                            -> abbrev Text := List UInt32 (stands for Bend's String)
+
+DEVIATIONS (all agreed)
+  1. Bytes are UInt8: all_bytes, utf8_decode_buffer_all_bytes,
+     all_buffers_bytes(.head/.tail), every erased `valid` argument, and
+     the all_bytes(rest) conjunct of utf8_decode_buffer_prompt are gone.
+     Shape functions and bit8_value return UInt8.
+  2. Text is List UInt32 (no scalar restriction), not Lean String/Char.
+  3. Type-valued propositions are Prop.
+  4. Streaming definitions and laws are over an abstract Decoder, not UTF8.*.
+
+JUDGEMENT CALLS
+  - Comments copied verbatim except where they describe Bend details:
+    "U32 representing the byte(s)" -> "byte(s)"; "Some/None" -> "some/none";
+    "Word(8n)" -> "BitVec 8"; "b1 <> more" -> "b1 :: more"; "string" ->
+    "text" where it means Bend's String; the all_bytes and `feed`
+    erased-proof comments replaced by a note that they were dropped; the
+    `decoded` signature comment updated.  Bend section headers (#, ##, ###)
+    kept as `-- ##` etc.  A short header comment states the conventions.
+  - u32_byte4 is written with projections (getLsbD) instead of a match;
+    the law u32_byte4_bits builds its argument with a different function
+    (ofBoolListLE), so the law is not definitionally trivial.
+  - bit8_value is built with ofBoolListLE; bit8_value_word therefore
+    uses the same bit construction and checks ofBitVec against
+    ofNat ∘ toNat, just as Bend's version checks U32{WCon...} against
+    U32.from_nat ∘ Word.to_nat over the same WCon chain.
+  - Bool tests are `decide (a ≥ b)` on UInt32, which is unsigned like U32.cmp.
+
+OBSERVATIONS ON LAWS.bend (not fixed)
+  - Domain change from deviation 1: Bend's universally quantified byte
+    lists (begins_with_scalar_unique, maximal_subpart_*, decodes_first_*,
+    decodes_exists/unique, and `rest` in utf8_decode_buffer_safe) range
+    over all U32 lists, including values > 255; here they range over
+    bytes only.  In particular Bend's safe law quantifies over non-byte
+    continuations (no all_bytes on `rest`) while its prompt law restricts
+    `rest` to bytes, an asymmetry in the original.  The Lean safe law is
+    therefore weaker than Bend's, but only outside the byte domain.
+  - utf8_decode_buffer_prompt quantifies `c` over all of U32; for a
+    non-scalar c other than U+FFFD it is satisfied trivially.  Harmless.
+  - decode_done is constrained only through utf8_decodes.
+  - is_unicode_scalar's `cp >= 0` conjunct is vacuous (kept).
+  - Comment at line 556 ("decodes_first implies that a result exists")
+    is loosely worded; the law itself is clear.  Kept verbatim.
+
+SELF-CHECK (scratch file, outside the spec; both toolchains, identical output)
+  encoding: U+0000 00 | U+007F 7F | U+0080 C2 80 | U+07FF DF BF | U+0800 E0 A0 80 |
+  U+20AC E2 82 AC | U+D800 ED A0 80 | U+FFFF EF BF BF | U+10000 F0 90 80 80 |
+  U+1F600 F0 9F 98 80 | U+10FFFF F4 8F BF BF | U+110000 F4 90 80 80 |
+  U+1FFFFF F7 BF BF BF | U+200000 none; also none for 0x400000, 0x7FFFFFFF,
+  0x80000000, 0xFFFFFFFF.
+  Shapes exist exactly as expected (e.g. two-byte shape of U+0000 = C0 80,
+  three-byte shape of U+0000 = E0 80 80, four-byte shape of U+20AC = F0 82 82 AC).
+  encoding agrees with an arithmetic reference encoder on every value 0..0x2000FF.
+  is_unicode_scalar: D7FF t, D800 f, DFFF f, E000 t, 10FFFF t, 110000 f, FFFFFFFF f, 0 t;
+  agrees with the reference predicate on 0..0x2000FF.
+  u32_byte4 0x12345678 = 00010010 00110100 01010110 01111000; bit8_value 10000001 = 129.
+
+TIME
+  start Wed Nov 11 13:28:59 +07 2026
+  end   Wed Nov 11 13:37:49 +07 2026  (about 9 minutes)

@@ -1,0 +1,55 @@
+JOURNAL -- Aeneas decoder candidate (VM clock, 2026-11-11)
+
+15:02:55  Start (`date`).  Read spec Decoder section, pure-lean STATUS/Utf8Ref, spike
+          REPORT/SETUP/JOURNAL/lib.rs/Proofs.lean, difftest README.
+15:04     Started the pure-layer build in the background (Utf8Table ~4.5 min CPU) into
+          lean/build with the Aeneas toolchain v4.36.0-rc2, so it was ready when needed.
+15:04     Crate written (state = u32 packing n + 256*b0 + 65536*b1 + 2^24*b2; per-byte
+          `step` on a `Pend {n,b0,b1,b2}` record mirroring Utf8Pure.step; output = u32 code
+          points, at most 2 per input byte).  wasm built first time (5.4 KB).
+15:05     Wrapper written; `difftest --quick` PASS (53 s).  Full difftest started in the
+          background on this first wasm: PASS (94.5 s).
+15:05     First Charon/Aeneas run: accepted everything (struct returns, `&mut [u32]`,
+          `as` casts, `%`, `/`, single while loop).  Problem found by reading the output:
+          short-circuit `&&`/`||` with compound conditions inside `step`
+          (`(lead2||lead3||lead4) && second_ok`) is translated to nested `if`s with the
+          continuation DUPLICATED per branch; `step` became ~300 lines of nested ifs.
+          Backed up: restructured the Rust so each Utf8Ref predicate is its own small Rust
+          function (is_lead_multi, vs2, vsp2, vs3, vsp3, vs4, cp2, cp3, cp4, emit, hold),
+          and `step` only branches on their results.  Generated `step` is now 40 lines and
+          mirrors Utf8Pure.step line by line.  Cost: ~2 min.  (Lesson: write Rust for the
+          translator: one boolean per function, no compound short-circuit conditions.)
+15:06     Regenerated; host and --target wasm32-unknown-unknown translations identical.
+15:07     Boundary.lean written and compiled (first try).
+15:08     Pure layer built.  Proofs started.
+          - `step*` did nothing on a goal `∃ c, f x = ok c ∧ P c`: it only works on the
+            spec form `f x ⦃ c => P c ⦄`.  Added a generic `spec_ok` (spec -> `= ok`)
+            lemma (the `cases r with | ret | vis | div` trick from the spike).
+          - Predicates: stated as `rust_pred b = ok (utf8ref_pred (byte b))`; proved by
+            unfold + split + simp [toNat lemmas] + scalar_tac.  One `No goals` error.
+15:10     cp2/cp3/cp4 via step* + the pure layer's cpOf_two/three/four (Nat forms):
+          worked first time, because the Rust uses `%`/`*`/`+` (matching cpOf_* Nat form)
+          rather than `&`/`<<`/`|`.
+15:11     step refinement (`step_eq`, 4 cases on the number of pending bytes) compiled at
+          the first attempt.  `decoder.EMPTY` is `irreducible`: needed an `empty_eq` lemma.
+15:12-15:14  Loop.  Friction:
+          - `omega` failed on bounds stated as `< 2 ^ UScalarTy.U8.numBits`; use scalar_tac.
+          - `step*` stopped at `let (_, index_mut_back) := x` (the destructured pair from
+            `Slice.index_mut_usize`): manual `rcases x` + `subst`, then continue.
+          - `step*` names its hypotheses inaccessibly when a name clashes (x✝, x_post✝);
+            switched to `step as ⟨k2, hk2⟩` one call at a time.
+          - List lemmas for "write at index k keeps the prefix/suffix": List.take_append,
+            set_eq_take_append_cons_drop, drop_set_of_lt (a few iterations).
+15:14-15:16  decode_buffer / decode_done / start / top level:
+          - `rfl` fails on `(do let i ← ok v'; ok ..) = ok ..` (`ok` is a def over the
+            interaction-tree Result, not reducible by rfl); `simp` does it.
+          - `step*` already performed the `split` in decode_done (my `split` then failed).
+15:16:41  All proved, no sorry; #print axioms: propext, Classical.choice, Quot.sound.
+15:17     check.sh written.  First run failed on my own forbidden-word grep matching
+          "bv_decide" in a COMMENT of the pure layer; adopted pure-lean's rule (reject
+          bv_decide outside comments).
+15:19     Full check.sh running; status files written meanwhile.
+15:22:40  check.sh: ALL CHECKS PASSED (5 min 8 s; difftest full PASS on the final wasm).
+          Benchmark: 37 MB/s ASCII, 65 MB/s 3-byte text (wrapper string conversion is
+          the likely bottleneck).  Done at ~20 min elapsed; stopped there rather than
+          start the UTF-16 extension (listed in STATUS.txt as next step).

@@ -1,0 +1,20 @@
+decoder: ./decoder.mjs
+       3 ms          2 runs          3 calls  ok  exhaustive len=0 alphabet=25 cuts=all
+      32 ms        150 runs        350 calls  ok  exhaustive len=1 alphabet=25 cuts=all
+    1297 ms      12500 runs      40625 calls  ok  exhaustive len=2 alphabet=25 cuts=all
+    7922 ms     250000 runs     750000 calls  ok  exhaustive len=3 alphabet=25 cuts=subsets+ends
+   23626 ms    3125000 runs    7812500 calls  ok  exhaustive len=4 alphabet=25 cuts=subsets
+   11234 ms    1600000 runs    4800000 calls  ok  exhaustive len=5 alphabet=10 cuts=subsets
+   12763 ms    1492992 runs    5225472 calls  ok  exhaustive len=6 alphabet=6 cuts=subsets
+    6788 ms     446488 runs    1744344 calls  ok  scalar-boundaries (+truncations, contexts, pairs)
+     898 ms       2400 runs     177175 calls  ok  random seed=1 count=600 maxLen=3000 corruption=mixed
+      17 ms        400 runs       3976 calls  ok  random seed=2 count=100 maxLen=40 corruption=mixed
+    1729 ms         40 runs       3866 calls  ok  random long (100KB..1MB), seed=777
+   28216 ms         66 runs        176 calls  ok  huge buffers (multi-MB in one call, seed=4242)
+
+inputs 564671, (input,split) runs 6930038, decode_buffer calls 20558487, 94.5 s
+P1 total output: PASS
+P2 per-call output (safe and prompt): PASS
+P3 state persistence / buffer hygiene: PASS
+RESULT: PASS
+EXIT 0

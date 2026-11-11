@@ -1,0 +1,106 @@
+REPORT -- Aeneas candidate: streaming UTF-8 decoder (Rust -> Charon/Aeneas -> Lean 4)
+
+1. THE FINAL THEOREM
+  DecoderProofs.verified : Boundary.Verified          (lean/Proofs.lean)
+  Boundary.Verified := ∃ D : Decoder, D.Correct ∧ Realizes D      (lean/Boundary.lean)
+  Realizes D := ∃ R : D.State → U32 → Prop,
+    (∃ v, decoder.decode_start_state = ok v ∧ R D.start v) ∧
+    (∀ s v input out, R s v → 2 * input.length ≤ out.length →
+       ∃ v' k out', decoder.decode_buffer v input out = ok ((v', k), out') ∧
+         R (D.decode_buffer s (bytes input)).1 v' ∧
+         WritesText out out' k (D.decode_buffer s (bytes input)).2) ∧
+    (∀ s v out, R s v → 1 ≤ out.length →
+       ∃ k out', decoder.decode_done v out = ok (k, out') ∧ WritesText out out' k (D.decode_done s))
+  WritesText out out' k t := k = |t| ∧ |out'| = |out| ∧ map codePoint (take |t| out') = t
+                             ∧ drop |t| out' = drop |t| out.
+  byte/codePoint are UInt8.ofNat / UInt32.ofNat of the Aeneas scalar's value.
+  Axioms: propext, Classical.choice, Quot.sound.  Witness D = Utf8Pure.RefDecoder.
+
+  What it is about: the Lean model (lean/Decoder/Funs.lean) that Aeneas generates from
+  the safe Rust in src/lib.rs -- not about the Wasm.  `= ok` excludes panics (index out
+  of bounds, overflow, failed casts) and divergence, in the model's semantics.
+  Design of the boundary vs the recommended shape: as recommended, with two choices:
+  text crosses as code points (one u32 each), so no UTF-16 definition is needed in the
+  boundary file (but the conversion to a JS string is unverified wrapper code); and the
+  output-size precondition is the simple 2*in.len (exact worst case is in.len+1, plus
+  pending, but a per-byte bound keeps the loop invariant trivial).  No `len <= U32.max`
+  style precondition: every count is a usize bounded by out.len, and slices in the model
+  have length <= Usize.max.  The state relation R is existential and not reviewed; that
+  is sound because R must hold initially, be preserved, and the text is pinned to D.
+
+2. TRUSTED / UNVERIFIED BETWEEN THE THEOREM AND NODE RUNNING THE BYTES
+  a. Lean kernel; the review of Utf8Laws.lean + Boundary.lean (69 lines).
+  b. Charon (rustc MIR -> LLBC): unverified.  Could mistranslate a construct (e.g.
+     casts, `%` semantics, struct update, loop exits).  Runs rustc in dev profile.
+  c. Aeneas (LLBC -> Lean): unverified (paper proofs of the approach only).  Could
+     mistranslate borrows/`&mut` back-functions or control flow.  Mitigation: the
+     generated code is readable and mirrors the Rust; check.sh regenerates it and
+     requires it byte-identical to the proved copy.
+  d. Aeneas Std library model: U8/U32/Usize arithmetic (checked +, *, %, /, casts),
+     Slice.index_usize / index_mut_usize / update / len.  If its semantics differed from
+     Rust (e.g. what `as u8` does), the theorem would be about a different program.
+     In this library version these are definitions, not axioms (no Aeneas axiom in the
+     #print axioms output).  Usize width is abstract in the model; nothing in the proof
+     depends on it.
+  e. Target: Charon translates for host and wasm32-unknown-unknown; check.sh enforces
+     that both translations are byte-identical to lean/Decoder (enforced, not manual).
+     Still trusted: that the MIR rustc produces for the wasm32 *release* build means the
+     same thing as the dev-profile MIR that was translated (overflow checks differ:
+     release has them off; the proof shows no overflow happens, so this is benign).
+  f. rustc/LLVM (opt-level 3, LTO) and its wasm32 backend; Node's Wasm engine.
+  g. The shim (src/lib.rs `mod shim`, 26 non-blank lines, excluded with
+     `charon --exclude crate::shim`): three `extern "C"` exports.  Logic: build `&[u8]`
+     and `&mut [u32]` with slice::from_raw_parts(_mut) from (ptr,len), call the core,
+     and for decode_buffer store the new u32 state through `state_out`.  Could get
+     wrong: aliasing/validity of the pointers (it trusts the caller), the state store.
+     The panic handler is `loop {}` (unreachable for in-contract calls, by the theorem).
+  h. The wrapper (decoder.mjs, 40 non-blank lines).  Logic: grow memory once by a fixed
+     region (64 KiB input chunk, 128K-entry u32 output, 4-byte state slot); split every
+     input into 64 KiB chunks (justified by the spec's split independence, but the
+     chunking loop itself is unverified); guarantee out.len = 2*CHUNK >= 2*in.len;
+     convert the written code points to a JS string with String.fromCodePoint in
+     8192-element slices; the state is a JS number (u32).  Could get wrong: chunk
+     offsets, the 0-length call, string conversion, reading stale memory.
+
+3. SIZES
+  Rust safe core: 115 non-blank, non-comment lines (shim 26).  Generated Lean:
+  Funs.lean 443 lines, Types.lean ~40.  Boundary.lean 69 lines.  Proofs.lean 464 lines
+  (406 non-blank/non-comment) => about 3.5 proof lines per line of Rust.  This does NOT
+  count the shared pure layer (RefDecoder and its correctness, ~1100 lines), reused
+  unmodified.
+  Wasm: 5436 bytes, no imports, no allocator.
+
+4. BUILD / RUN TIMES (this VM, other agents running)
+  cargo build wasm: ~2 s cold.  charon+aeneas: ~5 s per target.
+  Pure layer: ~4.5 min CPU (Utf8Table), once.  Boundary+Proofs: ~30 s (mostly loading
+  Mathlib-based Aeneas oleans; Proofs.lean itself ~8 s).
+  difftest full: 94.5 s (selftest good adapter ~55 s), quick 53 s.
+  check.sh total: 5 min 8 s wall (pure layer rebuilt ~3.7 min, Lean rest ~30 s,
+  difftest full 75.8 s); `./check.sh --fast` reuses the pure-layer build.
+  Throughput (single 8 MB decode_buffer call, Node 26): ASCII 37 MB/s (TextDecoder
+  1563 MB/s), all-3-byte 65 MB/s (TextDecoder 149 MB/s).  The ASCII case is dominated
+  by the wrapper's code-point -> string conversion (one u32 per byte through
+  String.fromCodePoint); not profiled further.
+
+5. SCALING
+  The proof effort tracked the Rust structure closely: one small lemma per Rust
+  function, one refinement lemma for the step, one loop invariant.  step*/scalar_tac
+  discharged all arithmetic and bounds obligations.  What scales well: functions with
+  scalar/struct/slice arguments, single loops, `&mut` slices.  What would not, or is
+  untested: nested loops with early exits, iterators/closures, traits beyond derives,
+  heap allocation (no_std with no allocator here).  The big leverage was the pure
+  layer: having RefDecoder as a per-byte fold made the refinement nearly mechanical; a
+  larger component would need such a reference model written first.
+
+6. PUSHES TOWARD AN INEFFICIENT OR AWKWARD IMPLEMENTATION
+  - Short-circuit `&&`/`||` compound conditions are translated with the continuation
+    duplicated per branch; I restructured into one-boolean-per-function helpers (fine
+    after inlining by LLVM, but a style constraint).
+  - Code points computed with `%`/`*`/`+` rather than `&`/`<<`/`|` to match the pure
+    layer's Nat lemmas (LLVM produces the same masks/shifts).
+  - Indexed while loop with bounds-checked indexing; the checks are proved unreachable
+    but remain in the Wasm unless LLVM removes them.
+  - No ASCII fast path or multi-byte stride (would need nested loops / more invariants);
+    the per-byte branchy step is the straightforward choice.  Output as u32 code
+    points (4 bytes per char) and String.fromCodePoint in JS are not the fastest path.
+  - Multiple return values cross the C ABI awkwardly, hence the `state_out` pointer.

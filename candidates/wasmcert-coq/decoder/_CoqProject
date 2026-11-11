@@ -1,0 +1,16 @@
+-arg -w -arg -notation-overridden,-notation-for-abbreviation,-deprecated-reference-since-mathcomp-2.3.0,-abstract-large-number,-deprecated-syntactic-definition
+-Q . Decoder
+-Q ../../pure-rocq Utf8
+Module.v
+Binary.v
+Steps.v
+Control.v
+Wp.v
+Mem.v
+WpMem.v
+Instance.v
+Boundary.v
+Repr.v
+Exports.v
+Decode.v
+Theorems.v

@@ -1,0 +1,69 @@
+Wed Nov 11 14:49:50 +07 2026
+[WARNING] Running as root is not recommended
+Utf8Laws.v is byte-identical to ../spec-rocq/Utf8Laws.v
+rocq makefile -f _CoqProject -o CoqMakefile
+make -f CoqMakefile -j2
+make[1]: Entering directory '/root/bend/utf8/candidates/pure-rocq'
+ROCQ DEP VFILES
+ROCQ compile Utf8Check.v
+ROCQ compile Utf8Proofs.v
+make[1]: Leaving directory '/root/bend/utf8/candidates/pure-rocq'
+== checking for holes
+no Admitted/admit/Axiom/Parameter/Abort in the build files
+== Print Assumptions
+bit8_value_sum_proved : bit8_value_sum
+     : bit8_value_sum
+Closed under the global context
+bit8_value_word_proved : bit8_value_word
+     : bit8_value_word
+Closed under the global context
+u32_byte4_bits_proved : u32_byte4_bits
+     : u32_byte4_bits
+Closed under the global context
+is_surrogate_code_point_examples_proved : is_surrogate_code_point_examples
+     : is_surrogate_code_point_examples
+Closed under the global context
+begins_with_scalar_unique_proved : begins_with_scalar_unique
+     : begins_with_scalar_unique
+Closed under the global context
+not_valid_sequence_prefix_extended_proved
+:
+not_valid_sequence_prefix_extended
+     : not_valid_sequence_prefix_extended
+Closed under the global context
+maximal_subpart_exists_proved : maximal_subpart_exists
+     : maximal_subpart_exists
+Closed under the global context
+maximal_subpart_unique_proved : maximal_subpart_unique
+     : maximal_subpart_unique
+Closed under the global context
+decodes_first_exists_proved : decodes_first_exists
+     : decodes_first_exists
+Closed under the global context
+decodes_first_unique_proved : decodes_first_unique
+     : decodes_first_unique
+Closed under the global context
+decodes_first_empty_proved : decodes_first_empty
+     : decodes_first_empty
+Closed under the global context
+decodes_first_nonempty_proved : decodes_first_nonempty
+     : decodes_first_nonempty
+Closed under the global context
+decodes_exists_proved : decodes_exists
+     : decodes_exists
+Closed under the global context
+decodes_unique_proved : decodes_unique
+     : decodes_unique
+Closed under the global context
+decodes_examples_proved : decodes_examples
+     : decodes_examples
+Closed under the global context
+RefDecoder_correct : Decoder_correct RefDecoder
+     : Decoder_correct RefDecoder
+Closed under the global context
+Closed under the global context
+
+real	15m16.549s
+user	14m50.182s
+sys	0m5.409s
+Wed Nov 11 15:05:06 +07 2026

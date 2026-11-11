@@ -1,0 +1,295 @@
+# WasmCert-Coq spike: report
+
+Outcome: **done**. Both exports are proved against the mechanised Wasm 2.0
+small-step semantics, the `.wasm` is printed from the same Rocq term, the
+mechanisation's parser reads those bytes back to the same term, and Node 26
+runs them through `spike.mjs` (`make test`). There are no `Admitted`,
+`admit` or new axioms.
+
+Setup finished at 11:24:40. Both proofs were done by 11:35, and the rest of
+the time went on checks and write-up. The proofs went fast partly because
+`Spec.v`, `Module.v`, `Steps.v` and a first draft of `Count.v` were written
+during the 30-minute install, before Rocq could check them.
+
+## Files
+
+| file | role | non-blank, non-comment lines |
+|---|---|---|
+| `Spec.v` | specs without Wasm: `is_surrogate_code_point : N -> bool` (with the six LAWS.bend examples as a lemma) and `count_non_ascii : list byte -> nat` | 21 |
+| `Module.v` | `spike_module`: the WasmCert AST term (the WAT is in a comment) | 48 |
+| `Steps.v` | reusable symbolic-execution layer over `reduce` | 258 |
+| `Instance.v` | instantiation in the empty store, computed and then lifted to the relational `instantiate` | 44 |
+| `Surrogate.v` | proof for export 0 (7 instructions) | 61 |
+| `Count.v` | proof for export 1 (22 instructions, block/loop/br_if/load8_u) | 230 |
+| `Binary.v`, `EmitHex.v` | prints the bytes and proves that parsing them gives the term back | 7 + 4 |
+| `Theorems.v` | the final statements | 50 |
+| `spike.mjs`, `test.mjs` | JS wrapper and Node test | |
+
+## Final theorems (`Theorems.v`)
+
+```coq
+Context `{ho: host}.   (* any host, any Memory implementation *)
+
+Theorem is_surrogate_code_point_correct (hs : host_state) :
+  instantiate empty_store spike_module [] (s0, Build_frame [] inst0, []) /\
+  In {| exportinst_name := String.list_byte_of_string "is_surrogate_code_point";
+        exportinst_val := EV_func 0%N |} inst0.(inst_exports) /\
+  forall s f (cp : i32),
+    s.(s_funcs) = s0.(s_funcs) ->
+    reduce_trans
+      (hs, s, f, [AI_basic (BI_const_num (VAL_int32 cp)); AI_invoke 0%N])
+      (hs, s, f, [AI_basic (BI_const_num (VAL_int32
+         (if is_surrogate_code_point (Z.to_N (Wasm_int.Int32.unsigned cp))
+          then Wasm_int.Int32.one else Wasm_int.Int32.zero)))]).
+
+Theorem count_non_ascii_correct (hs : host_state) :
+  instantiate empty_store spike_module [] (s0, Build_frame [] inst0, []) /\
+  In {| exportinst_name := String.list_byte_of_string "count_non_ascii";
+        exportinst_val := EV_func 1%N |} inst0.(inst_exports) /\
+  In {| exportinst_name := String.list_byte_of_string "memory";
+        exportinst_val := EV_mem 0%N |} inst0.(inst_exports) /\
+  forall s f m (ptr len : i32) (bs : list byte),
+    s.(s_funcs) = s0.(s_funcs) ->
+    List.nth_error s.(s_mems) 0 = Some m ->
+    bytes_at m (Z.to_N (Wasm_int.Int32.unsigned ptr)) bs ->
+    Z.of_nat (List.length bs) = Wasm_int.Int32.unsigned len ->
+    (Wasm_int.Int32.unsigned ptr + Wasm_int.Int32.unsigned len <= Wasm_int.Int32.modulus)%Z ->
+    reduce_trans
+      (hs, s, f, [AI_basic (BI_const_num (VAL_int32 ptr));
+                  AI_basic (BI_const_num (VAL_int32 len)); AI_invoke 1%N])
+      (hs, s, f, [AI_basic (BI_const_num
+                    (VAL_int32 (Wasm_int.Int32.repr (Z.of_nat (count_non_ascii bs)))))]).
+```
+
+`bytes_at m p bs` (in `Count.v`) is a short recursive definition: byte
+`i` of `bs` is at address `p+i` (`mem_lookup` of the memory's data). The
+reviewer should read it together with `Spec.v`.
+
+### What the theorems are about
+
+- **The object is the AST term `spike_module`.** Part 1 is the mechanised
+  relational `instantiate` from the empty store with no imports. It
+  includes `module_typing`, so the module is also proved to validate.
+  `s0` and `inst0` are written out in `Instance.v`. The proof computes the
+  library's executable `interp_instantiate` with `vm_compute` and applies
+  its soundness lemma `interp_instantiate_imp_instantiate`.
+- **The invocation is the configuration** `v_to_e_list args ++
+  [AI_invoke addr]`, under any caller frame `f`. The extracted WasmCert
+  runtime builds the same configuration in `invoke_extern`
+  (`extraction_instance.v`). Export names map to addresses through
+  `inst_exports`, which parts 2 and 3 state.
+- **The starting store is any store whose function list equals `s0`'s.**
+  Memory 0 can be any `m`: any contents and any size, for example after
+  the host wrote the input or grew the memory. Globals and the rest are
+  unconstrained. This is how instantiation and repeated invocation are
+  stated together:
+  - a call returns the *same* store `s`, so memory is unchanged and the
+    function list still matches;
+  - so the precondition holds again for the next call, after any host
+    writes to memory;
+  - a sequence of calls composes with `rt_trans`.
+
+  For the real decoder, the streaming state kept in Wasm memory would be a
+  representation predicate over `m`, like `bytes_at`. Each export's
+  theorem would then take the pre-state predicate to the post-state
+  predicate.
+- **What "reduces to" means.** `reduce_trans` is the reflexive-transitive
+  closure of `reduce`. The theorems say there is a finite reduction to a
+  configuration that is exactly one constant. That shows termination and
+  the correct value. A constant cannot step any further (library lemma
+  `value_no_reduce`).
+  - **Gap:** WasmCert-Coq 2.2.1 has no determinism theorem (I grepped
+    every file in `theories/`). So "never traps on any reduction path" is
+    not formally proved. The semantics is deterministic for host-free code
+    in fact, but closing this gap needs a determinism lemma for the
+    fragment used, or the type-soundness theorems plus determinism. This
+    affects every proof in this style.
+- The theorems hold for every `host` and every `Memory` implementation.
+  These are typeclass parameters, so they are also true of the
+  `Memory_vec` implementation that the extracted interpreter uses.
+- One precondition goes beyond what the spec states: `ptr + len <= 2^32`
+  (no address wraparound). In-bounds plus a 4 GiB memory limit implies it,
+  but the abstract `Memory` class does not promise `mem_length <= 2^32`.
+
+### `Print Assumptions` (the same for both theorems; `Assumptions.v`)
+
+```
+ClassicalDedekindReals.sig_not_dec, ClassicalDedekindReals.sig_forall_dec,
+FunctionalExtensionality.functional_extensionality_dep, Classical_Prop.classic,
+simd_execute.SIMD_ops.app_vunop_str, app_vtestop_str, app_vternop_str,
+app_vshiftop_str, app_vbinop_str      (opaque SIMD functions, as Parameters)
+```
+
+- The classical and reals axioms come from Flocq/CompCert floats, which
+  the numeric definitions use.
+- The `SIMD_ops.*_str` items are **uninterpreted function parameters**
+  that WasmCert uses to delegate SIMD. They are in scope because the
+  `reduce` relation mentions all opcodes.
+- Neither group is used by the instructions in this module, and all of
+  them can be realised (consistent).
+- `spike_bytes_parse_back` and the examples lemma depend on the
+  classical axioms only.
+
+## Trusted or unverified between the theorems and Node
+
+1. **The binary printer** `binary_of_module` (unverified, 690 lines). It
+   is mitigated three ways:
+   - `spike_bytes_parse_back : run_parse_module (binary_of_module
+     spike_module) = Some spike_module` (`vm_compute`, instant). This uses
+     the also-unverified parser, so a printer bug mirrored by a parser bug
+     would get through.
+   - `make crosscheck`: the official OCaml reference interpreter (`wasm
+     -d`, wasm 2.0.2) disassembles the bytes to exactly the expected WAT.
+   - The extracted WasmCert interpreter `wasm_coq_interpreter` runs the
+     six LAWS examples correctly.
+2. **Getting the bytes out.**
+   - `Redirect ... Eval vm_compute in spike_hex` prints a hex string (via
+     the library's `hex_small_no_prefix_of_bytes_compact`).
+   - A one-line `node -e` converts the hex to bytes (in the `Makefile`).
+   - `vm_compute` is also trusted in `Instance.v` and `Binary.v`.
+3. **Faithfulness of WasmCert's `reduce` and `instantiate` to the Wasm 2.0
+   spec.** This is not proved; it has been tested by running the extracted
+   interpreter on the official test suite.
+4. **Node/V8's Wasm engine** correctly running a valid 2.0 module.
+5. **The JS embedding.** The theorem's configuration corresponds to the JS
+   API's `exports.f(x)` through the JS-API spec, including ToInt32 of
+   arguments. The wrapper `spike.mjs` is unverified glue:
+   - `cp | 0` and `>>> 0` for number conversion;
+   - copying the input to offset 0;
+   - `memory.grow` when the input exceeds one page;
+   - `!== 0` for the boolean.
+
+   The preconditions that the wrapper must establish are `bytes_at`,
+   `len = |bs|` and `ptr + len <= 2^32`.
+6. Rocq kernel, CompCert's `Integers`, and the x86_64 CompCert
+   configuration. `Archi.big_endian = false` is used to decode loaded
+   bytes. It is `Global Opaque`, so it had to be made transparent locally.
+
+## Proof size, effort and compile time
+
+- Running the symbolic execution costs about **1.5 lines per
+  instruction**, one `eapply exec_cons; first by apply exec_<instr>.` each:
+  - surrogate body: 8 lines for 7 instructions;
+  - count loop body and function: about 35 lines for 22 instructions.
+- The real cost is elsewhere:
+  - **i32/byte arithmetic:** 25 lines in `Surrogate.v`, about 60 in
+    `Count.v` (`unsigned_repr` side conditions, `ltu`/`eq` against
+    constants, decoding a loaded byte, `add`/`sub` of `repr`);
+  - **the loop invariant:** stating it and re-establishing it took about
+    80 lines (pointer increment without wraparound, `bytes_at` shifting by
+    one, accumulator bookkeeping).
+- Overall, about **4 lines of proof per instruction** after the reusable
+  layer, which is 258 lines in `Steps.v`.
+- `make` from clean takes **11.2 s** wall clock for all 8 files. Each file
+  takes 0.7-1.9 s, and the peak RSS is 0.56 GB. The `vm_compute` checks
+  (instantiation, parse-back) are effectively free.
+
+## Proof approach and whether it scales
+
+Three options were considered:
+
+- **Raw `reduce`.** Every step needs `r_label` with a hand-built `lholed`
+  context, `lfill` equations, `cat` reshuffling, `v_to_e_list` of reversed
+  stacks, and so on. This is unworkable at a few hundred instructions.
+- **Interpreter plus soundness** (`interpreter_ctx.v`, `run_one_step`
+  with a proved soundness theorem). This works for concrete inputs. For
+  universally quantified inputs, the interpreter gets stuck on symbolic
+  booleans (`if ltu cp c then ...`). It also brings fuel and the
+  interpreter's own context data structures into every proof. Its value is
+  in testing.
+- **A small layer of my own over `reduce` (chosen).** It is `Steps.v`:
+  - `steps`, with lifting through value/instruction contexts, labels and
+    frames. All of these come from one generic lemma that maps
+    `clos_refl_trans` through a context.
+  - `exec s f stk bes s' f' stk'`: normal completion of a basic
+    instruction list. The stack is written *top first*, so each
+    instruction rule unifies on `::`.
+  - `exec_br`: the run ends at `br k`.
+  - One rule for `block (loop body)` with a measure-indexed invariant.
+  - One rule for invoking a native function.
+
+  Each instruction rule is 3-4 lines. A store rule
+  (`exec_store_packed`) was added to check that writes fit the same
+  pattern; it does, but it is unused.
+
+**Does it scale to the decoder? Yes, with known infrastructure work
+first.** I estimate 1-2k lines of reusable infrastructure, built up front
+by an agent:
+
+1. **Structured control in general.** `block`/`if`/`loop` with arbitrary
+   label depth: `exec_br` needs to track how many labels it is under, and
+   the rules need to work at any nesting. Block types with results.
+   `br_table` if used. A postcondition-style (wp) form of `exec`, so that
+   the two arms of an `if` can join at one assertion instead of an exact
+   final state.
+2. **Rules for every instruction the decoder uses**, plus a `run`
+   tactic that applies them automatically (one line of Ltac).
+3. **Memory framing.** Separating the input and output regions, and
+   lemmas that a store leaves other addresses' loads unchanged (from
+   `mem_update_lookup_ne`). This is where Iris-Wasm's separation logic
+   would help; doing it by hand on the abstract `Memory` class is tedious
+   but simple.
+4. **An i32 arithmetic library** for the UTF-8 bit operations: masks,
+   shifts, range tests on bytes, and tying `repr`/`unsigned` to `N`/`Z`.
+   I expect this to be the largest and slowest part. In this spike,
+   arithmetic and invariants were already about 70% of the
+   module-specific lines.
+5. A determinism lemma for the instruction fragment, if "does not trap"
+   is required in the strong sense.
+
+No program-logic metatheory (adequacy, step-indexing) is needed, because
+everything is a derived lemma about `reduce`.
+
+**Difficulty for coding agents.** It was low here. About 30 compile-fix
+rounds in total, all with shallow errors:
+
+- mathcomp `%N` means `nat`, not `BinNums.N`;
+- mathcomp `cat` is not `List.app`;
+- `addn` blocks `lia`;
+- named implicit arguments are not accepted after explicit ones;
+- `Archi.big_endian` is opaque;
+- `rewrite` puts side goals in an unexpected order.
+
+The semantics itself held no surprises.
+
+## Pressures toward inefficient code
+
+None forced so far. Two mild ones:
+
+- **Easy-to-prove constructs are tempting.** I wrote `ge_u`/`le_u`/`and`
+  instead of the cheaper `(cp - 0xD800) <u 0x800`, because every bit
+  trick costs an arithmetic lemma. On the real decoder this tempts the
+  agent towards simple comparisons over table lookups or bit tricks.
+- **Wraparound has to be handled.** Proofs must deal with addresses near
+  2^32. The easy way is a precondition, as here.
+
+Byte-at-a-time loads, rather than wide loads, are what the spec style
+suggests. Wide `i32.load`/`i64.load` fast paths would need lemmas about
+`decode_int` over 4 or 8 bytes.
+
+## Corrections and additions to the survey
+
+- opam resolves to **Rocq 9.2.0**, CompCert 3.18, mathcomp 2.6.0.
+- **Build time.** The whole dependency chain took about 25 minutes of
+  successful building at `-j 2`; CompCert 3.18 alone was about 10
+  minutes.
+  - The coq-wasm package step looked short in the opam log, but I could
+    not isolate its time. A separate theories-only rebuild from the clone
+    is recorded in `../JOURNAL.md` (dune, `-j 2`, cache disabled).
+  - Peak per-process RSS was 1.8 GB, far below the README's "at least
+    8 GB".
+- **There is a Debian 13 trap.** With `ocaml-system`, Debian's
+  `libcamlp-streams-ocaml` (pulled in by `apt install opam`) breaks
+  biniou/mdx/elpi. The fix is in `../SETUP.md`.
+- **Confirmed:**
+  - there is no program logic for 2.0, and no Iris dependency;
+  - the parser/printer has no round-trip theorem. The concrete parse-back
+    check by `vm_compute` works, and is instant for this module;
+  - `interp_instantiate` plus its soundness lemma works by `vm_compute`
+    even with the memory/host typeclasses left abstract.
+- **New findings:**
+  - no **determinism** theorem exists (see "What 'reduces to' means");
+  - `Print Assumptions` shows the opaque SIMD function Parameters.
+- The survey's guess of "several thousand lines" for a Hoare/wp layer is
+  pessimistic for the minimum. A working core took 258 lines. The
+  generalisations listed above would take it to about 1-2k.

@@ -1,0 +1,99 @@
+
+=== 1. spec and pure layer are unmodified copies (0s)
+byte-identical
+
+=== 2. build decoder.wasm (rustc, wasm32-unknown-unknown, release) (0s)
+    Finished `release` profile [optimized] target(s) in 0.06s
+-rwxr-xr-x 1 root root 5436 Nov 11 15:17 decoder.wasm
+
+=== 3. re-run Charon + Aeneas (host and wasm32 targets); compare with lean/Decoder (0s)
+generated Lean identical for host and wasm32 translations
+
+=== 4. forbidden constructs in hand-written Lean (6s)
+none (no sorry/admit/axiom/native_decide/implemented_by/extern/bv_decide)
+
+=== 5. build Lean (6s)
+== pure Utf8Laws
+== pure Utf8Bits
+Utf8Bits.lean:42:48: warning: This simp argument is unused:
+  Bool.toNat_true
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [getLsbD_toNat, Bool.toNat_false, UInt8.toNat_ofNat']
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+== pure Utf8Ref
+== pure Utf8Table
+Utf8Table.lean:33:56: warning: This simp argument is unused:
+  and_mask_15
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:33:69: warning: This simp argument is unused:
+  and_mask_7
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:42:43: warning: This simp argument is unused:
+  and_mask_31
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_15, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:42:69: warning: This simp argument is unused:
+  and_mask_7
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:53:43: warning: This simp argument is unused:
+  and_mask_31
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_15, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Utf8Table.lean:53:56: warning: This simp argument is unused:
+  and_mask_15
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_7, and_mask_63]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+== pure Utf8Proofs
+Utf8Proofs.lean:341:33: warning: This simp argument is unused:
+  List.singleton_append
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [h1, ↓reduceIte, List.cons_append]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+== Decoder/Types
+== Decoder/Funs
+== Boundary
+== Proofs
+
+=== 6. axioms (229s)
+== Axioms
+'DecoderProofs.verified' depends on axioms: [propext, Classical.choice, Quot.sound]
+'DecoderProofs.realizes' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Utf8Pure.RefDecoder_correct' depends on axioms: [propext, Classical.choice, Quot.sound]
+
+=== 7. difftest harness (232s)
+inputs 564671, (input,split) runs 6930038, decode_buffer calls 20558487, 75.8 s
+P1 total output: PASS
+P2 per-call output (safe and prompt): PASS
+P3 state persistence / buffer hygiene: PASS
+RESULT: PASS
+
+=== ALL CHECKS PASSED (308s)
+
+real	5m8.258s
+user	6m25.268s
+sys	0m24.885s

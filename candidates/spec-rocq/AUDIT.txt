@@ -1,0 +1,215 @@
+AUDIT: LAWS.bend -> candidates/spec-rocq/Utf8Laws.v
+Started: Wed Nov 11 13:39:32 +07 2026
+Finished: Wed Nov 11 13:49:30 +07 2026 (about 10 minutes; most of it two vm_compute runs)
+
+Overall: no discrepancies found. The translation says the same thing as
+LAWS.bend, apart from the agreed deviations, which were applied correctly.
+Two low-severity concerns are noted below (C1, C2). Neither needs a change
+before building on the file. C3 is informational only.
+
+Method: I compared every item by hand before reading TRANSLATION.txt. I
+compiled the file in a scratch copy (Rocq 9.2, switch wasmcert) and ran
+Compute/vm_compute checks there (scratch:
+/tmp/claude-0/-root-bend-utf8/fb8f45e1-da22-4da9-9708-a429fecde180/scratchpad/audit-rocq/Tests.v,
+Tests2.v). I pinned Bend semantics with `bend base` for U32, U32.is_le/is_ge,
+U32.cmp, Word.cmp, Cmp.is_le/is_ge, Char.to_u32, U32.from_nat, Word.to_nat,
+Word.zero, Bool.to_u32, Maybe.is_some, List.concat, List.append, String,
+Exists, Or and Empty.
+
+======================================================================
+1. ITEM-BY-ITEM TABLE
+======================================================================
+
+LAWS.bend line  name                                   verdict
+  7   Bit8                                             faithful (Rocq tuples nest left, Bend `&` nests right; this makes no difference to meaning)
+  12  bit8_value                                       faithful with agreed deviation (returns byte; bit order verified)
+  19  law bit8_value_sum                               faithful with agreed deviation (stated in N via Byte.to_N; the sum is at most 255, so nothing overflows)
+  41  law bit8_value_word                             faithful with agreed deviation (N_of_digits + Byte.of_N; verified)
+  59  Byte4                                            faithful
+  64  u32_byte4                                        faithful (bit positions verified)
+  75  law u32_byte4_bits                               faithful
+  121 is_surrogate_code_point                          faithful
+  125 law is_surrogate_code_point_examples             faithful (all 6 values checked)
+  139 is_unicode_scalar                                faithful
+  159 one_byte_shape.bits                              faithful with agreed deviation (byte output)
+  169 one_byte_shape                                   faithful
+  182 two_byte_shape.bits                              faithful with agreed deviation
+  193 two_byte_shape                                   faithful
+  206 three_byte_shape.bits                            faithful with agreed deviation
+  218 three_byte_shape                                 faithful
+  231 four_byte_shape.bits                             faithful with agreed deviation
+  244 four_byte_shape                                  faithful
+  255 encoding.four                                    faithful
+  262 encoding.three                                   faithful
+  269 encoding.two                                     faithful
+  276 encoding.if                                      faithful (shapes tried in the order one, two, three, four)
+  283 encoding                                         faithful (checked exhaustively, see 3)
+  288 encodes                                          faithful
+  301 is_valid_sequence                                faithful
+  310 begins_with_scalar                               faithful (seq ++ rest = bytes, same operand order)
+  317 no_valid_sequence                                faithful (forall cp, forall rest, ... -> False)
+  324 law begins_with_scalar_unique                    faithful with agreed deviation (domain is byte lists; see C3)
+  349 is_valid_sequence_prefix                         faithful ([] => False)
+  366 law not_valid_sequence_prefix_extended           faithful with agreed deviation (domain; C3)
+  379 is_prefix                                        faithful (prefix ++ rest = bytes)
+  435 maximal_subpart.longer_not_valid_prefix          faithful (parses as subpart ++ (c :: extra), checked with Set Printing Parentheses)
+  446 maximal_subpart                                  faithful (A /\ (B \/ C) /\ D, same as Bend's right-nested &)
+  457 law maximal_subpart_exists                       faithful with agreed deviation (domain; C3)
+  463 law maximal_subpart_unique                       faithful with agreed deviation (domain; C3)
+  486 code_point_to_string                             faithful with agreed deviation (Text = list U32; the Chr wrapper is dropped)
+  491 replacement_char                                 faithful (U32_of_N 0xFFFD; value 65533 checked)
+  496 replacement_char_string                          faithful
+  516 decodes_first.replaced                           faithful
+  526 decodes_first.scalar                             faithful
+  537 decodes_first.nonempty                           faithful (renamed decodes_first_nonempty_case; the rename is noted in a comment)
+  546 decodes_first                                    faithful ([] => result = None)
+  562 law decodes_first_exists                         faithful with agreed deviation (domain; C3)
+  569 law decodes_first_unique                         faithful with agreed deviation (domain; C3)
+  581 law decodes_first_empty                          faithful
+  589 law decodes_first_nonempty                       faithful with agreed deviation (domain; C3)
+  604 decodes.go                                       faithful (Fixpoint on text; nil case requires decodes_first bytes None)
+  612 decodes                                          faithful (decodes bytes text := decodes_go text bytes)
+  617 law decodes_exists                               faithful with agreed deviation (domain; C3)
+  623 law decodes_unique                               faithful with agreed deviation (domain; C3)
+  631 hex comment                                      faithful (each hex constant evaluated to its decimal value)
+  637 law decodes_examples                             faithful with agreed deviation (hex byte constructors; all 17 conjuncts match, see 3)
+  685-706 stream decoding comments                     faithful with agreed deviation (reworded for Decoder; accurate)
+  714 all_bytes                                        dropped (agreed deviation 1)
+  720 law utf8_decode_buffer_all_bytes                 dropped (agreed deviation 1)
+  739-757 all_buffers_bytes, .head, .tail              dropped (agreed deviation 1)
+  763 feed.prepend                                     faithful (text ++ more)
+  768 feed.then                                        faithful
+  777 feed                                             faithful with agreed deviation (no `valid`; threads state, joins texts in order; checked with a toy decoder)
+  788 decoded_so_far.text                              faithful
+  792 decoded_so_far                                   faithful with agreed deviation (starts from decode_start_state D)
+  798 decoded.text                                     faithful (text ++ decode_done state)
+  802 decoded                                          faithful with agreed deviation
+  813 law utf8_decodes                                 faithful with agreed deviation (decodes (concat buffers) (decoded D buffers))
+  820 is_text_prefix                                   faithful (prefix ++ more = text)
+  830 law utf8_decode_buffer_safe                      faithful with agreed deviation; concern C3 (Bend's `rest` ranges over all U32 lists; this does not change what the law requires)
+  843 law utf8_decode_buffer_prompt                    faithful with agreed deviation (the all_bytes(rest) conjunct is dropped)
+  --  (added) U32, U32_to_N, U32_of_N,                 concern C2 (all correct; they are trusted definitions)
+      U32_is_le, U32_is_ge, Maybe_is_some, Text
+  --  (added) Decoder record                           faithful with agreed deviation 4
+  --  (added) Decoder_correct                          harmless (a conjunction of exactly the three laws, in order)
+  --  Prop instead of Type                             concern C1 (agreed deviation 3; low severity)
+
+======================================================================
+2. DETAILS OF CONCERNS (no DISCREPANCY found)
+======================================================================
+
+C1 (low). Prop allows classical proofs.
+  Bend's Exists, Or and Empty are Type-valued and constructive. In Rocq,
+  Prop `exists` and `\/` are also constructive when no axioms are used. A
+  proof file could still `Require Import Classical` and prove, for example,
+  decodes_exists or maximal_subpart_exists non-constructively. That would
+  not change the truth of these statements: everything involved is
+  decidable on finite lists of bytes. But the proofs could no longer be
+  extracted or computed with, as they can in Bend. Suggestion (optional):
+  run `Print Assumptions` on the final theorems and require "Closed under
+  the global context". This is not a defect in the spec text.
+
+C2 (low). The added stand-ins are trusted definitions.
+  Each one is correct:
+  - U32: one constructor, b0..b31, least significant first. This matches
+    U32{Word(32n)} with WCon storing the least significant bit first.
+  - U32_to_N: the sum of b_i * 2^i (Horner form). Checked: 0x12345678 ->
+    305419896, U32_of_N 1 has only b0 set, 0x80000000 -> 2147483648,
+    2^32-1 -> 4294967295.
+  - U32_of_N: the low 32 bits, so 2^32+5 -> 5. U32_to_N (U32_of_N n) =
+    n mod 2^32 for 11 sample values, including 2^32, 2^32+1 and 2^40+7. It
+    is only applied to literals below 2^32 (0xD800, 0xDFFF, 0x10FFFF,
+    0xFFFD, 65, 66, 72, 169, 8364, 128512, and the examples). So the
+    comment at Utf8Laws.v:69-72 is true.
+  - U32_is_le a b = (a <= b) and U32_is_ge a b = (a >= b), unsigned, with
+    the same argument order as Bend. In Bend, Word.cmp lets the more
+    significant bits decide first, i.e. an unsigned comparison;
+    Cmp.is_le is "not GT" and Cmp.is_ge is "not LT". Checked: le(3,5)=T,
+    le(5,3)=F, le(5,5)=T, ge(3,5)=F, ge(5,3)=T, ge(5,5)=T, and
+    le(0x80000000, 1)=F (unsigned).
+  - Maybe_is_some is the same function as Base's Maybe.is_some.
+  - Text = list U32 matches Bend's String = list of Chr{U32}, with
+    structural equality, "" = [] and ++ = list append.
+
+C3 (informational; this is how agreed deviation 1 restricts the laws).
+  In Bend the byte lists are List<U32>, so every law that quantifies over
+  `bytes`/`more`/`rest` covers lists that contain values > 255. In Rocq
+  these laws cover only byte lists, so they are weaker as written:
+  begins_with_scalar_unique, not_valid_sequence_prefix_extended,
+  maximal_subpart_exists/unique, decodes_first_exists/unique/nonempty,
+  decodes_exists/unique and utf8_decode_buffer_safe.
+  Example: Bend's decodes_exists also asserts that [256] decodes (to one
+  U+FFFD). The Rocq file cannot express that input.
+  This does not affect the decoder:
+  - No value > 255 occurs in any encoding (bit8_value is < 256), so such
+    a value behaves exactly like 0xFF. Neither can appear in any valid
+    sequence or valid sequence prefix.
+  - Replacing each value > 255 with 0xFF therefore leaves every
+    begins_with_scalar, maximal_subpart and decodes fact unchanged.
+  - So Bend's utf8_decode_buffer_safe with an arbitrary U32 `rest` holds
+    exactly when it holds for byte `rest`, and the decoder's buffers are
+    bytes in both versions.
+  The prompt law's dropped all_bytes(rest) conjunct is automatically true
+  for `list byte`, so that law is unchanged. TRANSLATION.txt section 5
+  states the same about the safe law. I agree with it.
+
+======================================================================
+3. EVALUATION EVIDENCE (Compute / vm_compute in scratch)
+======================================================================
+
+- Byte.of_bits (Corelib.Init.Byte) takes the least significant bit first:
+  (true,...,true,false) = 127. bit8_value, which takes the most
+  significant bit first:
+    10000000 = x80, 00000001 = x01, 11000000 = xc0, 00010010 = x12,
+    10110001 = 177.
+  A reversal would have turned x80 into x01.
+- Ascii.N_of_digits reads the list least significant bit first ([true;
+  false x7] = 1). Byte.of_N 256 = None. Byte.of_N is a match table,
+  separate from of_bits, so bit8_value_word remains an independent check.
+- u32_byte4 (U32_of_N 0x12345678), with bit8_value applied to each byte,
+  gives (x12, x34, x56, x78). u32_byte4 (U32_of_N 0x80000001) gives a
+  first byte (true, false x7) and a last byte (false x7, true).
+- encoding agrees with an independent N-arithmetic reference encoder for
+  EVERY value 0 .. 0x20FFFF (vm_compute, 2162688 values). For example,
+  0x7F, 0x80, 0x7FF, 0x800, 0xFFFF, 0x10000, 0x10FFFF and 0x1FFFFF give
+  the expected 1-4 bytes, and 0x200000.. give None. It also agrees on
+  0x3FFFFF, 0x400000, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF and 0x12345678
+  (all None).
+- is_unicode_scalar agrees with a reference (n <= 0x10FFFF and not in
+  D800..DFFF) for every value 0 .. 0x11FFFF, and is false for 0xFFFFFFFF.
+  is_surrogate_code_point on 0, D7FF, D800, DC00, DFFF, E000 gives
+  F, F, T, T, T, F, matching the examples law.
+- The hex constants x41 ... xff in decodes_examples evaluate to 65, 66,
+  72, 128, 130, 144, 152, 159, 160, 169, 172, 192, 194, 224, 226, 237,
+  240, 244 and 255. Every byte list and expected text in the 17 conjuncts
+  matches LAWS.bend 639-680, including the order and number of
+  replacement characters (1, 2, 1, 1, 3, 3, 4 where they occur) and the
+  "H" ++ U+00A9 ++ U+FFFD order.
+- feed / decoded / decoded_so_far, run on a toy Decoder whose state
+  counts the buffers: for buffers [[x41];[x41;x42];[]] the output is
+  [11;22;30] so far and [11;22;30;1003] with decode_done. This confirms
+  the state is threaded, the texts are joined in order, decode_done is
+  appended last, and the run starts from decode_start_state.
+- Precedence: `subpart ++ c :: extra` prints as `subpart ++ (c :: extra)`.
+- The file has no Axiom, Parameter, Variable, Hypothesis, Admitted or
+  proof. The translation compiles cleanly.
+
+======================================================================
+4. CHECK OF TRANSLATION.txt CLAIMS
+======================================================================
+
+All claims I checked are accurate:
+- the imports;
+- "no Axiom/Parameter/...";
+- the representation of U32;
+- U32_of_N wraps modulo 2^32;
+- D2: no overflow;
+- D3: of_bits and of_N are separate tables;
+- D5: the hex table;
+- D8: the character literals;
+- section 5's note on the safe law;
+- section 6's encoding and scalar values (they agree with my exhaustive
+  runs).
+
+Nothing was changed beyond the agreed deviations and the listed additions.
+All comments in Utf8Laws.v are true of the Rocq text.

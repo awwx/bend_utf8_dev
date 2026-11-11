@@ -1,0 +1,185 @@
+AUDIT: /root/bend/utf8/candidates/spec-lean/Utf8Laws.lean
+   vs. /root/bend/utf8/LAWS.bend (Bend 2.0.40)
+
+Start: Wed Nov 11 13:38:38 +07 2026
+End:   Wed Nov 11 13:42:24 +07 2026  (about 4 minutes)
+
+OVERALL VERDICT: safe to build on as is.  No discrepancies found.  Two
+low-severity concerns and one correction to TRANSLATION.txt are below;
+none of them needs a change to the spec.
+
+Method: I compared each item by hand first, then read TRANSLATION.txt.
+Bend semantics come from `bend base` (U32, Word, Word.to_nat, Word.cmp,
+U32.cmp/is_ge/is_le, Cmp.is_ge, Char, String, List.append, List.concat,
+Maybe.is_some, Bool.to_u32).  The Lean file was compiled unmodified
+(as a copy) with leanprover/lean4:v4.35.0 and v4.36.0-rc2; both are
+clean.  Evaluations are in the scratch files T.lean, T2.lean and T3.lean
+under /tmp/claude-0/-root-bend-utf8/fb8f45e1-da22-4da9-9708-a429fecde180/scratchpad/audit-lean/
+
+ITEM TABLE
+LAWS.bend line | name                                   | verdict
+---------------+----------------------------------------+------------------------------------------
+  7            | Bit8                                   | faithful
+ 12            | bit8_value                             | faithful with agreed deviation (returns UInt8)
+ 19            | bit8_value_sum                         | faithful with agreed deviation (UInt8 sum; max 255, no wrap)
+ 41            | bit8_value_word                        | faithful; concern C1 (low)
+ 59            | Byte4                                  | faithful
+ 64            | u32_byte4                              | faithful
+ 75            | u32_byte4_bits                         | faithful
+121            | is_surrogate_code_point                | faithful (unsigned comparison on both sides)
+125            | is_surrogate_code_point_examples       | faithful
+139            | is_unicode_scalar                      | faithful
+159/169        | one_byte_shape(.bits)                  | faithful with agreed deviation (Option UInt8)
+182/193        | two_byte_shape(.bits)                  | faithful with agreed deviation
+206/218        | three_byte_shape(.bits)                | faithful with agreed deviation
+231/244        | four_byte_shape(.bits)                 | faithful with agreed deviation
+255-284        | encoding.four/three/two/if, encoding   | faithful (same order: 1, 2, 3, 4 bytes)
+288            | encodes                                | faithful
+301            | is_valid_sequence                      | faithful
+310            | begins_with_scalar                     | faithful
+317            | no_valid_sequence                      | faithful
+324            | begins_with_scalar_unique              | faithful with agreed deviation (domain, see N1)
+349            | is_valid_sequence_prefix               | faithful ([] -> False)
+366            | not_valid_sequence_prefix_extended     | faithful
+379            | is_prefix                              | faithful (param renamed pre; order kept)
+435            | maximal_subpart.longer_not_valid_prefix| faithful (`subpart ++ c :: extra` parses as subpart ++ (c :: extra), checked)
+446            | maximal_subpart                        | faithful
+457            | maximal_subpart_exists                 | faithful
+463            | maximal_subpart_unique                 | faithful
+486            | code_point_to_string                   | faithful with agreed deviation ([cp])
+491            | replacement_char                       | faithful (0xFFFD = 65533)
+496            | replacement_char_string                | faithful
+516            | decodes_first.replaced                 | faithful
+526            | decodes_first.scalar                   | faithful
+537            | decodes_first.nonempty                 | faithful
+546            | decodes_first                          | faithful ([] -> result = none)
+562            | decodes_first_exists                   | faithful
+569            | decodes_first_unique                   | faithful
+581            | decodes_first_empty                    | faithful
+589            | decodes_first_nonempty                 | faithful
+604            | decodes.go                             | faithful (text first; nil case = decodes_first bytes none)
+612            | decodes                                | faithful (decodes bytes text = decodes.go text bytes)
+617            | decodes_exists                         | faithful
+623            | decodes_unique                         | faithful
+637            | decodes_examples                       | faithful (17 conjuncts, same order, bytes and texts identical)
+685-694        | UTF8.* description                     | faithful with agreed deviation (structure Decoder)
+714            | all_bytes                              | dropped, agreed deviation
+720            | utf8_decode_buffer_all_bytes           | dropped, agreed deviation
+739-757        | all_buffers_bytes(.head/.tail)         | dropped, agreed deviation
+763            | feed.prepend                           | faithful (text ++ more)
+768            | feed.then                              | faithful
+777            | feed                                   | faithful with agreed deviation (valid dropped)
+788/792        | decoded_so_far(.text)                  | faithful (start state D.start)
+798/802        | decoded(.text)                         | faithful (text ++ decode_done state)
+813            | utf8_decodes                           | faithful (List.flatten = Bend List.concat)
+820            | is_text_prefix                         | faithful
+830            | utf8_decode_buffer_safe                | faithful with agreed deviation (see N1)
+843            | utf8_decode_buffer_prompt              | faithful with agreed deviation (all_bytes(rest) dropped)
+ --            | Text (abbrev), Decoder.Correct         | added, agreed (deviations 2 and 4)
+ --            | comments                               | no false comments found; concern C2 (info)
+
+DETAILS
+
+Bits (bit8_value, u32_byte4, the *_shape.bits patterns)
+  Bend: Word.to_nat treats the first WCon as the least significant bit
+  (WCon{True, t} -> 1 + 2*to_nat(t)).  bit8_value puts b0 first, so b7
+  is the most significant bit.  u32_byte4 matches WCon{b0, ..., b31} and
+  returns (b31..b24), ..., (b7..b0).
+  Lean: BitVec.ofBoolListLE : (bs : List Bool) -> BitVec bs.length, with
+  the least significant bit first.  getLsbD i is bit i counted from the
+  least significant bit.  Evaluated:
+    bit8_value (1,0,0,0,0,0,0,0) = 128; (0,...,0,1) = 1;
+      (1,0,1,1,0,0,0,1) = 177
+    bit8_value_sum and bit8_value_word: proved by `decide` over all 256 inputs
+    u32_byte4 0x12345678 = 00010010 00110100 01010110 01111000
+    u32_byte4 1 -> only the last bool is true; 0x80000000 -> only the first
+    u32_byte4_bits applied to [b0=1, b30=1, b31=1, others 0] gives
+      first byte (1,1,0,0,0,0,0,0) and the last bool 1; the built UInt32 is
+      0xC0000001
+    the mapping between u32_byte4 and ofBoolListLE checked on 1, 2,
+      0x80000000, 0x12345678, 0xDEADBEEF, 0x0F0F00FF, 0xC0000001, 0x7FFFFFFE
+  Every shape pattern was compared position by position: which positions
+  must be false, and which variable goes to which output bit.  They are
+  identical to the Bend text.  Shapes evaluated: two_byte_shape 0 = C0 80,
+  three_byte_shape 0 = E0 80 80, four_byte_shape 0x20AC = F0 82 82 AC.
+
+Encoding
+  encoding evaluated at 0, 41, 7F, 80, A9, 7FF, 800, 20AC, D800, FFFF,
+  10000, 1F600, 10FFFF, 110000, 1FFFFF (= F7 BF BF BF), 200000 (none),
+  and FFFFFFFF (none).  For every scalar 0..0x10FFFF (exhaustive),
+  `encoding` equals Lean's String.utf8EncodeChar, with 0 mismatches.
+
+Comparisons
+  Bend's U32.is_ge/is_le go through Word.cmp, which compares the higher
+  bits first: an unsigned comparison.  Lean's UInt32 order is the
+  unsigned order on toNat.  Evaluated: is_surrogate / is_unicode_scalar
+  at 0, D7FF, D800, DFFF, E000, 10FFFF, 110000, 0x80000000 and FFFFFFFF
+  are all as expected (0x80000000 and FFFFFFFF are not scalars).
+
+decodes_examples
+  Every byte list and expected text matches LAWS.bend.  ("AB" = [65,66],
+  "A" = [65], "H" = [72], "" = [].  The replacement counts are 1,2,1,1,1,
+  1,1,1,3,3,4 in the same places.)  I also checked the expected texts with
+  Python's bytes.decode('utf-8', 'replace'), which implements maximal
+  subpart substitution.  All 17 agree, so the original examples are
+  correct as well.
+
+Streaming
+  Toy decoders were evaluated.  With State = Nat, start = 0,
+  decode_buffer s b = (s+1, [10s + |b|]) and decode_done s = [900+s]:
+    decoded [[1],[2,3],[4,5,6]] = [1,12,23,903]
+    decoded_so_far the same buffers = [1,12,23]
+    decoded [] = [900]
+  This confirms that the state is passed along in order, that the texts
+  are joined in call order, and that the done text comes last.  A decoder
+  with start = 7 shows that D.start is the state used.  Decoder field
+  argument order is (state, buffer), as in Bend.  The quantifiers of the
+  three laws match the Bend laws once `valid` and `all_bytes(rest)` are
+  removed: safe is buffers, rest, full; prompt is buffers, c, exists
+  rest, exists full.
+
+C1 (concern, low): bit8_value_word is close to definitional in Lean.
+  bit8_value is UInt8.ofBitVec (ofBoolListLE [b0..b7]), and the law
+  compares that with UInt8.ofNat (ofBoolListLE [b0..b7]).toNat.  So
+  in Lean the "independent check" checks little beyond ofBitVec =
+  ofNat . toNat.  Bend's version is similarly shallow: the same WCon
+  chain, checked against Word.to_nat.  The independent content in both
+  is bit8_value_sum, which is arithmetic and which `decide` proves in
+  Lean.  If ofBoolListLE were MSB-first, bit8_value_sum would be false.
+  No change needed.
+
+C2 (info): Lean's OfNat UInt8 wraps silently: (300 : UInt8) = 44.
+  Every byte literal in the file is at most 255, so nothing is affected
+  today.  Anyone editing the examples later should watch for it.
+
+N1 (agreed deviation 1, effect on meaning; corrects TRANSLATION.txt)
+  Bend quantifies its byte lists over all U32 values.  This applies to
+  begins_with_scalar_unique, maximal_subpart_*, decodes_first_*,
+  decodes_exists/unique, and `rest` in utf8_decode_buffer_safe, which has
+  no all_bytes guard.  Lean quantifies over UInt8 lists, so these laws
+  are formally weaker.  TRANSLATION.txt says the safe law is "weaker than
+  Bend's, but only outside the byte domain".  In substance it is not
+  weaker.  A value v > 255 never appears in any encoding: lead bytes are
+  at most F7 and continuation bytes at most BF.  So a list beginning with
+  v has no valid sequence at the front, and no valid sequence prefix
+  contains v.  Every Bend definition therefore treats v exactly as it
+  treats 0xFF.  Replacing each value > 255 by 0xFF keeps decodes(bytes,
+  text) unchanged, so each Bend law over U32 lists follows from its
+  byte-list version.  No meaning relevant to the decoder is lost.  The
+  prompt law needs no such argument, since Bend already restricted rest
+  to bytes there.
+
+TRANSLATION.txt claims checked
+  - Compiles on 4.35.0 and 4.36.0-rc2: confirmed.
+  - No theorem, sorry or axiom: confirmed.  #print axioms
+    decodes_examples gives only propext and Quot.sound.
+  - The map of names and lines and the list of dropped items: confirmed.
+  - The self-check values (encodings, shapes, u32_byte4 0x12345678):
+    those I recomputed agree.
+  - "safe law weaker": formally true, substantively not (see N1).
+  - "prompt with non-scalar c is trivially satisfied": true, since
+    decodes only outputs scalars and U+FFFD.
+
+Nothing else was added beyond Text, Decoder, Decoder.Correct and the
+explanatory comments.  Every comment I checked is accurate for the Lean
+text.

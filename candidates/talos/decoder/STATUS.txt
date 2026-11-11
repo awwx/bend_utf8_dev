@@ -1,0 +1,84 @@
+STATUS of candidates/talos/decoder (Talos candidate, 60-minute time box)
+
+RUNNING IMPLEMENTATION
+  decoder.wat -> decoder.wasm (880 bytes, Wasm 1.0 + multi-value results, linear
+  memory only).  decoder.mjs passes the full difftest harness
+  (node ../../difftest/run.mjs decoder.mjs: P1/P2/P3 PASS, about 2 minutes).
+
+BOUNDARY STATEMENT
+  Boundary.lean: textBytes (u32le layout), bytesAt, sameOutside, storeWith
+  (initial store = Talos initialStore with arbitrary memory, pages <= 65536),
+  Calls, StartOk / BufferOk / DoneOk, Realizes, ShippedModuleCorrect.
+  Not changed during the work.  One known issue: BufferLayout allows the output
+  area to end exactly at 2^32 (only possible with 65536 pages); the loop proof
+  below assumes out + 8*len < 2^32.  Either prove the wrap-around case (the
+  claim stays true because UInt32.ofNat wraps the same way) or tighten
+  BufferLayout to `< 2^32` and record it.
+
+PROVED (no sorry, axioms propext / Classical.choice / Quot.sound; see Axioms.lean)
+  - decoderModule_decodes: Talos's decodeForVerification on the printed text of
+    the shipped bytes = the literal `decoderModule` (kernel `cbv`).
+  - start_ok: decode_start_state returns 0 (= enc []), store unchanged.  This is
+    already exactly Boundary's StartOk shape with R := Rel.
+  - done_runs: decode_done(v, out): v = 0 -> returns out, store unchanged;
+    v != 0 -> writes 0xFFFD (write32) at out, returns 4 + out.
+  - buffer_runs: decode_buffer(v, inp, len, out), under the layout contract
+    (plus out + 8*len < 2^32), terminates without trapping and returns
+    (runM ...).1 / .2.1 with final store storeWith (runM ...).2.2, where runM is
+    a Wasm-level model: a left fold over bytesAt mem inp len of stepM.
+  - Call lemmas (any caller context) for every function: call_cont,
+    call_second, call_vs, call_vsp, call_cp (pure helpers, against Bool/UInt32
+    models contB, secondB, vsB, vspB, cpV), call_step0 / call_step ($step with
+    its memory writes, against stepM / writeCps / endAddr), loop_correct.
+  - stepM_nil (ProofModel.lean): the per-byte refinement for the empty-pending
+    case:  stepM 0 x.toUInt32 = (enc (step [] x).1, (step [] x).2).
+    Also in ProofModel.lean: or_shl_toNat (packing as a Nat sum), bytes_of_toNat
+    (by1..by4 extract the bytes of a packed word), contB_eq (= isCont),
+    secondB_eq (= secondOk): the byte-level lemmas the other cases need.
+  - Imported unmodified: Utf8Pure.RefDecoder_correct.
+
+NOT PROVED (exact missing statements)
+  1. Model refinement (pure, no Wasm):
+       for p : List UInt8 with 1 <= p.length <= 3 and b : UInt8 (p = [] is done),
+         stepM (enc p) b.toUInt32 = (enc (step p b).1, (step p b).2)
+       and (step p b).1.length <= 3.
+     Still needs: (qOf (enc p) b).toNat and (enc p).toNat as Nat sums (from
+     or_shl_toNat), nOf (enc p) = p.length, the new-state equation
+     q ||| (m <<< 24) = enc (p ++ [b]), and vsB/vspB/cpV of a packed word =
+     isVS/isVSP/cpOf for lengths 2..4 (bytes_of_toNat + secondB_eq + contB_eq
+     reduce these to Bool goals over byte ranges, which still need closing);
+     then the case analysis of step as in stepM_nil.
+  2. runM v out mem bs = (enc s', endAddr out t, writeCps mem out t) where
+     (s', t) = decodeBuffer s bs and v = enc s  (induction using 1);
+     endAddr out t = ofNat (out + 4*|t|) (have endAddr_toNat);
+     bytesAt (writeCps mem out t) out (4*|t|) = textBytes t and
+     sameOutside mem (writeCps mem out t) out (4*|t|)  (write32 lemmas);
+     t.length <= 2 * bs.length  (from stepM_len, already proved).
+  3. decode_done: enc s = 0 <-> s = [] (enc_eq_zero, proved) and the write32 layout
+     lemma, to get DoneOk.
+  4. Assembly: Realizes decoderModule RefDecoder with R := Rel, the 2^32 edge case
+     (see above), then ShippedModuleCorrect by rewriting with
+     decoderModule_decodes and RefDecoder_correct.
+
+NEXT STEPS
+  1 (bit/byte lemmas), then 2-4 in that order.  No further Wasm-semantics work is
+  needed: everything left is pure Lean about UInt32/UInt8/Mem.write32.
+
+ESTIMATE OF REMAINING WORK
+  About 1.5-2.5 hours for an agent: 1 is the bulk (vsB/vspB/cpV of a packed
+  word = isVS/isVSP/cpOf for lengths 2..4 -- a draft got down to closing Bool
+  goals over byte ranges, where `decide +revert` / generalize tactics fought
+  me; then the three non-empty pending cases of stepM), 2-3 about 45 minutes,
+  4 about 15 minutes.
+
+FILES
+  decoder.wat decoder.wasm decoder.printed.wat decoder.mjs   implementation
+  Boundary.lean                                              reviewable statement
+  DecoderModule.lean  module literal + kernel decode theorem
+  ProofMach.lean      Reach, wstep/wauto/wcalls symbolic execution machinery
+  ProofFuncs.lean     helper call lemmas     ProofStep.lean  $step call lemma
+  ProofLoop.lean      loop                   ProofBuffer.lean decode_buffer export
+  ProofDone.lean      enc / Rel, decode_start_state, decode_done
+  ProofModel.lean     model refinement (empty-pending case only)
+  Axioms.lean         #print axioms          check.sh        full re-check
+  Utf8*.lean          byte-identical copies of spec-lean / pure-lean

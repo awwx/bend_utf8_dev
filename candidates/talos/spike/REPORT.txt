@@ -1,0 +1,209 @@
+# Talos spike: report
+
+Outcome: **done**. (a), (b) and (c) are fully proved, with no `sorry` and no new axioms.
+Probes (d)(i) and (d)(ii) are both stated and also proved; (ii) is proved only for one concrete
+input and under a hand-written model of the builtin. Spike work took 12 minutes after setup
+(12:00:48 to 12:12), plus the write-up.
+
+Files (all in `spike/`): `spike.wat` (source), `spike.wasm` (157 bytes, what Node runs),
+`spike.printed.wat` (`wasm-tools print spike.wasm`), `Spike.lean` (spec, proofs, end-to-end theorem),
+`Probe.lean` + `gc.printed.wat` (probe ii), `spike.mjs`, `test.mjs`, `check.sh`, `lean-toolchain`.
+User projects do not have to live anywhere in particular. `Spike.lean` is checked with plain `lean`
+and the interpreter package's `LEAN_PATH`, outside the repo.
+
+## 1. Final theorems
+
+```lean
+def isSurrogateCodePoint (cp : UInt32) : Bool := decide (0xD800 ≤ cp) && decide (cp ≤ 0xDFFF)
+theorem isSurrogateCodePoint_examples :            -- the six LAWS.bend examples, by `decide`
+  isSurrogateCodePoint 0x0000 = false ∧ isSurrogateCodePoint 0xD7FF = false ∧
+  isSurrogateCodePoint 0xD800 = true ∧ isSurrogateCodePoint 0xDC00 = true ∧
+  isSurrogateCodePoint 0xDFFF = true ∧ isSurrogateCodePoint 0xE000 = false
+
+def countNonAscii : List UInt8 → Nat
+  | [] => 0 | b :: bs => (if 0x80 ≤ b then 1 else 0) + countNonAscii bs
+def bytesAt (bytes : Nat → UInt8) (ptr len : Nat) : List UInt8 := (List.range len).map fun i => bytes (ptr + i)
+def boolI32 (b : Bool) : UInt32 := if b then 1 else 0
+abbrev env : HostEnv Unit := {}                     -- the module has no imports
+
+theorem spike_correct (m : Module)
+    (hm : Decoder.Wat.decodeForVerification printedWat = .ok m) :
+    (∀ cp : UInt32,
+      RunsExportWith env m "is_surrogate_code_point" (ExportCall.ofHost m () [.i32 cp])
+        (fun r => r.values = [.i32 (boolI32 (isSurrogateCodePoint cp))])) ∧
+    (∀ (bytes : Nat → UInt8) (pages : Nat) (ptr len : UInt32),
+      pages ≤ 65536 → ptr.toNat + len.toNat ≤ pages * 65536 →
+      let initial : Store Unit := { m.initialStore with mem := { pages, bytes } }
+      RunsExportWith env m "count_non_ascii"
+        { ExportCall.ofHost m () [.i32 ptr, .i32 len] with initial }
+        (fun r => r.values = [.i32 (UInt32.ofNat (countNonAscii (bytesAt bytes ptr.toNat len.toNat)))] ∧
+                  r.final = initial))
+```
+`printedWat := include_str "spike.printed.wat"`. Lemmas it is built from:
+`spikeModule_decodes`, `is_surrogate_code_point_correct` and `count_non_ascii_correct`,
+which are stated for the literal `spikeModule`.
+
+**What they are about.**
+- `RunsExportWith env m op call post` is Talos's export-call predicate (`Host/Run.lean`).
+  It takes the export by name, checks the argument count and types against the signature, builds
+  the entry configuration (`startExportConfig?`), and asserts `SmallStep.TerminatesWith`.
+  That means there exists a finite trace of the relational small-step `Step` relation that ends
+  in `.done values`, and `post` holds of the values and the final Wasm `Store`. This is
+  **total correctness**: the call terminates and does not trap. The repo also proves
+  `steps_done_deterministic` and `RunsExportWith.deterministic`, so no other run of the same
+  call can end in a different result (WasmCert-Coq lacked such a theorem).
+- **Semantics layer: the new one.** It is the small-step `SmallStep.Step` relation, with
+  `stepChecked?` proved sound and complete against it. It is not the old fuel-bounded big-step
+  `run`, which is still present in `Semantics.lean` (2,264+ lines, and SmallStep imports it for
+  helpers). It is also not the iris-lean layer, which lives in CodeLib and gives only partial
+  correctness.
+- **Initial state and instantiation.** Instantiation is not modelled as a process with a
+  theorem. `ExportCall.initial` is a store the specification supplies. Here it is
+  `Module.initialStore` (Talos's function that allocates memory and globals and applies active
+  data and element segments). For (b) the memory is replaced by an arbitrary one:
+  any page count up to 65536 and any contents (a total function `Nat → UInt8`).
+  `initialStore` skips the start function and store-dependent segment offsets, which the
+  instantiation code (`runConstGlobals`, `runActiveSegments`) handles; this module has neither.
+  Imports would be bound positionally through `HostEnv`; this module has none.
+- Memory unchanged: `r.final = initial` is equality of the whole Wasm store, which is stronger than "memory unchanged".
+
+## 2. Trusted chain from theorem to Node
+
+```
+spike.wat --wasm-tools parse--> --wasm-tools strip --all--> spike.wasm   (Node runs this)
+spike.wasm --wasm-tools print--> spike.printed.wat --include_str--> printedWat
+printedWat --decodeForVerification, evaluated in the kernel (cbv)--> m    (spike_correct quantifies over m)
+```
+Trusted or unverified pieces:
+1. **`wasm-tools print` 1.251.0** (bytes to text). `check.sh` re-runs it and fails if
+   `spike.printed.wat` is stale. The `.wat` source and `wasm-tools parse` are *not* trusted,
+   because the chain starts from the shipped bytes.
+2. **Talos's WAT decoder** (`Decoder/Wat.lean`, about 3,400 lines). Its *execution* is not
+   trusted: `spikeModule_decodes` is checked by the kernel. Its *meaning* is trusted: nothing
+   proves that it follows the Wasm text-format spec. One pitfall: `Decoder.Wat.decode`
+   silently replaces unsupported instructions with `unreachable`. `decodeForVerification`
+   (used here) rejects them.
+3. **Talos semantics ≡ the Wasm spec** (and ≡ V8). The semantics is hand-written. It is tested
+   (testsuite report: 64,740 pass, 0 fail, 357 skipped) and differentially tested against V8 in CI,
+   but it is not generated from SpecTec and has no theorem linking it to the spec.
+4. **`Module.initialStore` ≡ the JS-API instantiation** for this module, and the export-call
+   boundary (`startExportConfig?`) ≡ the JS-to-Wasm call (ToInt32 of a JS number, etc.).
+5. **No validation in the theorem.** The decoder does not type-check. `wasm-tools validate`
+   (in `check.sh`) and V8 do. Talos has `Validate.lean`, which this spike does not use.
+6. **`spike.mjs`** (unverified): `cp | 0`, `!== 0`, copying into memory at offset 0,
+   `memory.grow` so that `ptr + len <= pages*65536`, `>>> 0` on the result.
+7. Lean kernel, `include_str` (reads the file at elaboration time), and the `kernel_decoder` / `cbv`
+   machinery. That machinery is proof-producing, so the kernel checks its output.
+   The `spikeWat%` elaborator (a copy of `watModule%`) is **not** trusted, because the kernel theorem
+   re-derives its output.
+
+## 3. Axioms
+`#print axioms` for `spike_correct`, `spikeModule_decodes`, `is_surrogate_code_point_correct`,
+`count_non_ascii_correct`, `count_twice`, and `Probe.hello_spec`: `[propext, Classical.choice, Quot.sound]`.
+For `isSurrogateCodePoint_examples` it prints none. So there is no `sorryAx`, no `native_decide`
+(`Lean.ofReduceBool`) and no custom axiom on the path. A grep of the 14 interpreter files on the
+path finds no `sorry`, no `axiom`, no `implemented_by` and no `@[extern]`.
+Elsewhere in the repo: CodeLib's `IEEE32.Exec` declares float "bridge axioms" (not imported here),
+and `Mergesort` has documented `sorry`s.
+
+## 4. Proof size and times
+- (a) 7 instructions: 18 lines, about 2.5 lines per instruction. The symbolic run is
+  `runSteps_values_terminates (fuel := 20) (by rfl)`. The kernel reduces the symbolic `if` terms,
+  and one case-split lemma maps them to the spec.
+- (b) 21 instructions (19 in the loop): about 145 lines, about 7 lines per instruction. That includes
+  about 25 lines restating the loop body, the control frames and the entry config, and about 40 lines
+  of UInt32/Nat arithmetic (wrap-around at `ptr+len = 2^32`, `l-1`, the count step).
+- Decode link 6 lines; end-to-end theorem 17 lines; two-call probe 20 lines.
+- Checking `Spike.lean` takes 27.9 s wall and 1.9 GB RSS. **20.5 s of that is the kernel-checked `cbv`
+  decode of a 157-byte module.** The step proofs take about 5 s together. `Probe.lean`: 8 s.
+
+## 5. Automation used
+- `wasm_steps [ctor, ...]` (a macro that just chains `Steps.cons`): you name every `Step`
+  constructor by hand. Side conditions take `rfl`, `simpa using h` or `decide`.
+  `Step.eqz`/`geU` take an equation argument (`.eqz rfl`) but `Step.add` does not.
+  This is inconsistent but the errors are clear. Writing it worked first time once the shapes were known.
+- `runSteps n cfg` with `rfl` for straight-line code on symbolic inputs. It cannot cross a branch
+  on a symbolic value (`br_if len`, the bounds check in `load8U`), so loops need explicit steps.
+- `cbv` with `kernel_decoder` for the decoder (kernel-checked but slow) and for probe (ii).
+- The WP layer (`Wp/*`, `wp_run`) and the iris-lean WP (CodeLib) were **not** used. The repo's own
+  CLAUDE.md says the examples don't use `wp_run`. For a decoder, iris-lean WP would give only
+  partial correctness, so the termination proof would have to be done separately.
+- The awkward points were all about term shapes: `i32.add` puts `rhs + lhs` (`1 + p`, not `p + 1`, so the
+  goal was not defeq and the unification error was huge), and a metavariable entry config hit
+  `maxRecDepth` (fixed by writing the config out). About 12 compile/fix rounds.
+
+## 6. API stability and documentation
+- README: "**Work in progress.** ... APIs and proof interfaces may change."
+- AGENTS.md and CLAUDE.md disagree. AGENTS.md forbids `native_decide`/`bv_decide`, while CLAUDE.md
+  tells you to use `native_decide` for concrete checks. Both describe the semantics as a
+  "fuel-bounded big-step interpreter" in the Architecture section, while the same files' Examples
+  section (and the code) use SmallStep. AGENTS.md on `main` still carries the "`iris` branch only,
+  temporary" notice.
+- The examples and `Host/Run.lean` docstrings matched the code and were the useful documentation.
+  `ExportCall`, `RunsExportWith` and `TerminatesWith` behaved as their documentation says.
+
+## 7. Probes
+- **(i) Several calls on one store: yes.** `ExportReturn.final` is the post-call `Store` (memory,
+  globals, tables, GC heap, host state), and it can be fed to the next `ExportCall`. `TwoCalls`
+  nests two `RunsExportWith`. `count_twice` (proved, 20 lines) composes two calls through
+  `TerminatesWith.mono`. A decoder state kept in linear memory or globals would be carried over the
+  same way. The runtime half of the `MachineStore` (instance list) is rebuilt on each call.
+  That is right for one module but would need checking for linked modules.
+- **(ii) GC `(array (mut i16))` + `wasm:js-string.fromCharCodeArray`: representable.**
+  `decodeForVerification` accepts the module (type, import, `array.new_fixed`, `ref null 0`
+  locals). Node 26 runs it with `{builtins: ['js-string']}` and returns `"hi"`. Talos has no model of
+  JS strings or builtins. I wrote a `HostFn JsHost` (about 20 lines): it reads `gcHeap[a]` and the
+  `[start, end)` elements, appends the UTF-16 units to a host-state list `strings`, and returns
+  `externref (some index)`. Its RangeError/TypeError cases are traps. `hello_spec` is proved by `cbv`:
+  `RunsExportWith jsEnv gcModule "hello" ... (fun r => ∃ i, r.values = [.externref (some i)] ∧ r.final.host.strings[i]? = some [104, 105])`.
+  So the theorem is relative to **my model of the builtin, which is trusted**, and it states the
+  string's contents through host state. JS-side identity of the `externref` and the
+  `compile(..., {builtins})` import-resolution rules are outside the model. A contract-style
+  `HostSpec` (a relation rather than one implementation) is also available in the repo.
+
+## 8. Does this scale to a decoder of a few hundred instructions?
+- **Semantics coverage: yes** (loops, `br_table`, nested blocks, all loads and stores, GC, multi-value).
+  `Mem` is a total function `Nat → UInt8`, which keeps reasoning about writes simple
+  (`write8` is a pointwise `if`).
+- **Proof effort:** the explicit-trace style costs about 7 lines per instruction on a loop path, and
+  every path through nested control flow needs its own trace and frame stack written out. For about
+  300 instructions with many paths, expect thousands of lines unless lemmas are factored per basic
+  block. The repo's compiled-Rust examples are large for this reason (HexDecodeStdio supporting proofs
+  about 31k lines, Mergesort about 18k). Hand-written WAT with a few loops is much smaller. The more
+  scalable option would be CodeLib's iris-lean WP (`wasm_wp_step`, `wasm_twp_step` for total WP),
+  which I did not test.
+- **Decode link cost:** the kernel `cbv` decode took 20 s for 157 bytes. If it grows linearly with
+  the text size, a 300-instruction module (about 5-10 KB of WAT) would take several minutes per
+  check, and memory might grow faster than linearly. This was not measured. A fallback is to put the
+  decode theorem in its own file built once, or to trust the elaborator plus the repo's
+  `checkWatFidelity` (an `#eval`, i.e. compiled code is trusted).
+- **Framework build:** about 14 min and 3.9 GB of RAM just for `SmallStep.lean` and `ProofEval.lean`
+  on this machine. That is fine once, but every Talos bump repeats it.
+- Nothing pushes toward an inefficient Wasm implementation: the spec is about the module as written,
+  with any instructions. The only pressure is on proof cost: fewer control-flow paths and
+  straight-line code inside loop bodies make the proofs cheaper.
+
+## 9. Licence
+`LICENSE` is GNU AGPL v3, and the README "License" section says "GNU Affero General Public License
+v3.0". If the decoder's proofs import Talos, the proof artefacts depend on AGPL code. The shipped
+`.wasm` contains no Talos code.
+
+## 10. Corrections to the survey
+- Lean 4.35.0 with Mathlib v4.35.0: correct. But the semantics/decoder path imports **no Mathlib**.
+  Only `Examples`, `Wp` and `Host/Random` do. The 6.9 GB Mathlib cache was unused here.
+- "Verified example programs ... e.g. `ByteEcho`, `HexStdio`": **`ByteEcho`, `HexStdio` and `Xor`
+  have a `Spec.lean` but no proof** (no `@[proves]`). Proved examples include RustArray,
+  TotalVariation, GcdStdio, NumInteger, SwapElements and FloatTrunc. Mergesort has documented `sorry`s.
+- The spec form `∀ input, ∃ output, Runs ...` is confirmed (for example `UniversalHost.lean`).
+- "`.wasm` connected only via `wasm-tools print` plus the WAT parser": correct about what is trusted,
+  but the parser's *execution* can be kernel-checked (`kernel_decoder` + `cbv`), as done here.
+  So only the parser's meaning and `wasm-tools print` remain trusted. Also, `wasm-tools print`
+  output must be `strip --all`ed first, because the decoder rejects named locals (`$cp`). The
+  repo's verifier does this too.
+- Mid-rewrite: confirmed. SmallStep is authoritative, and the old big-step `run` still exists in
+  `Semantics.lean`. The Examples have been migrated, while the Architecture sections of AGENTS.md
+  and CLAUDE.md lag.
+- RAM estimate of 8-16 GB: too high. The peak was 3.9 GB.
+- CI of about 2 h: not re-verified. The workflow files set no global timeout except `differential.yml` (60 min).
+- AGENTS.md / CLAUDE.md present: confirmed, and they contradict each other (section 6).
+- Multi-call chaining (the survey's open question): it works (section 7).

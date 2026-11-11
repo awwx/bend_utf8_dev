@@ -1,0 +1,83 @@
+Talos decoder candidate: journal (times are `date`, +07)
+
+14:19:50  Start. Read spec Decoder section, pure-lean STATUS/Utf8Ref, spike REPORT,
+          Spike.lean, SETUP.md, difftest README.
+14:21     decoder.wat + decoder.mjs written in one go.  Design chosen to mirror
+          Utf8Ref.lean function by function ($vs = isVS, $vsp = isVSP, $cp = cpOf,
+          $step = step with stepFresh b = step [] b as a recursive call $step(0,b)).
+14:21:40  difftest --quick: PASS first try (26.6 s).
+14:22:05  Full difftest started in background -> PASS (2 min 08 s wall).
+14:22:14  DecoderModule.lean (copy of the spike's elaborator + kernel `cbv` decode).
+          First run failed: "cannot compute parent directory of DecoderModule.lean":
+          include_str needs the file to be given to `lean` by absolute path (the spike's
+          check.sh does this; I had used a relative path).  Rerun 14:23:23.
+          Decode of the 7.6 KB printed text: 89.8 s wall, 2.19 GB RSS (spike: 20.5 s for
+          925 bytes of text).
+14:23     Boundary.lean written; compiles.
+14:24     Pure layer copied (byte-identical) and built in background (~4 min total,
+          Utf8Table is the slow file).
+14:24-26  ProofDone.lean: start_ok proved first try (runSteps-free: two explicit steps).
+          decode_done traces: two confusing failures:
+           - `refine ⟨?t, ?h⟩` then `wasm_steps`: "could not unify" -- the named
+             metavariable ?t is synthetic-opaque, so unification may not assign it.
+           - `refine ⟨_, _, _, ?_, ?_⟩`: "don't know how to synthesize placeholder".
+          Fix: `apply Exists.intro` (natural mvar).  Also store32's bound needs
+          `simpa [storeWith]`, and results come out as `4 + out` (rhs + lhs).
+14:27     5-minute look at Talos's Wp layer: it is a WP over the OLD fuel-based
+          big-step `exec` (Semantics.lean), imports Mathlib, and is not built here;
+          the iris-lean layer (CodeLib) gives partial correctness only.  Not used.
+14:27-32  Own machinery (ProofMach.lean): `Reach c c'` (existential trace, so
+          traces are never written), `wstep` (tries each instruction rule with its
+          standard side condition), `wnorm` (if-encoded booleans -> `b2i (decide _)`),
+          `wcalls` (extensible via macro_rules: per-function call lemmas),
+          `wauto` = repeat(any_goals(first|wstep|wnorm|wcalls|split)).
+          Problems on the way: antiquotation inside `first | ...` alternatives and a
+          `wdone [lemmas]` macro would not parse/typecheck (TSepArray kinds); two
+          doc comments in a row are a parse error that surfaced at the *next*
+          declaration; `repeat` only continues on the main goal after `split`
+          (switched to any_goals); call_second hit the 200000 heartbeat limit
+          (set maxHeartbeats 0; it takes ~30 s).
+14:33-35  ProofFuncs.lean: call lemmas for all five pure helpers, compiled first try
+          (2 min).
+14:35-38  ProofStep.lean: call lemma for $step (state 0 first, then general state
+          using it for the recursive call).  Problems: numerals in the model needed
+          type ascriptions (HAnd UInt32 Nat); hypotheses from `split` are not
+          normalized, so the closing simp must be simp_all; a multi-line `first`
+          inside parentheses did not parse (made it a macro).  call_step: 47 s.
+14:39-43  ProofLoop.lean (spike-style loop induction against a fold model) and
+          ProofBuffer.lean (the export).  omega failures: an explicit `ih _ _ ...`
+          left `out` as a metavariable which a later `rw` instantiated with the
+          wrong term; fixed by giving all arguments.  Found that the loop needs
+          out + 8*len < 2^32 strictly (if the output area ends exactly at 4 GiB the
+          returned end pointer wraps to 0); the boundary allows equality.
+14:44     done_runs (decode_done in Boundary's `Calls` form).  #print axioms of
+          buffer_runs / done_runs / start_ok: propext, Classical.choice, Quot.sound.
+14:44:44  check.sh written and started.
+14:45-47  Tried the bit-extraction lemmas needed for the model <-> RefDecoder
+          refinement (e.g. ((a ||| b<<<8 ||| c<<<16 ||| d<<<24) >>> 8) &&& 255 = b):
+          the `ext i; simp; by_cases` route works but needs per-lemma care
+          (~10 lines each); not finished.
+14:48-52 check.sh full run: PASS, 8 min 05 s (DecoderModule 37 s when not contended).
+14:50-52 stepM_nil (empty-pending case of the model refinement) proved; moved to
+          ProofModel.lean and added to check.sh.  UInt32/UInt8 comparisons go
+          through le_iff_toNat_le + omega; `if_neg` with exactly matching
+          hypothesis shapes was needed because simp would not decide the nested
+          disjunction from a differently associated hypothesis.
+14:53    Packing lemma (a ||| b <<< 8).toNat = a + 256*b proved in a scratch file
+          (Nat.shiftLeft_add_eq_or_of_lt): the remaining bit lemmas look routine.
+          Stopped proof work; second check.sh run started; wrote STATUS/REPORT.
+Time per milestone: implementation + harness 2 min (+2 min full harness);
+  module decode + Boundary 4 min; done/start 3 min; machinery 6 min; helpers
+  2 min; $step 4 min; loop + export 5 min; partial refinement 3 min;
+  status files and checks the rest.
+14:54-56 More of statement 1: or_shl_toNat, bytes_of_toNat, contB_eq, secondB_eq
+          proved (toNat + omega works well).  The per-length vsB/vspB/cpV = isVS/
+          isVSP/cpOf lemmas got down to Bool goals like
+            (194<=a && a<=244 && x) = ((194<=a && a<=223 || ...) && x)
+          and my attempts to close them generically (cases + simp + omega,
+          Bool.eq_iff_iff simp loops, generalize + `decide +revert`, a macro using
+          `_` placeholders that escaped `try`) did not land in the time left.
+          Kept only the compiled lemmas in ProofModel.lean.
+15:01:36 Second full check.sh: CHECK PASSED in 8 min 08 s (includes ProofModel.lean).  Stopped at about 42 minutes:
+          the rest of statement 1 needs more than the remaining time, so I chose to
+          leave the compiled state clean.

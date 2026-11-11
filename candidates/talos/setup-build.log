@@ -1,0 +1,41 @@
+Wed Nov 11 11:46:20 +07 2026
+✔ [2/16] Built Interpreter.Wasm.IEEE754 (1.1s)
+✔ [3/16] Built Interpreter.Wasm.Mem (1.1s)
+✔ [4/16] Built Interpreter.Wasm.Float (496ms)
+✔ [5/16] Built Interpreter.Wasm.Simd (1.0s)
+✔ [6/16] Built Interpreter.Wasm.Syntax (8.5s)
+✔ [7/16] Built Interpreter.Wasm.Locals (791ms)
+✔ [8/16] Built Interpreter.Wasm.Host (841ms)
+✔ [9/16] Built Interpreter.Wasm.Continuation (1.1s)
+✔ [10/16] Built Interpreter.Wasm.Validate (25s)
+✔ [11/16] Built Interpreter.Wasm.Decoder.Wat (38s)
+✔ [12/16] Built Interpreter.Wasm.Semantics (74s)
+✔ [13/16] Built Interpreter.Wasm.Decoder.ProofEval (445s)
+✔ [14/16] Built Interpreter.Wasm.SmallStep (764s)
+✔ [15/16] Built Interpreter.Wasm.Host.Run (697ms)
+✔ [16/16] Built Interpreter.Wasm.Examples.Harness (10s)
+Build completed successfully (16 jobs).
+	Command being timed: "lake build Interpreter.Wasm.SmallStep Interpreter.Wasm.Host.Run Interpreter.Wasm.Examples.Harness Interpreter.Wasm.Decoder.ProofEval"
+	User time (seconds): 1945.31
+	System time (seconds): 41.82
+	Percent of CPU this job got: 229%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 14:24.84
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 3895160
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 124168
+	Minor (reclaiming a frame) page faults: 5256837
+	Voluntary context switches: 281715
+	Involuntary context switches: 401340
+	Swaps: 0
+	File system inputs: 6022904
+	File system outputs: 419512
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+Wed Nov 11 12:00:45 +07 2026

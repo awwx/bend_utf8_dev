@@ -1,0 +1,67 @@
+JOURNAL (WasmCert-Coq decoder candidate)
+
+14:49:09 start (time box 60 min -> 15:49).  Read spec tail, pure-layer STATUS, spike REPORT/Steps.v.
+14:5x    Module.v written directly as a Rocq AST term (no .wat first).  State packed in one
+         i32 (b1|b2<<8|b3<<16|n<<24), loop body mirrors RefDecoder.step case by case
+         (step_empty / pending with range check / complete / extend / reject+step_empty).
+         Output UTF-16LE at OUT=65536, input at 0, IN_MAX=65536, 5 fixed pages.
+         Binary.v parse-back check by vm_compute: passed first time (3.5 s).
+         decoder.mjs written; difftest --quick: PASS first try (57 s).
+14:53    Full difftest harness PASS (97 s, incl. 3-8 MB single calls; wrapper chunks by 64 KiB).
+14:53    Boundary.v compiles (against stub pure layer).  Small snags: mathcomp set_nth needs
+         `From mathcomp Require seq.` + `seq.set_nth`; `length` resolved to String.length
+         (String imported after List) -> wrote List.length.
+14:55    Control.v (block/if rules; 4 compile rounds: ssreflect implicit args, i32 has no
+         eqType so `==` on i32 fails -> case on Int32.eq_dec instead).
+14:58    Mem.v: 16-bit store spec + derived "block update preserves length" (the Memory class
+         does not state it; derived from the lookup laws).  Pitfalls: mathcomp redefines %N
+         as nat scope (used %num), `mem_length` name clash between memory.v and operations.v,
+         and lia failing on a goal identical to a hypothesis up to instance unfolding
+         (`exact` worked).
+15:00    Wp.v (wp layer + wp_step tactic), WpMem.v (store16 rule) compiled first or second try.
+15:08    Exports.v: start and done exports PROVED in Boundary's form (no admits).  ~15 compile
+         rounds.  Traps: `[]` is not nil under mathcomp (use [::]); `/=` evaluated
+         N.of_nat (Z.to_nat 65536) -> rocq hung (killed after 2 min; replaced by vm_compute'd
+         constant lemmas); `/=` also folds OUT_addr + 1 into 65537 so rewrites stop matching;
+         ssreflect rewrite side-goal order; wp_store16 with an existential memory did not match
+         the memory chosen elsewhere -> added wp_store16_eq taking the store_packed result.
+15:09    Decision: with ~40 min left, the per-byte refinement (symbolic i32 arithmetic for ~10
+         paths) will not fit.  Prove the loop, framing and top-level theorem CONDITIONALLY on an
+         explicitly stated per-byte lemma `step_spec`, then attack step_spec if time remains.
+15:10    Decode.v: step_spec stated (Definition : Prop); pure helpers (snoc of fold_left,
+         utf16le_app, mem_holds_app/same).
+15:13    A_ok/B_ok (loop test and i++) proved.  Snags: mathcomp `++` is `cat`, which the
+         unfold tactic's `cbv [app]` does not unfold; Int32 `add` appears as `iadd`.
+15:14-15:21 loop_body_ok (the invariant step) proved.  Most time lost on lia:
+         - Stdlib nth_error_map is now an iff (used map_nth_error);
+         - section Hypotheses got implicit arguments (Set Implicit Arguments): `Hin _ _ H`
+           and `Hstep a b ...` mis-applied -> unfolded the hypothesis first;
+         - lia failed with "Cannot find witness" on true goals: (a) a large nat literal
+           (262140 is Nat.of_num_uint, opaque to lia), (b) a big context (set-variables /
+           memory hyps) -- `clear - H1 H2; lia` fixed it, (c) mathcomp `*` on nat;
+         - one compile hung > 100 s inside the invariant proof (a `do 4 f_equal; lia` on
+           frames, or `/=`); bisected with admit, rewrote with explicit equations.
+15:22    decode_loop (block_loop_rule) and decode_correct proved (conditional on step_spec).
+15:24    Printing a large goal with Show hung once (killed by timeout).
+15:26    Boundary.v CHANGE: Realizes now takes the host state hs, and the claim is
+         exists D, Decoder_correct D /\ forall hs, Realizes hs D.  Reason: proving the
+         relational `instantiate` goes through interp_instantiate, which needs a host_state
+         value; with `forall hs` inside after the existential instantiate clause, there is
+         no hs to use (host_state is an abstract type).  Not a weakening of the per-call
+         claims (they were already for all hs); D is still chosen before hs.
+15:26    Theorems.v: decoder_module_correct_if_step compiled at the first attempt.
+15:27    check.sh against the REAL pure layer (built by the other agent at 15:04): build 47 s,
+         wasm printed, parse-back, no holes, assumptions = WasmCert library axioms only,
+         difftest full PASS (105 s).  exit 0.
+15:30    STATUS.txt, REPORT.txt written.  Not done: step_spec (the per-byte refinement,
+         ~200 instructions of i32 bit arithmetic), determinism.
+15:30-15:33 wip/StepWIP.v (OUTSIDE the build): first pieces of step_spec.
+         Proved (Qed): emit_fffd_ok (U+FFFD store + o += 2), empty_ascii_ok (ASCII path of
+         empty_code, a full Wasm-level path with an if, a store and arithmetic), ltu/leu
+         value lemmas, or_lead (b | 1<<24 = b + 2^24 for bytes; first tried a bitwise proof
+         with Z.testbit lemmas -- abandoned after one error; replaced by a 256-case
+         vm_compute check, 4 lines).  Each path lemma took ~1-2 min of compile/fix rounds.
+         empty_lead_ok: Admitted (final frame goal, ran out of time).  Snags: binop results
+         appear as `Wasm_int.int_sub i32m ...` (not Int32.isub), so rewrite lemmas must be
+         stated in that form; set_nth at index (N.to_nat 0) not reduced by the tactic's cbn.
+15:34    Stopped.  Elapsed: 45 min of the 60 min box.

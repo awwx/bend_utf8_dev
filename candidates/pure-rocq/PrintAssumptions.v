@@ -1,0 +1,18 @@
+From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs.
+Check bit8_value_sum_proved : bit8_value_sum. Print Assumptions bit8_value_sum_proved.
+Check bit8_value_word_proved : bit8_value_word. Print Assumptions bit8_value_word_proved.
+Check u32_byte4_bits_proved : u32_byte4_bits. Print Assumptions u32_byte4_bits_proved.
+Check is_surrogate_code_point_examples_proved : is_surrogate_code_point_examples. Print Assumptions is_surrogate_code_point_examples_proved.
+Check begins_with_scalar_unique_proved : begins_with_scalar_unique. Print Assumptions begins_with_scalar_unique_proved.
+Check not_valid_sequence_prefix_extended_proved : not_valid_sequence_prefix_extended. Print Assumptions not_valid_sequence_prefix_extended_proved.
+Check maximal_subpart_exists_proved : maximal_subpart_exists. Print Assumptions maximal_subpart_exists_proved.
+Check maximal_subpart_unique_proved : maximal_subpart_unique. Print Assumptions maximal_subpart_unique_proved.
+Check decodes_first_exists_proved : decodes_first_exists. Print Assumptions decodes_first_exists_proved.
+Check decodes_first_unique_proved : decodes_first_unique. Print Assumptions decodes_first_unique_proved.
+Check decodes_first_empty_proved : decodes_first_empty. Print Assumptions decodes_first_empty_proved.
+Check decodes_first_nonempty_proved : decodes_first_nonempty. Print Assumptions decodes_first_nonempty_proved.
+Check decodes_exists_proved : decodes_exists. Print Assumptions decodes_exists_proved.
+Check decodes_unique_proved : decodes_unique. Print Assumptions decodes_unique_proved.
+Check decodes_examples_proved : decodes_examples. Print Assumptions decodes_examples_proved.
+Check RefDecoder_correct : Decoder_correct RefDecoder. Print Assumptions RefDecoder_correct.
+Print Assumptions step_output_ok.

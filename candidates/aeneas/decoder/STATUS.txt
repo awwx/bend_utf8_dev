@@ -1,0 +1,40 @@
+STATUS -- candidates/aeneas/decoder (Rust -> Charon -> Aeneas -> Lean 4; rustc -> wasm32)
+
+PROVED (lean/Proofs.lean; no sorry, no new axioms, no native_decide/bv_decide;
+#print axioms: propext, Classical.choice, Quot.sound)
+
+  DecoderProofs.verified : Boundary.Verified
+    where Boundary.Verified := ∃ D : Decoder, D.Correct ∧ Boundary.Realizes D
+    (Decoder, Decoder.Correct from the audited spec Utf8Laws.lean; Realizes in
+    lean/Boundary.lean).  Witness: Utf8Pure.RefDecoder (shared pure layer, unmodified),
+    so D.Correct is Utf8Pure.RefDecoder_correct.
+  DecoderProofs.realizes : Boundary.Realizes Utf8Pure.RefDecoder
+    The Aeneas-generated decode_start_state / decode_buffer / decode_done (from the Rust
+    source, identical for host and wasm32 translation) return `ok` (no panic, overflow,
+    out-of-bounds, divergence) with exactly RefDecoder's state and text, for every input
+    slice and every output slice with out.len >= 2*in.len (decode_buffer) or >= 1
+    (decode_done); the rest of the output slice is unchanged.  No length bound such as
+    len <= U32.max is needed.
+
+  Milestones: per-byte step refines Utf8Pure.step (step_eq) -- done; decode_buffer loop
+  (loop_spec) -- done; decode_done and start (decode_done_eq, start_eq) -- done;
+  top-level -- done.
+
+RUNNING IMPLEMENTATION
+  decoder.wasm (5.4 KB, no imports, no allocator); decoder.mjs passes the full difftest
+  harness (P1/P2/P3 PASS, including the 3..8 MB single-call buffers).
+
+NOT PROVED / OUT OF SCOPE OF THE THEOREM
+  - Anything below the Lean model: Charon, Aeneas, the Aeneas Std model, rustc/LLVM, the
+    unsafe shim (mod shim), the JS wrapper (decoder.mjs).  See REPORT.txt.
+  - Code points -> JS string (String.fromCodePoint) is in the unverified wrapper; a
+    UTF-16 output in Rust would move it under the theorem (see next steps).
+
+NEXT STEPS (if continued)
+  1. Emit UTF-16 code units from Rust and define the UTF-16 encoding of Text in
+     Boundary.lean (uses Utf8Pure.decoded_scalar: every output is a scalar).  ~30-45 min.
+  2. Performance: ASCII fast path in the loop (would need a second loop or an inner
+     loop; nested loops untested in Aeneas), and a faster code-point -> string path.
+  3. Shrink the shim further / generate it; possibly translate the shim with Aeneas's
+     raw-pointer model to state its contract (low value).
+  Estimate of remaining work for the brief as written: none; items above are improvements.

@@ -1,0 +1,48 @@
+13:53:30 Start. Read Utf8Laws.v (905 lines). Plan: N-range table (valid_prefix_b / valid_b),
+  exhaustive vm_compute checks (all 1.1M scalars; all valid prefixes via nested forallb over 256 bytes),
+  encodes_iff central lemma, relational lemmas about decodes_first for the step machine's cases,
+  streaming via invariant "D(st ++ b :: rest) = out ++ D(st' ++ rest)".
+14:04:07 Exhaustive check perf: first 1.1M-iteration loop timed out (>120s). Cause: U32_of_N/U32_to_N cost ~40us each in VM and a 1.1M-deep non-tail recursion (GC scanning deep stack, superlinear). Switched to two-level loop (1088 x 1024) in Utf8Check.v.
+13:50 Start (see above).  13:53 Utf8Ref.v (RefDecoder) written; Compute sanity tests on all
+      decodes_examples cases plus 3 multi-buffer splits all correct on first try.
+13:57-14:05 Performance dead end: a 1.1M-element vm_compute loop over all scalars did not finish
+      in 120s.  Micro-benchmarks: U32_of_N+U32_to_N ~40us each in the VM (32 testbits, 32-level
+      sums); fA ~200us per scalar.  First guess (deep non-tail recursion / GC) partly right: a
+      one-level 1.1M-deep loop is superlinear; two-level 1088 x 1024 loop is linear.
+      Two self-inflicted losses: 'pkill -f <pattern>' killed my own shell twice (pattern in
+      the command line); a background build ran 10 min on a stale file version.
+14:05-14:12 Utf8Check.v reflection lemmas.  Confusing errors: 'lia' failing with
+      "Cannot find witness" on 0 <= m mod 1024 and on a goal identical to a hypothesis
+      (the context held the 1024-way unfolded 'if' chain after 'simpl'; replaced simpl by
+      cbv beta and gave the facts directly); 'apply I in H' picking the wrong premise.
+14:12 'simpl in H' on hypotheses containing the 256-byte list / nested forallb blew up
+      (killed after 100 s).  Rule adopted: never simpl near the enumerations; cbv beta / cbn [..].
+14:15 U32_of_N (U32_to_N x) = x: 'rewrite !tb_cons' with an if-then-else lemma looped forever
+      (the else branch still matches).  Fixed with tb0 / tbS (N.pos p) + cbv [Pos.pred_N]; 8 s.
+14:20 Full checkA_comp measured: ~9.5 min for vm_compute + Qed re-check.  Precomputed
+      all_bytes (Eval vm_compute) and pruned check_all by expected length.
+14:23 Started final Utf8Check build.  Developed Utf8Proofs.v against a scratch copy of
+      Utf8Check.v whose two *_comp lemmas were Admitted (scratch only, never in this dir).
+14:23-14:29 Utf8Proofs.v: ~12 small fixes, all of the same kind: simpl/injection unfolding
+      too much (decodes_go fixpoint, Nat.eqb into match, U32 injection into 32 bit equations),
+      and 'decode_start_state RefDecoder' not syntactically [] for destruct.  No logical
+      surprises: the plan (step-machine invariant D(st ++ b :: rest) = o ++ D(st' ++ rest))
+      worked as designed.  Time per law: bit8/u32/surrogate laws ~1 min total; valid sequence
+      and subpart laws ~6 min; decodes_first/decodes laws ~3 min; streaming ~5 min.
+14:31 Downstream lemmas (ranges, step equations, cp value, output_ok) compiled.
+14:24-14:43 Final Utf8Check build ran 19 min without finishing.  Cause found at 14:43:
+      check_all used implb / orb, which are ordinary functions and therefore STRICT in the
+      VM: the "pruned" enumeration actually evaluated all 256^4 = 4.3e9 byte lists.  Rewrote
+      with if-then-else (lazy).  checkA_comp itself had been checked (vm_compute + Qed) in the
+      14:09 run, which failed only later in the file (line 128, missing Nat.leb_le import).
+14:47 After the fix, 'Eval vm_compute in check_all fB' still did not finish within 100 s
+      (~1.1M fB evaluations at an estimated 50-100 us each in this VM).  Time box reached;
+      stopped.  Final full build of Utf8Check.v (and hence of Utf8Proofs.v in this directory)
+      NOT observed.
+14:47:41 Stop.  Elapsed ~58 min.
+14:49:50 Extension (30 min). 14:49 stub-build/ made (checkA_comp, checkB_comp Admitted only), compiled in 16 s. Profiled checkB: enumeration skeleton alone 30 s (4M vp calls on 4-byte leads), fB ~100 us each (~1.1M) -> ~130 s per evaluation, ~260 s with Qed. The 100 s timeout earlier was simply too short. Starting real check.sh.
+15:05 check.sh PASSED, total 15m16s (Utf8Check.v dominates).  All Print Assumptions:
+      "Closed under the global context".  No source change was needed after 14:47: the
+      if-then-else fix to check_all was sufficient; checkB_comp just needed ~4-5 min.
+      checkA_comp speed-up not attempted (a rebuild alone would exceed the remaining time).
+15:05:22 Stop.  Total ~75 min (60 + 15 of the 30-min extension).
