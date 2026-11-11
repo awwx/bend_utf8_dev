@@ -1,24 +1,36 @@
-This VM is a sandbox dedicated to your use.  You may install any
-software that would be useful for your task, but leave the installed
-`bend` as it is.  In your final message for the turn, say what you
-installed.  (No need to say that you didn't install anything.)
+## Running in hostname "d"
 
-The user makes commits; don't commit unless asked.
+This is an EC2 instance dedicated to your use.
+
+## Running in hostname "y"
+
+This VM is a sandbox dedicated to your use.
 
 In this shell, `cp`, `mv` and `rm` are aliased to their `-i`
 (interactive) versions. In scripts and one-off commands, use
 `command cp`, `command mv` and `rm -f`, so that nothing waits for
 confirmation.
 
+## Installing software
+
+You may install any software that would be useful for your task, but
+leave the installed `bend` as it is.  In your final message for the
+turn, say what you installed.  (No need to say that you didn't install
+anything.)
+
+## Commits
+
+The user makes commits; don't commit unless asked.
+
 ## Working with Bend
 
 Bend files have the extension ".bend".
 
 The `bend` program is available on the command line. Run
-`bend version` for the installed version; `/root/mirror/bend` is
+`bend version` for the installed version; `$HOME/mirror/bend` is
 checked out at the matching tag.
 
-Read `/root/mirror/bend/guide/GUIDE.md`, which `bend guide` also
+Read `$HOME/mirror/bend/guide/GUIDE.md`, which `bend guide` also
 prints. `bend base <name>` prints a Base definition.
 
 ## This project
