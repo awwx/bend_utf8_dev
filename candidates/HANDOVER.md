@@ -338,9 +338,14 @@ were proposed to the user and not objected to.
   in `candidates/talos/tools/`; npm `wabt` and `binaryen` in a scratchpad.
 - Bend and `/root/mirror/bend` are the user's setup; leave the installed
   `bend` alone.
-- Instance type: `m8a` (AMD, 4.5 GHz, one vCPU per physical core) has the best
-  single-thread performance among ordinary x86 families; `m8a.2xlarge`
-  (8 vCPU, 32 GB) for several agents in parallel, `m8a.xlarge` when one or two.
+- Instance type: the instance is in Singapore (ap-southeast-1), which has no
+  `m8a`, `m7a` or `r7iz`. Recommended there: `m8i` (Intel Xeon 6, 3.9 GHz
+  all-core turbo, two vCPUs per physical core); `m8i.2xlarge` (8 vCPU, 32 GB)
+  for several agents in parallel, `m8i.xlarge` when one or two. Alternative
+  for parallel builds: `c7a.2xlarge` (AMD, 3.7 GHz, 8 physical cores, 16 GB).
+  Avoid `m8i-flex` and `t8i`: their CPU is not guaranteed at full speed, which
+  would distort check-time measurements. Check times measured on the laptop VM
+  are not comparable with times on the instance; re-measure there.
   Peak memory per agent so far was under 4 GB.
 
 ## 9. Practical notes for running subagents
