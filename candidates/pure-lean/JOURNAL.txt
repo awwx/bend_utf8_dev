@@ -56,3 +56,18 @@
 12:21 secondOk_iff: `repeat' split` on the definition's ifs, one omega per branch (was 16 by_cases + `first | omega | (constructor ...) | (simp_all <;> omega)`). secondOk_80: `repeat' split; all_goals decide` instead of `split <;> (try split) <;> decide`.
 12:24 Shape lemmas: `hne _ _ ... (by simp only [testBit_high ...]; rfl)` works with holes (the earlier timeout I had blamed on this was in byte_value), so the 21-argument explicit bit lists went.  Added docstrings and headers listing exports.
 12:26 Measured before/after per file, both toolchains (contended).  Wrote IMPROVEMENT.txt and STATUS.txt.  Statement diff old vs new: only additions plus two removed internal Bits lemmas (getLsbD_toNat, getLsbD_false).
+
+2026-11-12 04:10-04:35  New Utf8StepFacts.lean (imports Utf8Proofs; counterpart of
+  pure-rocq/Utf8StepFacts.v): isVSP4, step_length, step_text_length,
+  decodeBuffer_bounds (from Talos ProofPureExtras.lean), decodeBuffer_snoc (from
+  Aeneas Proofs.lean), and a general output-size bound in code points:
+  pendingCount, stepFresh_count_bound, step_count_bound, decodeBuffer_count_bound
+  (|text| + pendingCount st' <= |bytes| + pendingCount st), decodeBuffer_text_length
+  (|text| <= 2|bytes|, derived).  Aeneas's ref_step_bad was step_bad_pending.
+  check.sh: Utf8StepFacts in FILES; the axiom file imports Utf8StepFacts.
+  The file takes 0.25 s per toolchain; check.sh 12.4 s (was 11.9 s).
+
+2026-11-12 05:35-05:45  check.sh: kernel replay on each toolchain (step 4, default on;
+          --skip-replay), exact law types and recomputed axioms of the 16 theorems on
+          the replayed environment.  Smuggled-False mutation: old PASS, new FAIL (both
+          toolchains).  check.sh 25 s with replay, 12 s without.

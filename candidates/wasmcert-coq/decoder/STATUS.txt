@@ -1,53 +1,87 @@
-STATUS (WasmCert-Coq decoder candidate; time box 14:49-15:49 +07)
+STATUS (WasmCert-Coq decoder candidate; Rocq 9.2.0, WasmCert-Coq 2.2.1)
+Updated 2026-11-12 after the improvement pass (session 7; see IMPROVEMENT.txt).  History
+of sessions 1-6 (and the audit fix of session 5) is in JOURNAL.txt and REPORT.txt.
 
-Run: ./check.sh  (builds against the REAL pure layer ../../pure-rocq, which finished
-building at 15:04 and whose check.sh reports no holes / "Closed under the global context";
-prints decoder.wasm from the term; parse-back lemma; hole grep; Print Assumptions; difftest).
+CURRENT STATE: FULLY PROVED, check.sh prints PASS.
+  ./check.sh from clean: 1 min 50 s wall, 118 s CPU, while other agents' Lean builds
+  were running (was 3 min 29 s wall / 244 s CPU under the same conditions).  It rebuilds from clean the pure layer (its own check.sh),
+  ../symexec and ../determinism, builds this directory, prints decoder.wasm from the term
+  and compares it with the shipped file, greps for holes, elaborates both top-level claims
+  by fully qualified name against the hash-pinned Boundary.v, compares the printed
+  statements and Print Assumptions with check.expected.txt, runs rocqchk on every library of
+  the development, and runs the difftest harness.
+  2026-11-12 (check-script parity fix): check.sh also ties the wrapper's layout to the
+  Rocq layout: decoder.mjs's one "// LAYOUT IN_addr IN_max OUT_addr" line must give plain
+  decimals equal to the values CheckTop.v computes for Boundary.IN_addr/IN_max/OUT_addr
+  (Eval vm_compute, last command, pinned in check.expected.txt), and the chunking loop,
+  the copy and the output read must use IN_MAX / IN / OUT (fixed-text lines, occurrence
+  counts, no other numeric literal >= 100 in the code).  The hole grep is now
+  ../../pure-rocq/holes.pl (fuller word list; Hypothesis/Variable/Context outside a
+  Section) over decoder, symexec and determinism.
 
-DONE
-  - Module.v: decoder_module, the WasmCert AST term (3 functions, 251 instructions,
-    5 fixed pages).  decoder.wasm (643 bytes) is printed from it by WasmCert's printer;
-    Binary.v proves run_parse_module decoder_bytes = Some decoder_module (vm_compute).
-  - decoder.mjs: difftest harness, FULL corpus incl. 3-8 MB single calls: PASS (97 s).
-  - Boundary.v: reviewable statement (definitions + Props only):
-      decoder_module_correct :=
-        exists D, Decoder_correct D /\ forall hs, Realizes hs D.
-  - Proved, no Admitted/admit/Axiom in the build (check.sh greps):
-      start_correct, done_correct   (Exports.v)  -- the start and done exports, exactly the
-                                      corresponding conjuncts of Realizes
-      decode_correct                (Decode.v)   -- the decode export: loop, termination,
-                                      input reading, output accumulation, memory framing,
-                                      result values -- PREMISED on step_spec (see below)
-      decoder_module_correct_if_step (Theorems.v):
-        (forall hs, step_spec hs) -> decoder_module_correct
-      Assumptions: only WasmCert-Coq's own library axioms (classical logic, functional
-      extensionality, Dedekind reals, 5 opaque SIMD string functions) -- same as the spike.
+TOP-LEVEL CLAIMS (Boundary.v, sha256 pinned in check.sh)
+  decoder_module_correct  proved as Decoder.Theorems.decoder_module_correct_proved
+    exists D, Decoder_correct D /\ forall hs, Realizes hs D: the module's exports start /
+    decode / done implement a decoder satisfying the spec's streaming laws, through the
+    state representation and the memory layout (input <= 64 KiB at 0, output at 64 KiB,
+    at most 2*len+2 bytes written, nothing else changed); each call's result is its only
+    possible outcome (no trap or other result reachable, no infinite run).
+  decoder_module_applies  proved as Decoder.NonVacuity.decoder_module_applies_proved
+    layout_fits /\ instance_memory_fits /\ instantiation_unique: the layout fits the
+    module's fixed 5-page memory; every instantiation result meets Realizes' store
+    condition; and (new in session 7) instantiating the module has exactly one possible
+    result, so the memory this claim talks about is the memory the guarantees are about.
+  Assumptions of both: exactly the nine WasmCert-Coq library axioms (check.expected.txt).
 
-NOT DONE (exactly one statement)
-  - step_spec (Decode.v, a Definition ... : Prop): one run of step_code (the loop body
-    minus the bounds test and i++; ~200 instructions, nested ifs, no branches) on byte b
-    in packed state enc st writes utf16le (snd (step st b)) at o, sets st to
-    enc (fst (step st b)), o += its length, writes nothing outside [o, o+4).
-    So the top-level theorem is CONDITIONAL on this lemma.  It is the whole per-byte
-    refinement: i32 bit arithmetic (and/or/shl/shr_u/add/sub/compare on small values)
-    plus the bridge to RefDecoder.step via the pure layer's range lemmas (seq_len_cases,
-    vp_cons2, vs_vp_len, step_empty_*, step_pending, seq_cp_value2..4).
-  - Determinism (not attempted; see REPORT.txt).
+LAYOUT (three libraries plus the pure layer)
+  ../../pure-rocq  (Utf8)        spec copy, RefDecoder, its correctness; Utf8StepFacts.v
+                                 has the step equations, pending-state ranges, seq_cp_bound
+                                 and the output bound in UTF-16 units used here.  No axioms.
+  ../symexec       (SymExec)     REUSABLE: symbolic execution over WasmCert's reduce
+                                 (Steps, Control, Wp, Mem, WpMem) and i32 arithmetic (I32).
+  ../determinism   (Determinism) REUSABLE: a call in the fragment that returns has no
+                                 other outcome.
+  .  (Decoder)                   DECODER-SPECIFIC:
+    Module.v       the module term (source of truth; decoder.wasm is printed from it)
+    Binary.v       printed bytes; decoder_bytes_parse_back
+    Instance.v     instantiation by computation (s0, inst0)
+    DetInstance.v  the module is in the determinism fragment (by computation)
+    Boundary.v     the statement (reviewed; definitions and Props only)
+    OutBound.v     utf16le <-> UTF-16 units; output bound in bytes (pure)
+    NonVacuity.v   decoder_module_applies (incl. instantiate_decoder_result: every
+                   instantiation result is (s0, Build_frame [] inst0, []))
+    Repr.v         the packed i32 state (enc, Rst)
+    Exports.v      start and done; call_of_wp (wp proof -> call_returns)
+    Decode.v       the decode loop, conditional on step_spec
+    StepEmpty.v / StepPending.v / StepComplete.v   the six cases of step_spec
+    StepSpec.v     step_spec_proved (the case split)
+    Theorems.v     decoder_module_correct_proved
+  Each file's header lists its exports.  Style: files that touch Wasm use ssreflect
+  (as WasmCert-Coq does); pure files (pure-rocq, OutBound.v, Repr.v) use stdlib tactics.
 
-WORK IN PROGRESS (outside the build, wip/StepWIP.v, compile command in its header)
-  Proved there: emit_fffd_ok, empty_ascii_ok (one of the 3 paths of empty_code), i32
-  compare/or lemmas.  empty_lead_ok is Admitted (unfinished).  These are the first
-  building blocks of step_spec; they took ~1-2 min each once the infrastructure existed.
+OPACITY
+  seq_cp (the spec's 32-boolean code point of a byte sequence) is Global Opaque at the end
+  of ../../pure-rocq/Utf8Proofs.v; downstream uses only its numeric interface (seq_cp_value,
+  seq_cp_value1..4, seq_cp_bound).  The previous per-file `Local Strategy opaque
+  [seq_cp U32_of_N]` in StepComplete.v is gone.  No other Strategy/Opaque in the decoder.
 
-NEXT STEPS (estimate)
-  1. i32 lemma set on repr of small Z (land/lor/shl/shru/ltu/leu/eq, isub wrap for
-     b - 0xC2): ~1 h.
-  2. Sub-block lemmas, each with a functional post: empty_code, range_code, len_code,
-     cp_code, emit_cp, emit_fffd (each 2-16 paths through wp_if; run wp_step + rewrite
-     arithmetic): ~2-3 h.  Note wp_step must not `cbv` across large definitions;
-     use Section-local `clear` before lia (lia was confused by unrelated hyps here).
-  3. pending_code / step_code composition and the bridge to step (case split on
-     seq_len_cases of b1 and on length st = 1,2,3; enc arithmetic): ~2-3 h.
-  Total remaining: roughly 3-6 agent-hours (revised down after the WIP path lemmas went
-  quickly), less with better automation (a symbolic evaluator returning a normalized
-  frame; byte-indexed arithmetic facts by 256-case vm_compute checks).
+WHAT A CODE EDIT TO Module.v REQUIRES
+  The case proofs run the code instruction by instruction (wp_step) and name locals by
+  position, so any change to step_code's instruction sequence or local numbering breaks
+  the matching lemma in StepEmpty/StepPending/StepComplete.v (and Decode.v for the loop,
+  Exports.v for start/done).  The code is factored into named pieces (Module.v:
+  emit_fffd, emit_cp, empty_code, range_code, len_code, cp_code, pending_code, ...), and
+  each has its own lemma (emit_fffd_ok, emit_cp_ok, empty_code_ok, range_code_ok,
+  len_code_ok, cp_code_ok2..4, ...), so an edit inside one piece is repaired in that
+  lemma; the case lemmas only chain them.  DetInstance.v and Instance.v recompute by
+  vm_compute and need no edit; Binary.v and decoder.wasm are regenerated by make.
+
+REMOVED IN SESSION 7
+  PrevImplied.v (archived in archive/; compared with two superseded vacuous statements),
+  wip/StepWIP.v (obsolete first draft), Assumptions.v (superseded by check.sh's CheckTop),
+  the pure lemmas moved to pure-rocq, the symbolic-execution files moved to ../symexec.
+
+NOT DONE: see IMPROVEMENT.txt, "What a further pass could do".
+Untracked files needed for a clone to build (the user commits): DetInstance.v,
+NonVacuity.v, OutBound.v, Step*.v, archive/, ../determinism, ../symexec,
+../../pure-rocq/Utf8StepFacts.v.

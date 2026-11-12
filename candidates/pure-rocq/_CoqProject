@@ -3,3 +3,4 @@ Utf8Laws.v
 Utf8Ref.v
 Utf8Bridge.v
 Utf8Proofs.v
+Utf8StepFacts.v

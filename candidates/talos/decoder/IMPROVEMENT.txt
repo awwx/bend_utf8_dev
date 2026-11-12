@@ -1,0 +1,168 @@
+IMPROVEMENT PASS ON candidates/talos/decoder (2026-11-12, 03:34-04:03, EC2)
+
+Goal: the same theorems, checked faster, with the time limit restored, and
+proofs structured for maintenance.  Not changed: Boundary.lean, the spec,
+decoder.wat / .wasm / .printed.wat, decoder.mjs, the Talos checkout, the
+pure-layer copies (Utf8*.lean), check.expected.txt.
+
+RESULT
+  check.sh from a clean build, kernel replay included: PASS, 2 min 47 s wall
+  (212 s user CPU), was about 3 min 45 s.  The kernel replay (128 s, nearly
+  all Talos constants) and DecoderModule (kernel-checked decode) did not
+  change; the candidate's own proof files went from 72 s to 13 s of CPU.
+  No `maxHeartbeats` override left anywhere (was 0 in four files).
+
+PER FILE, before -> after (sequential `lean` per file in a scratch copy,
+/usr/bin/time; wall is contended by two other agents' builds and will be
+re-measured; CPU = user time is the comparison)
+
+  file             wall before  wall after  CPU before  CPU after  lines  theorems
+  DecoderModule        15.5        15.4        21.6        21.6     80->86    1->1
+  ProofMach             0.8         1.3         0.7         1.2     92->212   8->8
+  ProofFuncs           47.3         2.7        47.3         2.7     91->95    5->5
+  ProofStep            17.6         2.2        17.4         2.1     71->90    2->5
+  ProofLayout (new)      -          0.8          -          0.8      -->140    -->15
+  ProofLoop             1.0         0.9         1.2         0.9    196->140  12->3
+  ProofBuffer           0.7         0.7         0.5         0.5     33->35    2->2
+  ProofDone             0.8         0.7         0.7         0.7    100->105   6->5
+  ProofModel            0.9         0.9         1.1         1.0     85->79    7->5
+  ProofPureExtras (new)  -          0.3          -          0.3      -->53     -->4
+  ProofRefine           1.1         1.1         1.8         1.7    256->235  22->19
+  ProofMain             0.9         0.7         1.0         0.6    225->118  21->8
+  ProofWrapper          0.7         0.7         0.5         0.5     40->40    3->3
+  total                88.5        28.3        93.7        34.4   1269->1428 89->83
+  total without DecoderModule      73.0  12.9  72.1  12.8
+  (CPU > wall in DecoderModule because Lean elaborates in parallel.)
+  Candidate's Lean CPU: 37% of before overall, 18% without the unchanged
+  decode theorem.  Lines grew by 159: +120 in ProofMach (the instruction
+  dispatch and `wlocals`, both meta code with docstrings) and header
+  comments; proof lines elsewhere shrank (duplicates and dead code removed).
+
+PROFILE FINDINGS (set_option profiler / trace.profiler, Elab.async false)
+  Note: with the default asynchronous elaboration, `profiler true` put almost
+  all of ProofFuncs under "attribute application" (49.7 s): the `macro_rules`
+  after each theorem waits for that theorem's proof.  `Elab.async false` is
+  needed for a usable profile.
+  Before: call_second 14.9 s, call_vs 17.1 s, call_vsp 9.5 s, call_cp 13.6 s,
+  call_cont 0.3 s (ProofFuncs); call_step0 7.4 s, call_step 12.4 s
+  (ProofStep).  All time was in `wauto` (tactic execution), not in simp
+  (0.7-1.2 s per file) or kernel checking.  Three causes, each confirmed by
+  measuring the fix:
+  1. Quadratic driver.  wauto was `repeat (any_goals (first | wstep | wnorm |
+     wcalls | split))`: after every step, every stuck goal (finished paths,
+     paths waiting at a call) re-tried all rules.  `repeat'` works on each
+     goal until it is stuck and never retries it.  ProofFuncs 47 -> 18 s.
+  2. Trial-and-error steps.  wstep was a `first` over 17 `refine Reach.cons
+     (Step.X rfl) ?_`; each failing alternative cost 20-30 ms of elaboration
+     and unification against the large configuration.  wstep is now an
+     `elab` that reads the instruction at the head of the code and applies
+     only its rule (and fails at once on a symbolic `if`, a call, a store or
+     the end).  ProofFuncs 18 -> 6.7 s, ProofStep 17 -> 4 s.
+  3. Unevaluated frames.  After Step.call and Step.localSet the frame's
+     params/locals are terms like `List.set (List.map ValueType.zero
+     fn.locals) 2 v` that contain the whole callee record (with its body);
+     every `local.get` re-evaluated the chain, so a successful step cost
+     ~150 ms late in $vs.  New `wlocals` rewrites them definitionally to
+     literal lists (replaceTargetDefEq) after each call and local.set.
+     ProofFuncs 7.4 -> 2.7 s, ProofStep 4.9 -> 2.2 s.
+  DecoderModule: 12.7 s of its 15 s is the `cbv` call in
+  decoderModule_decodes (Talos's kernel_decoder route).  `decide +kernel`
+  is not available (no Decidable instance for the Except equality); plain
+  `rfl` runs the elaborator's whnf and hits the heartbeat limit.  Kept `cbv`.
+  It needs maxRecDepth 100000 (checked: fails with the default) but not the
+  heartbeat override, which was removed.
+
+WHY THE TIME LIMIT WAS DISABLED, AND THE m07 HANG
+  maxHeartbeats 0 was needed because of causes 1-3 (whole theorems of
+  10-17 s inside one declaration).  With them fixed every file passes with the
+  default limit (200000); the overrides were removed, not raised.
+  Audit mutation m07 (state count packed at bit 25 instead of 24) ran 17 min
+  before.  Reproduced in a scratch copy: one path of call_step0 ends in a
+  false goal; `wdone` (`exact Reach.refl _`) then asks for a definitional
+  equality between two different configurations, and the unifier unfolds
+  UInt32/BitVec arithmetic in the values and the store without bound
+  (confirmed: with that `wdone` removed the same file fails in 4 s).  With
+  maxHeartbeats 0 this ran until killed.  Now: m07 fails in 10 s with
+  "unsolved goals ... vsB b 1 = false, vspB b 1 = true" at call_step0 (the
+  wrong path) and a heartbeat timeout at call_step.  Tried to make the
+  final `Reach.refl` reducible-only so that wrong code fails structurally;
+  backed out: correct paths need numerals unfolded (the module literal has
+  `{ toBitVec := 255#32 }` where the model has `255`).  The restored limit is
+  the fail-fast mechanism; check.sh's per-step timeout stays as a net.
+
+WHAT CHANGED (and why)
+  ProofMach   wstep: dispatch by instruction (cause 2).  wlocals (cause 3),
+              run by wcall and after local.set.  wauto: repeat' (cause 1).
+              wfinish [defs]: one path closer for all call lemmas: simp_all with
+              the model definitions, the return bookkeeping, and &&/|| AC
+              lemmas, then Reach.refl.  Removed: the unused `wrun`, `wdone`
+              (folded into wfinish).  Header: exports, file map, and what a
+              decoder.wat edit requires on the proof side.
+  ProofFuncs / ProofStep: every call lemma is `wcall; wauto; wfinish [model]`;
+              no maxHeartbeats override.  ProofStep's ad-hoc `wauto2` and the
+              hand-extended rule loop are gone: `wstore` and the state-0 $step
+              lemma are registered as `wcalls` rules.  stepM_len (with its two
+              helpers, now private) moved here from ProofLoop, next to stepM.
+  ProofLayout (new): all writeCps / endAddr / bytesAt lemmas, previously split
+              between ProofLoop and ProofMain.  writeCps_below (ProofLoop) was a
+              special case of writeCps_outside (ProofMain) and is deleted;
+              endAddr_toNat is now a corollary of endAddr_eq.
+  ProofPureExtras (new): isVSP4, step_length, step_text_length,
+              decodeBuffer_bounds -- see "lemmas for the pure layer".
+  ProofModel: dead `u8lt` removed; `or_shl_toNat` merged into ProofRefine's
+              `toNat_or_shl` (it was used only there); deprecated `if_neg`
+              replaced; stale "(partial) ... done so far" header replaced.
+  ProofRefine: unused private `le32` removed; header updated.
+  ProofLoop:  unused `buf_body_eq` removed (buffer_runs' entry `rfl` already
+              checks the body); deprecated `if_neg` gone with writeCps_below.
+  ProofDone:  unused `done_body_eq` removed (same reason).
+  ProofBuffer: unneeded `maxRecDepth 100000` removed.
+  DecoderModule: stale header ("spike.printed.wat", "spikeModule") replaced;
+              heartbeat override removed; maxRecDepth commented.
+  check.sh:   the two new files added to the build and forbidden-construct
+              lists; comment on the timeouts updated.  No other change.
+  Lean warnings: none left in the candidate's files (were: unused simp
+  argument, deprecated if_neg x 6).
+
+ORDER DEPENDENCE (priority 3)
+  The execution is no longer scripted anywhere in the call lemmas, so
+  reordering or inserting straight-line instructions or `if`s needs no tactic
+  edit.  Audit mutation h01 (swap the i32.and operands in $cont) now passes
+  with no edit at all (before: ProofFuncs failed, and after fixing the model
+  ProofModel failed too).  Still tied to the code: model definitions must
+  compute the same values (an arithmetic change means editing the model and
+  its refinement lemmas); a new instruction kind needs a line in wstep's
+  table; ProofLoop and ProofDone still step through decode_buffer /
+  decode_done by explicit rule lists.  This is written in ProofMach's header.
+
+PINNED STATEMENTS (check.expected.txt)
+  Unchanged; check.sh's diff passed without edits.  All pinned internal
+  lemmas still exist with the same names and types.  The top-level theorems
+  are untouched.  Theorems removed (none pinned): u8lt, le32, or_shl_toNat
+  (merged), buf_body_eq, done_body_eq, writeCps_below (duplicate).
+
+LEMMAS FOR THE PURE LAYER (candidates/pure-lean), all in ProofPureExtras.lean,
+importing only Utf8Proofs, namespace Utf8Wasm:
+  isVSP4, step_length, step_text_length (now proved directly from
+  Utf8Ref.step; before it went through the Wasm model), decodeBuffer_bounds.
+
+AXIOMS
+  Unchanged: both top-level theorems [propext, Classical.choice, Quot.sound];
+  no sorry / native_decide / bv_decide.  The new `elab` tactics only build
+  proof terms that the kernel checks (and check.sh's kernel replay re-checks:
+  11644 constants OK).
+
+WHAT A FURTHER PASS COULD DO
+  - ProofLoop.loop_iter / loop_exit and ProofDone's traces: add br_if,
+    load8U, br, block/loop to wstep's table and prove them with wauto, so
+    those files no longer list rules by hand.
+  - Call lemma dispatch by function index instead of `macro_rules`
+    backtracking (small gain; ProofFuncs is 2.7 s).
+  - DecoderModule (15 s, now 60% of the candidate's Lean CPU): cache on the
+    sha256 of decoder.printed.wat, or ask Talos for a kernel-reduction route;
+    out of scope here.
+  - The kernel replay (128 s) is dominated by Talos's own constants; a replay
+    restricted to the candidate's constants plus their dependency closure
+    would be much shorter, if the user accepts that Talos's oleans were
+    replayed once.
+  - Mutation re-run of the whole audit list (only m07 and h01 redone here).

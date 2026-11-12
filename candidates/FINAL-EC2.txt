@@ -1,0 +1,279 @@
+FINAL PROOF-CHECK TIMES ON THE EC2 INSTANCE (2026-11-12)
+Measurement only. No scripts, proofs, specs or sources were edited. Nothing was installed. Nothing committed.
+Raw logs and /usr/bin/time -v output: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/final-measure/
+  (<n>-<name>.log/.time, .status.before/.after, .hash.before/.after, .hashdiff, .statusdiff;
+   breakdown/*.txt = per-file timings, tables2.txt = the per-file tables below)
+Same machine and method as BASELINE-EC2.txt and AFTER-PASS1-EC2.txt: m8i.2xlarge, Xeon 6975P-C, 8 vCPU, 30 GB, Ubuntu 26.04,
+kernel 7.0.0-1017-aws, nothing else running, one thing at a time, everything run via /root/bend/utf8/... (symlink),
+each from clean build state (git clean -fdXq of the script's directory and, for wasmcert-coq/decoder, also pure-rocq,
+symexec and determinism; pure-lean builds into mktemp dirs; ref-WasmCert-Coq, talos/talos, talos/tools,
+~/aeneas-nightly untouched), under /usr/bin/time -v.  Toolchains as in the baseline (Lean 4.35.0 / 4.36.0-rc2, Rocq 9.2,
+rustc 1.99.1, node 26.13.0, bend 2.0.40, Aeneas nightly-2026.11.10-0d21a9e).
+wall = elapsed; CPU = user+sys; RSS = peak of the largest single process.  Per-file numbers are single runs (+-0.1 s).
+
+SUMMARY: three measurement points (wall; baseline = 2026-11-11 morning, pass 1 = 2026-11-11, final = now)
+  #  script                                   baseline   after pass 1   FINAL     final CPU   peak RSS   verdict
+  1  pure-lean/check.sh                       1:55.4     0:11.9         0:12.4    26.1 s      0.75 GB    ALL CHECKS PASSED
+  2  pure-rocq/check.sh                       8:40.5     0:22.0         0:22.3    22.3 s      0.71 GB    ALL CHECKS PASSED (15 laws, RefDecoder_correct, step_output_ok, 10 Utf8StepFacts lemmas: no axioms)
+  3  wasmcert-coq/determinism/check.sh        (n/a)      (n/a)          0:19.0    20.7 s      0.79 GB    VERDICT: ALL PROVED
+  4  aeneas/decoder/check.sh                  1:45.5*    0:52.2         0:51.3    68.8 s      2.83 GB    ALL CHECKS PASSED: Boundary.Verified, and non-vacuity (Boundary.VerifiedForWrapper)
+  5a talos/decoder/check.sh (default, replay)  2:55.5   2:03.4         2:42.9    214.8 s     7.14 GB    PASS: ShippedModuleCorrect + ShippedWrapperCovered, ..., kernel replay of 11655 constants OK
+  5b talos/decoder/check.sh --skip-replay  (n/a)      (n/a)          0:37.3    89.1 s      2.25 GB    PASS ... kernel replay SKIPPED, difftest PASS
+  6a wasmcert-coq/decoder/check.sh (default)  0:57.5   0:58.9         1:49.5    118.6 s     1.00 GB    PASS: decoder_module_correct + decoder_module_applies, rocqchk passed (every library of this development)
+  6b   ... FULL_ROCQCHK=1                   (n/a)      (n/a)          2:38.1    167.3 s     1.46 GB    PASS ... rocqchk passed (all libraries, including installed dependencies)
+  6c   ... SKIP_ROCQCHK=1                   (n/a)      (n/a)          1:37.8    107.0 s     1.00 GB    PASS ... rocqchk SKIPPED
+  7  bend PROOF.bend (repo root)              0:02.0     (not run)      0:01.8    3.1 s       0.38 GB    ALL PROOFS CHECK
+  (* baseline Aeneas needed a mkdir workaround; baseline numbers for 6 were against the old, much smaller development.)
+  Exact (user+sys, KB): 1: 24.85+1.21, 754900.  2: 21.39+0.93, 714976.  3: 18.21+2.44, 793632.  4: 64.16+4.63, 2827836.
+    5a: 206.52+8.28, 7144200.  5b: 83.91+5.18, 2251440.  6a: 110.38+8.18, 998328.  6b: 158.68+8.60, 1457768.
+    6c: 98.94+8.06, 997956.  7: 2.89+0.21, 378292.
+  All ten runs exit 0, all passed on the first try (no reruns needed).
+  The five original scripts (1,2,4,5a,6a): baseline 13:48 -> pass 1 4:48 -> final 5:58 (the increase over pass 1 is the Talos
+  kernel replay, 2:05, and the wasmcert statement check + rocqchk, which are new; Talos Lean itself fell from ~90 s to ~35 s and
+  wasmcert's build from 22 s to 13 s).  With --skip-replay and SKIP_ROCQCHK=1: 0:12+0:22+0:51+0:37+1:38 = 3:41.
+  Not re-measured: difftest selftest (candidates/difftest/selftest/run.mjs; baseline 1:00).
+  Notes on what each script rebuilds itself:
+   - wasmcert-coq/decoder/check.sh deletes the .vo of and rebuilds: pure-rocq (runs pure-rocq/check.sh, ALL CHECKS PASSED
+     required), symexec, determinism, and its own libraries.  Nothing is taken from earlier runs.
+   - aeneas/decoder/check.sh rebuilds the pure Lean layer (6 files, from lean/pure copies, which must equal pure-lean/), its own
+     Lean files, the wasm (cargo) and the Charon+Aeneas translation (host and wasm32).  Needs ~/aeneas-nightly.
+   - talos/decoder/check.sh rebuilds the pure Lean layer (copies in the directory, must equal pure-lean/) and all its own files;
+     it does NOT build Talos (checks that the checkout at ../talos/talos is at the pinned commit, clean, with up-to-date .olean).
+     The difftest runs in the background concurrently with the Lean steps, so its 32 s is hidden in the wall time.
+   - 5a vs 5b: kernel replay of 11655 constants costs 125.6 s wall (standalone 124.5 s), 7.1 GB RSS (the 7.1 GB is the replay).
+
+THREE-WAY SPLIT OF EACH DEFAULT CHECK
+  (a) proof checking of shared layers the candidate rebuilds; (b) proof checking of its own files (incl. the statement/axioms
+  checks that elaborate its own theorems); (c) everything else.  Standalone step timings (below) summed; "other" = script wall
+  minus the standalone sums (startup, hash checks, greps, elan/lake invocations, wasm-tools).  Wall in s, then CPU in s.
+
+  AENEAS/decoder        script 51.3 wall, 68.8 CPU
+    (a) pure Lean layer (Laws, Bits, Ref, Table, Proofs, StepFacts)       5.8 wall   12.4 CPU    ( 11%)
+    (b) own Lean (Types, Funs, Boundary, Proofs, CheckTop statement/axioms) 6.6 wall  12.3 CPU    ( 13%)
+    (c) difftest harness 33.1 wall / 35.5 CPU; cargo wasm build 0.1; Charon+Aeneas host+wasm32 2.0 wall / 4.3 CPU (twice);
+        other 3.8 wall / 4.2 CPU                                            38.9 wall   44.1 CPU  ( 76%)
+  TALOS/decoder, default   script 162.9 wall, 214.8 CPU
+    (a) pure Lean layer (6 files, shared with the others)                  6.0 wall    13.0 CPU    (  4%)
+    (b) own Lean (DecoderModule 15.1, ProofMach 1.3, ProofFuncs 2.7, ProofStep 2.2, other Proof* 6.1, Boundary 0.2, statement checks 1.1)
+                                                                           28.8 wall   37.5 CPU    ( 18%)
+    (c) kernel replay 124.5 wall / 124.5 CPU; difftest 32.2 / 34.7 CPU (concurrent with Lean steps: ~0 wall); other 3.5 wall / 5.2 CPU
+                                                                          128.0 wall  164.4 CPU    ( 79%)
+  TALOS/decoder, --skip-replay   script 37.3 wall, 89.1 CPU
+    (a) 6.0 / 13.0 (16%)   (b) 28.8 / 37.5 (77%)   (c) 2.4 wall (+ hidden concurrent difftest 32.2 wall, 34.7 CPU) / 38.6 CPU (7% of wall)
+  WASMCERT-COQ/decoder, default   script 109.5 wall, 118.6 CPU
+    (a) shared layers rebuilt: pure-rocq (make 12.4 + Print Assumptions compile 9.7), symexec (make 3.2), determinism (make 13.4)
+                                                                           38.7 wall   42.0 CPU    ( 35%)
+        [pure-rocq 22.2 + symexec 3.2 + determinism 13.4; scope per the task: symexec/determinism are reusable infrastructure of this
+         candidate, pure-rocq is the shared pure layer.  Of the 38.7 s, 16.5 s are the project's reusable infrastructure.]
+    (b) own Coq files (make all 12.6 wall / 16.0 CPU, -j2) + statement/assumption check of the top-level theorems 16.7
+                                                                           29.3 wall   32.7 CPU    ( 27%)
+    (c) rocqchk (default) 11.5; difftest 28.8 wall / 31.2 CPU; decoder.wasm re-emit 0.7; other 0.6 wall / 0.5 CPU
+                                                                           41.5 wall   43.9 CPU    ( 38%)
+  WASMCERT-COQ/decoder, FULL_ROCQCHK=1   158.1 wall, 167.3 CPU: (a) 38.7 (b) 29.3 (c) 90.1  [rocqchk 59.6; +48.6 s over default]
+  WASMCERT-COQ/decoder, SKIP_ROCQCHK=1    97.8 wall, 107.0 CPU: (a) 38.7 (b) 29.3 (c) 29.8  [no rocqchk; default minus 11.7 s]
+  Reading: Aeneas is dominated by the difftest harness (65% of wall); Talos by kernel replay (77% of wall) and, without it, by its
+  own DecoderModule decode (15 s, 40% of the 37 s); Wasmcert is spread over the shared pure-rocq layer, the statement check
+  (16.7 s) and the harness.
+
+SUB-STEP BREAKDOWN, per file (separate pass, one step at a time, clean; wall s / CPU s as measured by /usr/bin/time)
+  (pure-lean timings include ~0.1 s of `elan run` start; a whole script's per-file times add up to about the script wall.)
+  Changes since pass 1: Talos ProofFuncs 47 -> 2.7 s, ProofStep 18 -> 2.2 s (wauto/ProofMach tactics, IMPROVEMENT.txt);
+  wasmcert Decode.v 15.2 -> 1.2 s (and Step* split over StepEmpty/Pending/Complete); the new work is the statement check
+  (16.7 s: it elaborates Boundary, determinism and symexec statements and ~40 Print Assumptions) and rocqchk.
+
+(per-file tables follow; "rc=0" for every step)
+  pure-lean, Lean v4.35.0 (each file: elan run lean -o)
+    file / step                          wall s    CPU s
+    Utf8Laws                               0.35     0.49
+    Utf8Bits                               2.05     4.34
+    Utf8Ref                                0.20     0.23
+    Utf8Table                              2.46     5.63
+    Utf8Proofs                             0.59     1.73
+    Utf8StepFacts                          0.25     0.42
+    Utf8Eval                               0.16     0.16
+    (sum)                                  6.06    13.00
+  pure-lean, Lean v4.36.0-rc2
+    file / step                          wall s    CPU s
+    Utf8Laws                               0.32     0.43
+    Utf8Bits                               2.01     4.21
+    Utf8Ref                                0.18     0.21
+    Utf8Table                              2.43     5.43
+    Utf8Proofs                             0.59     1.69
+    Utf8StepFacts                          0.25     0.39
+    Utf8Eval                               0.16     0.16
+    (sum)                                  5.94    12.52
+  pure-rocq, per file (rocq c, clean, serial)
+    file / step                          wall s    CPU s
+    Utf8Laws                               0.45     0.44
+    Utf8Ref                                0.21     0.21
+    Utf8Bridge                            10.13    10.12
+    Utf8Proofs                             1.00     1.00
+    Utf8StepFacts                          0.41     0.40
+    (sum)                                 12.20    12.17
+  wasmcert-coq/determinism, per file
+    file / step                          wall s    CPU s
+    Fragment                               0.64     0.63
+    ReduceDet                              1.16     1.16
+    Trapped                                1.59     1.58
+    Preservation                           1.61     1.61
+    Focus                                  1.64     1.64
+    HeadStep                               1.82     1.81
+    Det                                    5.60     5.60
+    Main                                   0.62     0.61
+    (sum)                                 14.68    14.64
+  wasmcert-coq/symexec, per file
+    file / step                          wall s    CPU s
+    Steps                                  0.84     0.83
+    Control                                0.67     0.66
+    Wp                                     0.76     0.76
+    Mem                                    0.73     0.73
+    WpMem                                  0.66     0.66
+    I32                                    0.82     0.81
+    (sum)                                  4.48     4.45
+  whole-library make (as the scripts run them; -j2 where the Makefile says so)
+    file / step                          wall s    CPU s
+    pure-rocq-make                        12.43    12.42
+    pure-rocq-PrintAssumptions-compile     9.74     9.74
+    symexec-make                           3.15     4.80
+    determinism-make                      13.36    15.04
+    wasmdecoder-make                      12.57    15.98
+  aeneas/decoder, per step
+    file / step                          wall s    CPU s
+    cargo-wasm-build                       0.11     0.10
+    charon+aeneas-host                     0.97     2.12
+    charon+aeneas-wasm32                   0.99     2.16
+    pure/Utf8Laws                          0.32     0.43
+    pure/Utf8Bits                          1.99     4.09
+    pure/Utf8Ref                           0.19     0.23
+    pure/Utf8Table                         2.45     5.54
+    pure/Utf8Proofs                        0.60     1.69
+    pure/Utf8StepFacts                     0.25     0.39
+    own/Decoder/Types                      0.74     0.79
+    own/Decoder/Funs                       1.12     1.35
+    own/Boundary                           1.00     1.06
+    own/Proofs                             2.74     8.10
+    own/CheckTop-statements-axioms         0.99     1.01
+    own/Axioms.lean                        0.96     0.97
+    difftest-alone                        33.08    35.50
+  talos/decoder, per step
+    file / step                          wall s    CPU s
+    Utf8Laws                               0.36     0.48
+    Utf8Bits                               2.07     4.43
+    Utf8Ref                                0.22     0.26
+    Utf8Table                              2.49     5.63
+    Utf8Proofs                             0.62     1.75
+    Utf8StepFacts                          0.27     0.42
+    DecoderModule                         15.11    21.64
+    Boundary                               0.21     0.23
+    ProofMach                              1.32     1.38
+    ProofFuncs                             2.74     2.84
+    ProofStep                              2.19     2.29
+    ProofLayout                            0.75     0.98
+    ProofLoop                              0.86     1.07
+    ProofBuffer                            0.64     0.65
+    ProofDone                              0.74     0.87
+    ProofModel                             0.88     1.18
+    ProofRefine                            0.98     1.81
+    ProofMain                              0.64     0.72
+    ProofWrapper                           0.64     0.66
+    statement-check                        0.60     0.60
+    toplevel-check                         0.54     0.54
+    kernel-replay-alone                  124.54   124.53
+    difftest-alone                        32.17    34.69
+    wasm-tools-parse+strip+print           0.00     0.00
+  wasmcert-coq/decoder, per step
+    file / step                          wall s    CPU s
+    Module                                 0.68     0.66
+    Binary                                 1.23     1.23
+    Instance                               0.66     0.66
+    DetInstance                            0.65     0.64
+    Boundary                               0.66     0.65
+    OutBound                               0.64     0.63
+    NonVacuity                             0.76     0.76
+    Repr                                   0.73     0.72
+    Exports                                0.87     0.87
+    Decode                                 1.16     1.15
+    StepEmpty                              1.30     1.29
+    StepPending                            2.75     2.74
+    StepComplete                           2.09     2.08
+    StepSpec                               0.69     0.69
+    Theorems                               0.72     0.71
+    EmitHex.v                              0.65     0.65
+    emit-node-step                         0.02     0.01
+    statements-assumptions-CheckTop       16.73    16.72
+    rocqchk-default                       11.50    11.50
+    rocqchk-full                          59.63    59.62
+    difftest-alone                        28.75    31.19
+
+  Notes on the tables:
+   - Kernel replay alone: 124.5 s wall, 121.5 user + 3.0 sys, "replaying 11655 non-core constants", replay OK.
+   - Talos DecoderModule (kernel-checked decode of the printed module text): 15.1 s wall / 21.2 user (it is multi-threaded).
+   - Talos wasm-tools parse/strip/validate/print: < 0.01 s.
+   - Differential harness alone (node difftest/run.mjs decoder.mjs, full): aeneas 33.1, talos 32.2, wasmcert 28.8 s wall.
+   - rocqchk alone: default (every library of this development, -norec, 15 + 6 + 8 + 5 modules) 11.5 s;
+     FULL (Decoder.Theorems Decoder.NonVacuity Determinism.Main with all dependencies: Stdlib, mathcomp, CompCert, coq-wasm) 59.6 s.
+   - wasmcert statements-assumptions-CheckTop = the CheckTop.v of check.sh (types of the two top-level claims, ~40 Print Assumptions,
+     determinism statements) compiled against the built libraries: 16.7 s.
+   - pure-rocq: `make` 12.4 s wall (-j2, Utf8Bridge 10.1 is the critical path); PrintAssumptions.v compile (27 Print Assumptions) 9.7 s.
+   - Aeneas: Charon+Aeneas 1.0 s per target; cargo build of the wasm 0.1 s; lean/Axioms.lean (not run by check.sh) 1.0 s.
+   - Aeneas per-file Lean times here (own Proofs 2.7 wall / 7.7 CPU) are multi-threaded Lean elaboration.
+
+SIZES (non-blank lines; `grep -cv '^[[:space:]]*$'`)
+  Spec (the reviewed laws): spec-lean/Utf8Laws.lean 656; spec-rocq/Utf8Laws.v 686.
+  Shared pure layer, Lean (candidates/pure-lean; aeneas lean/pure and talos/decoder hold byte-identical copies, counted once):
+     Utf8Laws 656 (= spec copy), Utf8Bits 161, Utf8Ref 79, Utf8Table 237, Utf8Proofs 565, Utf8StepFacts 106
+     => 1148 without the spec copy (1804 with).  Utf8Eval 14 (sanity test, not in the proof).
+  Shared pure layer, Rocq (candidates/pure-rocq): Utf8Laws 686 (= spec copy), Utf8Ref 100, Utf8Bridge 334, Utf8Proofs 449,
+     Utf8StepFacts 162 => 1045 without the spec copy (1731 with).  (PrintAssumptions.v is generated by check.sh.)
+
+  Per candidate (lines)                                   TALOS    AENEAS   WASMCERT-COQ
+  1 statement files (the user-facing claim)
+      Boundary file                                        186      169      213
+      module definition                                     71        -      139     (Talos DecoderModule.lean; wasmcert Module.v)
+      subtotal                                             257      169      352
+  2 candidate-specific proofs                              958      385     1679
+      Talos: ProofFuncs 80, ProofStep 73, ProofLayout 118, ProofLoop 128, ProofBuffer 30, ProofDone 91, ProofModel 71,
+             ProofRefine 212, ProofMain 99, ProofWrapper 34 (=936) + Axioms.lean 22
+      Aeneas: lean/Proofs.lean 380 + lean/Axioms.lean 5
+      Wasmcert: Binary 10, Instance 45, DetInstance 46, OutBound 66, NonVacuity 59, Repr 41, Exports 148, Decode 299,
+             StepEmpty 281, StepPending 302, StepComplete 305, StepSpec 37, Theorems 40 (EmitHex.v 5 not counted)
+  3 reusable infrastructure written in this project        192     0        2071
+      Talos: ProofMach.lean (symbolic-execution tactics wstep/wcall/wauto/wfinish) 192
+      Wasmcert: symexec/ 761 (Steps 285, Control 66, Wp 85, Mem 73, WpMem 50, I32 202)
+                + determinism/ 1310 (Fragment 124, ReduceDet 235, Trapped 149, Preservation 126, Focus 101, HeadStep 290,
+                  Det 257, Main 28)
+  1+2+3 written for this candidate                         1407     554      4102
+  4 shared pure layer (Lean for Talos/Aeneas, Rocq for Wasmcert), without spec copy
+                                                           1148     1148     1045
+  5 spec (copy inside the pure layer)                       656      656      686
+  Implementation (not proof; for scale)
+      source: Talos decoder.wat 151 (hand-written Wasm text; decoder.printed.wat 443 is generated from the .wasm and is part of the
+              statement's input); Aeneas src/lib.rs 183 Rust (+ generated Lean lean/Decoder/Types 35 + Funs 408 = 443);
+              Wasmcert: the module term is Module.v (counted in 1).
+      wrapper decoder.mjs lines                             52       45       35
+      shipped decoder.wasm bytes                           880     5487      643
+  Note: Aeneas row 1 does not contain the module definition because the program the theorem is about is the Rust source plus its
+  generated translation (443 generated lines, not hand-written).  Wasmcert row 3 is mostly generic WebAssembly-semantics
+  infrastructure (determinism 1310 is a library result, not specific to the decoder).
+
+GIT STATE, ANOMALIES
+  - Tracked files: `git status --short` (83 lines of pre-existing uncommitted work, including deleted tracked wasmcert files) and a
+    sha256 of every tracked and every untracked-not-ignored file were taken before and after each of the ten runs: hashdiff and
+    statusdiff are EMPTY for all ten.  After the whole session (including all breakdown steps) status and hashes still equal the
+    state at the start.  No script modified any tracked file.  wasmcert check.sh deletes and regenerates decoder.wasm and
+    decoder_hex.out (tracked); both came back byte-identical.  My breakdown steps also rewrote decoder_hex.out via EmitHex (identical).
+  - wasmcert Makefile `clean:` now leaves decoder.wasm/decoder_hex.out alone (the earlier pass-1 anomaly c is fixed; not run).
+  - Failures: none.  Every run passed on the first try; no reruns.  No nondeterminism seen.
+  - Checks depending on leftovers: none found for the scripts as run.  Remaining external prerequisites: Talos check.sh needs the
+    pre-built Talos checkout (pinned commit, clean worktree, .olean files up to date; verified by the script, not built);
+    Aeneas check.sh needs ~/aeneas-nightly; both fail loudly if missing.  wasmcert check.sh rebuilds all of pure-rocq, symexec,
+    determinism, so the old order dependency (pure-rocq before wasmcert) is gone.  The tracked build copies (aeneas lean/pure,
+    talos Utf8*.lean) matched pure-lean/ so no --refresh-copies was needed.
+  - Talos: difftest runs in the background concurrently with the Lean build (it takes 32 s CPU-hidden); script-printed per-file Lean
+    times differ by +-1 s from the standalone ones (integer seconds).  Kernel replay is 77% of the default wall time and needs 7.1 GB.
+  - Aeneas: lean/Axioms.lean is not run by check.sh (its checks are in CheckTop); I timed it separately (1.0 s).
+  - pure-rocq's check.sh spends 9.7 s of 22.3 s in the PrintAssumptions.v compile (it re-checks 27 Print Assumptions, mostly
+    re-loading the libraries); make itself is 12.4 s.
+  - Per-file Rocq timings were compiled serially with `rocq c`; `make -j2` (pure-rocq, decoder) gives wall less than the sum of files
+    only where independent files exist.  Single runs; differences under about 0.3 s are noise.
+  - Files in the repo root, symlink: node resolves /root/bend/utf8 to /root/utf8 in stack traces (harmless, as in the baseline).

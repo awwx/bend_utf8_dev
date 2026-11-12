@@ -1,11 +1,17 @@
-(** * The top-level statement of Boundary.v, proved CONDITIONALLY on the
-    per-byte lemma [step_spec] (Decode.v), with RefDecoder as witness. *)
+(** * The top-level statement of Boundary.v, with RefDecoder as witness.
+
+    Exports:
+    - decoder_module_correct_if_step : (forall hs, step_spec hs) -> decoder_module_correct
+      (the loop/framing/exports part, from session 1);
+    - decoder_module_correct_proved : decoder_module_correct
+      (unconditional, using step_spec_proved from StepSpec.v). *)
 
 From Stdlib Require Import ZArith NArith List Lia.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool eqtype seq.
 From Wasm Require Import datatypes operations opsem properties.
-From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs.
-From Decoder Require Import Module Steps Wp WpMem Instance Boundary Repr Exports Decode.
+From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs Utf8StepFacts.
+From SymExec Require Import Steps Wp WpMem.
+From Decoder Require Import Module Instance Boundary Repr Exports Decode StepSpec.
 
 Section Top.
 
@@ -34,5 +40,8 @@ Proof.
   - move => st v HR.
     case: (done_correct hs Hf Hm Hlen HR) => m' H. by exists m'.
 Qed.
+
+Theorem decoder_module_correct_proved : decoder_module_correct.
+Proof. apply: decoder_module_correct_if_step. exact: step_spec_proved. Qed.
 
 End Top.

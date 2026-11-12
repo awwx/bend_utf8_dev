@@ -7,6 +7,11 @@ session's conversation; this file is the context.
 
 Read `AGENTS.md` in the repo root first. It still applies.
 
+**Update 2026-11-12:** the second session (on EC2) completed, audited and
+improved all three candidates. `COMPARISON.md` in this directory has the
+results and supersedes sections 6 and 7 below; sections 1 to 5 and 9 still
+describe the experiment and how it is organized.
+
 ## 1. What the user is after
 
 The user once built a security layer between an API and a database

@@ -1,11 +1,23 @@
-(** * Proofs for the [start] and [done] exports, and shared lemmas for
-    invoking exports on a store like the instantiated one. *)
+(** * Exports.v: proofs for the [start] and [done] exports, and shared
+    lemmas for invoking exports on a store like the instantiated one.
+
+    Decoder-specific.
+
+    Exports:
+    - [unfold_code] (tactic: unfold the module's code abbreviations).
+    - [upd_mem0_same], [store_with_mem0], [call_of_wp] (from a wp proof of
+      a function body to Boundary.call_returns, including the
+      unique-outcome part via DetInstance.decoder_call_outcome).
+    - Layout constants: [mem_bytes_needed_val], [OUT_addr_val],
+      [out_area0], [N_of_uint_OUT].
+    - [start_correct], [FFFD_units], [done_correct]. *)
 
 From Stdlib Require Import ZArith NArith List Lia.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool eqtype seq.
 From Wasm Require Import datatypes operations opsem properties.
-From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs.
-From Decoder Require Import Module Steps Control Wp Mem WpMem Instance Boundary Repr.
+From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs Utf8StepFacts.
+From SymExec Require Import Steps Control Wp Mem WpMem.
+From Decoder Require Import Module Instance Boundary Repr DetInstance.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -32,8 +44,12 @@ Qed.
 Lemma store_with_mem0 s m : store_with_mem s 0%num m = upd_mem0 s m.
 Proof. by []. Qed.
 
-(** Wrap a [wp] proof of a function body into a call. *)
+(** Wrap a [wp] proof of a function body into a call.  The reduction
+    comes from [invoke_rule]; that it is the only outcome comes from
+    [decoder_call_outcome] (DetInstance.v), which needs the store to have
+    the instantiated store's functions. *)
 Lemma call_of_wp s a ts1 ts2 x ts body args defs s' res :
+  s.(s_funcs) = s0.(s_funcs) ->
   lookup_N s.(s_funcs) a = Some (FC_func_native (Tf ts1 ts2) inst0 (Build_module_func x ts body)) ->
   length args = length ts1 -> length res = length ts2 ->
   default_vals ts = Some defs ->
@@ -41,16 +57,22 @@ Lemma call_of_wp s a ts1 ts2 x ts body args defs s' res :
      (fun s1 f1 stk1 => s1 = s' /\ stk1 = rev res) ->
   call_returns hs s a args s' res.
 Proof.
-  move => Hl Ha Hr Hd [s1 [f1 [stk1 [Hx [E1 E2]]]]] f; subst.
-  by apply: invoke_rule; eauto.
+  move => Hf Hl Ha Hr Hd Hwp f.
+  have Hrt : reduce_trans (hs, s, f, v_to_e_list args ++ [:: AI_invoke a])
+                          (hs, s', f, v_to_e_list res).
+  { case: Hwp => [s1 [f1 [stk1 [Hx [E1 E2]]]]]; subst.
+    by apply: invoke_rule; eauto. }
+  case: (decoder_call_outcome Hf Hrt) => Hall [Hinf _].
+  split; first exact: Hrt.
+  split; first exact: Hall.
+  move => run H0 Hrun. exact: (Hinf run H0 Hrun).
 Qed.
 
-
-Lemma mem_bytes_needed_val : mem_bytes_needed = 327684%num.
+Lemma mem_bytes_needed_val : mem_bytes_needed = 196610%num.
 Proof. by vm_compute. Qed.
 Lemma OUT_addr_val : OUT_addr = 65536%num.
 Proof. by vm_compute. Qed.
-Lemma out_area0 : out_area 0 = 4%num.
+Lemma out_area0 : out_area 0 = 2%num.
 Proof. by vm_compute. Qed.
 Lemma N_of_uint_OUT : Wasm_int.N_of_uint i32m (Wasm_int.Int32.repr OUT) = 65536%num.
 Proof. by vm_compute. Qed.

@@ -1,13 +1,29 @@
-(** * The [decode] export: the loop, memory framing and output
+(** * Decode.v: the [decode] export: the loop, memory framing and output
     accumulation, proved CONDITIONALLY on [step_spec] (one iteration of
     [step_code] refines RefDecoder's [step]), which is stated here as a
-    [Definition ... : Prop] and taken as an explicit premise. *)
+    [Definition ... : Prop] and taken as an explicit premise
+    (StepSpec.v proves it; Theorems.v combines the two).
+
+    Decoder-specific.
+
+    Exports:
+    - [vZ] (an i32 value), [frame_of] (the locals of decode for a state,
+      length, index, output address), [writes] (the bytes written by one
+      step), [step_spec].
+    - [utf16le_cat] (utf16le over ssreflect's cat), [mem_holds_app],
+      [mem_holds_same], [wp_exec], [upd_mem0_nth], [upd_mem0_twice].
+    - Section Decode (premise [step_spec], a store like the instantiated
+      one, an input buffer in memory): loop invariant [inv], [post],
+      [loop_body_ok] (one iteration), [decode_loop], and
+      [decode_correct]: the call returns the new state and output length,
+      and the output bytes are at OUT. *)
 
 From Stdlib Require Import ZArith NArith List Lia.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool eqtype seq.
 From Wasm Require Import datatypes operations opsem properties.
-From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs.
-From Decoder Require Import Module Steps Control Wp Mem WpMem Instance Boundary Repr Exports.
+From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs Utf8StepFacts.
+From SymExec Require Import I32 Steps Control Wp Mem WpMem.
+From Decoder Require Import Module Instance Boundary Repr Exports OutBound.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -24,24 +40,27 @@ Definition vZ (z : Z) : value := VAL_num (VAL_int32 (Wasm_int.Int32.repr z)).
 Definition frame_of (st : State) (L : Z) (i : nat) (o : Z) (junk : list value) : frame :=
   Build_frame (vZ (enc st) :: vZ L :: vZ (Z.of_nat i) :: vZ o :: junk) inst0.
 
-(** Bytes written by one step, and the rest of memory unchanged. *)
+(** Bytes [ns] written by one step at [o], and the rest of memory unchanged. *)
 Definition writes (m1 m2 : meminst) (o : N) (ns : list N) : Prop :=
   m2.(meminst_type) = m1.(meminst_type) /\
   operations.mem_length m2 = operations.mem_length m1 /\
   mem_holds m2 o ns /\
-  forall q, (q < o \/ o + 4 <= q)%num ->
+  forall q, (q < o \/ o + N.of_nat (length ns) <= q)%num ->
     mem_lookup q m2.(meminst_data) = mem_lookup q m1.(meminst_data).
 
-(** THE PER-BYTE LEMMA (not yet proved): one run of [step_code] on byte
-    [b] (at address [i]) in state [st] produces RefDecoder's [step st b]:
-    the new state, and the UTF-16LE bytes of its output at [o]. *)
+(** THE PER-BYTE LEMMA (proved as StepSpec.step_spec_proved): one run of
+    [step_code] on byte [b] (at address [i]) in state [st] produces
+    RefDecoder's [step st b]: the new state, and the UTF-16LE bytes of its
+    output at [o], changing nothing else.  Memory room needed at [o]: 2
+    bytes from the empty state (at most one unit is written), 4 bytes
+    when bytes are pending (U+FFFD plus a unit, or a surrogate pair). *)
 Definition step_spec : Prop :=
   forall (s1 : store_record) (m1 : meminst) (st : State) (b : Byte.byte) (wb : bytes.byte)
          (L : Z) (i : nat) (o : Z) (junk : list value),
     nth_error s1.(s_mems) 0 = Some m1 ->
     Inv st -> length junk = 7 ->
     mem_lookup (N.of_nat i) m1.(meminst_data) = Some wb -> byte_as_mem b wb ->
-    (0 <= o)%Z -> (Z.to_N o + 4 <= operations.mem_length m1)%num ->
+    (0 <= o)%Z -> (Z.to_N o + 2 + N.of_nat (pend st) <= operations.mem_length m1)%num ->
     (o + 4 < Wasm_int.Int32.modulus)%Z -> (Z.of_nat i < Wasm_int.Int32.modulus)%Z ->
     wp hs s1 (frame_of st L i o junk) [::] step_code
       (fun s2 f2 stk2 =>
@@ -53,21 +72,12 @@ Definition step_spec : Prop :=
            writes m1 m2 (Z.to_N o) (utf16le (snd (step st b))) /\
            (length (utf16le (snd (step st b))) <= 4)%coq_nat).
 
-
 (** ** Pure helpers *)
 
-Lemma ref_decode_buffer_snoc st0 pre b :
-  ref_decode_buffer st0 (pre ++ [:: b]) =
-  let '(st, t) := ref_decode_buffer st0 pre in
-  (fst (step st b), t ++ snd (step st b)).
-Proof.
-  rewrite /ref_decode_buffer fold_left_app /=.
-  case: (fold_left step_acc pre (st0, [::])) => st t /=.
-  by case: (step st b).
-Qed.
-
-Lemma utf16le_app t1 t2 : utf16le (t1 ++ t2) = utf16le t1 ++ utf16le t2.
-Proof. by rewrite /utf16le !flat_map_app. Qed.
+(* [utf16le_app] (OutBound.v) is stated with List.app; under ssreflect's
+   seq, [++] is [cat], which [rewrite] does not identify with app. *)
+Lemma utf16le_cat t1 t2 : utf16le (t1 ++ t2) = utf16le t1 ++ utf16le t2.
+Proof. exact: utf16le_app. Qed.
 
 Lemma mem_holds_app m p ns1 ns2 :
   mem_holds m p ns1 -> mem_holds m (p + N.of_nat (length ns1))%num ns2 ->
@@ -96,42 +106,6 @@ Lemma wp_exec s1 f1 stk bes S F K :
   exec hs s1 f1 stk bes S F K.
 Proof. move => [s2 [f2 [stk2 [H [E1 [E2 E3]]]]]]; by subst. Qed.
 
-Lemma unsigned_small z : (0 <= z < Wasm_int.Int32.modulus)%Z ->
-  Wasm_int.Int32.unsigned (Wasm_int.Int32.repr z) = z.
-Proof.
-  move => H; apply Wasm_int.Int32.unsigned_repr. rewrite /Wasm_int.Int32.max_unsigned. lia.
-Qed.
-
-Lemma geu_val a b : (0 <= a < Wasm_int.Int32.modulus)%Z -> (0 <= b < Wasm_int.Int32.modulus)%Z ->
-  app_relop (Relop_i (ROI_ge SX_U)) (VAL_int32 (Wasm_int.Int32.repr a)) (VAL_int32 (Wasm_int.Int32.repr b))
-  = (b <=? a)%Z.
-Proof.
-  move => Ha Hb. rewrite /app_relop /= /Wasm_int.Int32.ltu !unsigned_small //.
-  case: Coqlib.zlt => H; case: Z.leb_spec => H' //=; lia.
-Qed.
-
-Lemma i32_iadd_repr a b :
-  Wasm_int.Int32.iadd (Wasm_int.Int32.repr a) (Wasm_int.Int32.repr b) = Wasm_int.Int32.repr (a + b).
-Proof.
-  rewrite /Wasm_int.Int32.iadd /Wasm_int.Int32.add.
-  apply Wasm_int.Int32.eqm_samerepr, Wasm_int.Int32.eqm_add;
-    apply Wasm_int.Int32.eqm_sym, Wasm_int.Int32.eqm_unsigned_repr.
-Qed.
-
-Lemma i32_isub_repr a b :
-  Wasm_int.Int32.isub (Wasm_int.Int32.repr a) (Wasm_int.Int32.repr b) = Wasm_int.Int32.repr (a - b).
-Proof.
-  rewrite /Wasm_int.Int32.isub /Wasm_int.Int32.sub.
-  apply Wasm_int.Int32.eqm_samerepr, Wasm_int.Int32.eqm_sub;
-    apply Wasm_int.Int32.eqm_sym, Wasm_int.Int32.eqm_unsigned_repr.
-Qed.
-
-Lemma wasm_bool_true_nz : wasm_bool true <> Wasm_int.int_zero i32m.
-Proof. by []. Qed.
-
-Lemma modulus_val : Wasm_int.Int32.modulus = 4294967296%Z.
-Proof. by []. Qed.
-
 (** ** The loop *)
 
 Hypothesis Hstep : step_spec.
@@ -159,7 +133,8 @@ Definition inv (n : nat) (s' : store_record) (f : frame) : Prop :=
     length junk = 7 /\
     mem_frame m m' OUT_addr (out_area (length bs)) /\
     mem_holds m' OUT_addr (utf16le t) /\
-    (length (utf16le t) <= Nat.mul 4 (length pre))%coq_nat.
+    (* output so far, plus the credit of pending bytes (OutBound.pend) *)
+    (Nat.add (length (utf16le t)) (pend st) <= Nat.add (Nat.mul 2 (length pre)) (pend st0))%coq_nat.
 
 Definition post (s' : store_record) (f : frame) : Prop :=
   exists m' junk st t,
@@ -168,7 +143,6 @@ Definition post (s' : store_record) (f : frame) : Prop :=
     f = frame_of st lenZ (length bs) (OUT + Z.of_nat (length (utf16le t))) junk /\
     mem_frame m m' OUT_addr (out_area (length bs)) /\
     mem_holds m' OUT_addr (utf16le t).
-
 
 Lemma loop_split :
   loop_body = (([:: lg 2; lg 1; i_geu] ++ [:: BI_br_if 1%num]) ++ (step_code ++ [:: lg 2; i32c 1; i_add; ls 2])) ++ [:: BI_br 0%num].
@@ -252,8 +226,13 @@ Proof.
     have Ho0 : (0 <= o)%Z by rewrite /o /OUT; lia.
     have Eo : Z.to_N o = (65536 + N.of_nat (length (utf16le t)))%num.
     { rewrite /o /OUT. apply N2Z.inj. rewrite Z2N.id; lia. }
-    have Ho4 : (Z.to_N o + 4 <= operations.mem_length m1)%num.
-    { rewrite Hlen1 Eo. have Hz1 : (Z.of_nat (length pre) < 65536)%Z by clear - Hlt' Hbs65; lia. have Hz2 : (Z.of_nat (length (utf16le t)) <= 262140)%Z by clear - Hlt Hz1; lia. apply: (N.le_trans _ 327684%num); [clear - Hz2; lia | exact HL]. }
+    have Hp0 := pend_le2 st0.
+    (* room for this step: o + 2 + pend st <= OUT + 2 * |bs| + 2 = mem_bytes_needed *)
+    have Ho4 : (Z.to_N o + 2 + N.of_nat (pend st) <= operations.mem_length m1)%num.
+    { rewrite Hlen1 Eo. have Hz1 : (Z.of_nat (length pre) < 65536)%Z by clear - Hlt' Hbs65; lia.
+      apply: (N.le_trans _ 196610%num); last by exact HL.
+      have Hnb : (Z.of_nat (length (utf16le t)) + Z.of_nat (pend st) <= 131072)%Z by clear - Hlt Hz1 Hp0; lia.
+      clear - Hnb. lia. }
     have Hom : (o + 4 < Wasm_int.Int32.modulus)%Z by rewrite modulus_val /o /OUT; lia.
     have Him : (Z.of_nat (length pre) < Wasm_int.Int32.modulus)%Z by rewrite modulus_val; lia.
     have W0 := Hstep. rewrite /step_spec in W0.
@@ -273,7 +252,7 @@ Proof.
       move => s4 f4 stk4 [E4 [E5 E6]]. subst s4 f4 stk4.
       split => //.
       move: Hw => [Hty2 [Hlen2 [Hho2 Hout2]]].
-      have Hz : (Z.of_nat (length (utf16le t)) <= 4 * Z.of_nat (length pre))%Z by clear - Hlt; lia.
+      have Hsb := step_out_bound st b.
       have Hzp : (Z.of_nat (length pre) + 1 <= Z.of_nat (length bs))%Z by clear - Hlt'; lia.
       have Hz4 : (Z.of_nat (length (utf16le (snd (step st b)))) <= 4)%Z by clear - Hle4; lia.
       exists (pre ++ [:: b]), rest', m2, junk', (fst (step st b)), (t ++ snd (step st b)).
@@ -294,8 +273,8 @@ Proof.
       { split; first by rewrite Hty2.
         split; first by rewrite Hlen2.
         move => q Hq.
-        have Hq2 : (q < Z.to_N o \/ Z.to_N o + 4 <= q)%num.
-        { rewrite Eo. move: Hq. rewrite OUT_addr_val /out_area. clear - Hz Hzp. lia. }
+        have Hq2 : (q < Z.to_N o \/ Z.to_N o + N.of_nat (length (utf16le (snd (step st b)))) <= q)%num.
+        { rewrite Eo. move: Hq. rewrite OUT_addr_val /out_area. clear - Hsb Hlt Hp0 Hzp. lia. }
         rewrite (Hout2 _ Hq2). by apply Hout. }
       split.
       { rewrite utf16le_app. apply: mem_holds_app.
@@ -304,7 +283,7 @@ Proof.
         - have -> : (OUT_addr + N.of_nat (length (utf16le t)))%num = Z.to_N o
             by rewrite OUT_addr_val Eo.
           exact Hho2. }
-      rewrite utf16le_app !length_app. cbn [length]. clear - Hlt Hle4. lia. }
+      rewrite utf16le_app !length_app. cbn [length]. clear - Hlt Hsb. lia. }
     case: W2 => s2 [f2 [stk2 [Hex [E Hinv]]]]. subst stk2.
     exists (length rest'), s2, f2. split; first by rewrite Hn /=; lia.
     split => //. apply: exec_then_br; first exact Hex. apply exec_br_br.
@@ -346,7 +325,8 @@ Proof.
     rewrite Hf' Hs' /frame_of.
     repeat wp_step.
     split; first by [].
-    rewrite /= i32_isub_repr /i32_of_nat. have -> : (OUT + Z.of_nat (length (utf16le t)) - OUT = Z.of_nat (length (utf16le t)))%Z by clear; lia. by [].
+    change (Wasm_int.int_sub i32m) with Wasm_int.Int32.isub.
+    rewrite i32_isub_repr Z.add_simpl_l. reflexivity.
 Qed.
 
 End Decode.

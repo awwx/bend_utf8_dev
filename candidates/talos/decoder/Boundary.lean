@@ -4,10 +4,10 @@ Boundary.lean -- what is claimed about the shipped Wasm module.
 Reviewed together with Utf8Laws.lean (the spec); nothing else needs to be
 read to know what is proved.  Definitions and `Prop` statements only.
 
-The claim, in words: for the module that Talos's WAT decoder produces from
-`decoder.printed.wat` (the output of `wasm-tools print decoder.wasm`), there
-is a decoder `D` satisfying the spec's three streaming laws (`D.Correct`)
-whose behaviour the module's three exports realize:
+The claim, in words: Talos's WAT decoder accepts `decoder.printed.wat` (the
+output of `wasm-tools print decoder.wasm`) and produces a module, and for
+that module there is a decoder `D` satisfying the spec's three streaming laws
+(`D.Correct`) whose behaviour the module's three exports realize:
 
   * the decoder state is one i32 value (related to `D.State` by some
     relation `R`, which is existential: its encoding is the module's choice);
@@ -141,10 +141,81 @@ def Realizes (m : Module) (D : Decoder) : Prop :=
 
 /-! ## The top-level claim -/
 
-/-- Whatever module Talos's verification decoder produces from the printed
-text of the shipped bytes realizes a decoder that satisfies the spec. -/
+/-- Talos's verification decoder succeeds on the printed text of the shipped
+bytes, producing a module `m`, and `m` realizes a decoder that satisfies the
+spec.  (The decoder is a function, so `m` is the only module it produces.) -/
 def ShippedModuleCorrect : Prop :=
-  ∀ m : Module, Decoder.Wat.decodeForVerification printedWat = .ok m →
+  ∃ m : Module, Decoder.Wat.decodeForVerification printedWat = .ok m ∧
     ∃ D : Decoder, D.Correct ∧ Realizes m D
+
+/-! ## The guarantees apply to the shipped wrapper (non-vacuity)
+
+The guarantees above hold only for calls that meet their conditions (memory
+size, where the input and output areas are, the state value).  This section
+says that every call the shipped JavaScript wrapper `decoder.mjs` makes meets
+all of them, so the guarantees are not empty for the real module as it is
+used.
+
+The wrapper's choices, as numbers (`check.sh` reads them from the marked lines
+of `decoder.mjs`, and the memory size from the module text, and fails if they
+differ from the numbers here):
+
+  * it copies each piece of input (at most `wrapperMaxChunk` bytes; longer
+    input is split) to address `wrapperInputAddr`;
+  * it asks for the output at address `wrapperOutputAddr`, for both
+    `decode_buffer` and `decode_done`;
+  * it never grows the module's memory, which has `shippedMemoryPages` pages
+    of 64 KiB each.
+
+The state condition (`R s v`) needs nothing here: the wrapper only passes
+state values that `decode_start_state` or `decode_buffer` returned, and their
+guarantees say exactly that such a value is related to the decoder's state.
+-/
+
+/-- Where the wrapper puts the input bytes. -/
+def wrapperInputAddr : Nat := 0
+/-- The most input bytes the wrapper passes in one call. -/
+def wrapperMaxChunk : Nat := 1048576
+/-- Where the wrapper asks for the output. -/
+def wrapperOutputAddr : Nat := 1048576
+/-- The size of the module's memory, in 64 KiB pages. -/
+def shippedMemoryPages : Nat := 160
+
+/-- A memory as the wrapper's instance has it: the module's size. -/
+def WrapperMem (mem : Mem) : Prop := mem.pages = shippedMemoryPages
+
+/-- For module `m`, every call the wrapper makes meets the conditions above:
+
+  1. the instance starts with a memory of the module's size, and its initial
+     store is the store the guarantees start from (`storeWith`), so the start
+     guarantee applies to it;
+  2. the input area and the largest output area (two code points of four
+     bytes per input byte) lie inside that memory and do not overlap;
+  3. on any memory of that size (any contents), decode_start_state's memory
+     condition holds; decode_buffer's layout condition holds for every input
+     length up to the maximum, with input and output at the wrapper's
+     addresses; decode_done has room for one code point at the output address;
+  4. a guarantee that changes memory only in place (`sameOutside`, which all
+     three guarantees state) leaves a memory of the same size, so the next call
+     again meets the conditions. -/
+def WrapperCallsCovered (m : Module) : Prop :=
+  WrapperMem (m.initialStore : Store Unit).mem ∧
+  storeWith m (m.initialStore : Store Unit).mem = m.initialStore ∧
+  wrapperInputAddr + wrapperMaxChunk ≤ wrapperOutputAddr ∧
+  wrapperOutputAddr + 8 * wrapperMaxChunk ≤ shippedMemoryPages * 65536 ∧
+  (∀ mem : Mem, WrapperMem mem →
+    mem.pages ≤ 65536 ∧
+    (∀ len : UInt32, len.toNat ≤ wrapperMaxChunk →
+      BufferLayout mem (UInt32.ofNat wrapperInputAddr) len (UInt32.ofNat wrapperOutputAddr)) ∧
+    inMem mem ((UInt32.ofNat wrapperOutputAddr).toNat + 4)) ∧
+  (∀ (mem mem' : Mem) (lo len : Nat), WrapperMem mem → sameOutside mem mem' lo len →
+    WrapperMem mem')
+
+/-- Second top-level claim: the module Talos decodes from the shipped bytes
+(the same `m` as in `ShippedModuleCorrect`) is used by the wrapper only in
+calls its guarantees cover. -/
+def ShippedWrapperCovered : Prop :=
+  ∃ m : Module, Decoder.Wat.decodeForVerification printedWat = .ok m ∧
+    WrapperCallsCovered m
 
 end Utf8Boundary

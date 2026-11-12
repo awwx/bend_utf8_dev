@@ -263,3 +263,115 @@ Notes on the mutations
   aeneas PASS, talos PARTIAL.  The aeneas and talos scripts refreshed their tracked copies
   of Utf8Bits/Utf8Table/Utf8Proofs from the new pure-lean (shown as modified in git status;
   intended -- they are duplicates the scripts keep equal to pure-lean).
+
+======================================================================================
+10. TALOS CHECK-SCRIPT FIXES FROM talos/decoder/AUDIT.txt (2026-11-12, EC2, 8 vCPU)
+--------------------------------------------------------------------------------------
+Findings addressed: AUDIT.txt M3 (no timeout), L1 (grep blind to metaprogramming),
+L2 (Talos checkout not pinned), L3 (silent refresh of the pure-layer copies).
+FIXES (talos/decoder/check.sh)
+  - Timeouts: every Lean file, the two statement checks and the difftest run under
+    `timeout` (CHECK_STEP_TIMEOUT, default 600 s); the kernel replay under
+    CHECK_REPLAY_TIMEOUT (default 1500 s).  On expiry: "FAIL: TIMEOUT: <step> did not
+    finish within N s (killed)".  The difftest now runs in the background during the Lean
+    steps (it needs only the checked decoder.wasm) and is waited for at the end.
+  - Kernel replay (as in the audit): a generated Lean program imports ProofMain, takes
+    every constant not in Init/Lean/Std (11,632: Talos + candidate), replays them with
+    Lean.Kernel.Environment.replay in a fresh kernel environment, and then requires the
+    replayed Utf8Wasm.shippedModuleCorrect to be a theorem whose type is exactly the
+    constant Utf8Boundary.ShippedModuleCorrect.  Cost 127 s, 7.1 GB RSS.  Default on;
+    --skip-replay skips it and the PASS line then says "kernel replay SKIPPED
+    (--skip-replay)".  (Lean's replay skips unsafe/partial constants; a theorem cannot
+    use them.)
+  - Talos pin: TALOS_COMMIT (d7c84ac..., from talos/SETUP.md) in the script; HEAD must
+    equal it, `git status --porcelain --untracked-files=all` must be empty (.lake/ is
+    ignored), and `lake build --no-build` of the Talos modules the candidate imports must
+    report up to date (0.5 s).
+  - Pure-layer copies: a stale decoder/Utf8*.lean is now a FAIL (with a diff excerpt);
+    --refresh-copies restores the old refresh-with-note behaviour.
+  - PASS line now also says "Talos at pinned commit, kernel replay of N constants OK".
+FIX (aeneas/decoder/check.sh): it had the same silent refresh of lean/pure/*.lean; now
+  the same FAIL unless --refresh-copies (arguments parsed as flags; --fast unchanged).
+MUTATIONS (scratch copies with talos/talos and talos/tools symlinked, or in place and
+restored byte for byte)
+  stale decoder/Utf8Bits.lean (in place)            FAIL "build copy Utf8Bits.lean differs"
+  same, scratch copy, --refresh-copies              note "refreshing", cmp OK, continued
+  stale aeneas lean/pure/Utf8Ref.lean (in place)    FAIL "lean/pure/Utf8Ref.lean differs"
+  appended line to talos/talos/README.md            FAIL "local modifications" ( M README.md)
+  untracked talos/talos/stray.txt                   FAIL "local modifications" (?? stray.txt)
+  TALOS_COMMIT changed in a scratch script          FAIL "checkout is at d7c84ac..., not the pinned"
+  ProofLoop.lean + `set_option maxHeartbeats 0 in example : True := by repeat skip`,
+    CHECK_STEP_TIMEOUT=60                           FAIL "TIMEOUT: lean build of ProofLoop.lean
+                                                    did not finish within 60 s"; no lean/node left
+  ProofMain.lean: run_cmd adding `smuggled : False := True.intro` via
+    Environment.addDeclCore ... (doCheck := false), shippedModuleCorrect := smuggled.elim
+                                                    old checks all pass (grep, statements, exact
+                                                    type, axioms [propext, Classical.choice,
+                                                    Quot.sound]); replay FAIL "declaration type
+                                                    mismatch, 'smuggled'"
+FINAL RUN (talos, build/ removed first): PASS line with "kernel replay of 11632 constants
+  OK", 224.5 s wall (replay 127 s of it).
+  aeneas/decoder/check.sh after its fix, unmutated: "=== ALL CHECKS PASSED (97s)".
+NOT DONE: heartbeat limits stay disabled in the proofs (DecoderModule.lean:73 `set_option
+  maxHeartbeats 0 in`; ProofFuncs.lean:16, ProofLoop.lean:12, ProofStep.lean:13
+  `set_option maxHeartbeats 0`) -- for a later proof pass.  STATUS.txt still quotes the
+  old PASS line.  The grep was not extended to metaprogramming words (the replay covers it).
+
+2026-11-12 -- WasmCert-Coq / pure-rocq parity fix (the two low findings of
+wasmcert-coq/decoder/AUDIT.txt "RE-AUDIT AFTER IMPROVEMENT PASS")
+FIX 1 (wasmcert-coq/decoder/check.sh): decoder.mjs's constant line now carries the marker
+  "// LAYOUT IN_addr IN_max OUT_addr" (comments only; behaviour unchanged, difftest PASS).
+  Before the build the script requires exactly one such line with plain decimals, the
+  chunking loop (`p += IN_MAX`, `Math.min(p + IN_MAX, ...)`), the copy (`mem.set(chunk, IN)`)
+  and the output read (`ex.memory.buffer, OUT, nbytes`) as fixed text, exact occurrence
+  counts of IN/IN_MAX/OUT, and no other numeric literal >= 100 in the code.  After the
+  statement check, the last command of CheckTop.v (Eval vm_compute of Boundary.IN_addr,
+  IN_max, OUT_addr; pinned in check.expected.txt) is parsed and compared with the wrapper.
+FIX 2 (pure-rocq/check.sh): (1) Print Assumptions "Closed" now required for the 15 laws,
+  RefDecoder_correct and every top-level declaration of Utf8Ref/Bridge/Proofs/StepFacts
+  (generated from the sources: 162); (2) new rocqchk -o context check: only the 26
+  Stdlib/Corelib module-type parameters may appear as axioms, no type-in-type / unsafe
+  fixpoint / assumed positivity; (3) new pure-rocq/holes.pl (fuller word list incl.
+  Axioms, Parameters, Conjecture(s), Primitive, bypass_check, Admit Obligations, Typing
+  Flags, Declare ML Module, Load, any Unset except Strict Implicit / Printing Implicit
+  Defensive, multi-line; Hypothesis/Variable/Context outside a Section).  decoder/check.sh
+  uses holes.pl for decoder, symexec and determinism instead of its grep.
+MUTATIONS (scratch copies; git status --short identical before/after apart from the
+  intended decoder.mjs and new holes.pl)
+  decoder.mjs IN_MAX 65536->32768 (harmless to difftest)  FAIL "layout: decoder.mjs IN_MAX
+                                                         = 32768, Boundary.IN_max = 65536"
+  decoder.mjs `p += 65536` in the loop                    FAIL 0 s (fixed-text line)
+  Module.v IN_MAX 65536->32768, pin old or updated        FAIL make all (Exports.v:72); the
+                                                         proofs need 65536, so the new
+                                                         Rocq-side comparison is not reached
+  `Axioms cheat cheat2 : False.` used by ref_decode_buffer_snoc  pure FAIL holes.pl
+     same, holes.pl disabled                              pure FAIL 161/162 Closed
+     `Axioms ... : True.` unused, holes.pl disabled       pure FAIL rocqchk context lists
+                                                         Utf8.Utf8StepFacts.cheat/cheat2
+  unused `Axiom` appended to symexec/I32.v                decoder FAIL holes.pl (I32.v:237)
+FINAL RUN (clean): pure-rocq/check.sh ALL CHECKS PASSED 35 s; decoder/check.sh PASS 125 s.
+NOT DONE: a Module.v layout change that the proofs accept (none found), so the Rocq-side
+  comparison was exercised only from the wrapper side.
+
+2026-11-12 05:45 UTC  KERNEL REPLAY FOR THE AENEAS CANDIDATE AND THE PURE LAYER
+Gap: the Talos re-audit (s05) showed that a False theorem added by metaprogramming
+  (elab + addDecl with debug.skipKernelTC set programmatically, name built from strings)
+  passes build, statement pins, forbidden-word grep and #print axioms; only a kernel
+  replay rejects it.  aeneas/decoder/check.sh and pure-lean/check.sh had no replay.
+  Also: in Lean 4.36 #print axioms uses per-module axiom lists stored in .olean files
+  for imported constants, so axioms are now also recomputed on the replayed environment.
+aeneas/decoder/check.sh step 6b (default on; --skip-replay => final line "kernel
+  replay SKIPPED"; CHECK_REPLAY_TIMEOUT default 900 s): replays every constant in the
+  import closure of Proofs except Init/Lean/Std -- 149,103 constants: candidate, pure
+  layer, Aeneas, AeneasMeta, and all Mathlib/Batteries/Aesop/Qq/... modules imported.
+  Exact types of DecoderProofs.verified / verified_for_wrapper = Boundary.Verified /
+  Boundary.VerifiedForWrapper and recomputed axioms = the standard three, on the
+  replayed environment.  Cost 81 s, 6.7 GB; check.sh 134 s (53 s skipped).  Not
+  replayed: Lean core; lean/Axioms.lean (not imported); unsafe/partial constants.
+pure-lean/check.sh step 4 (default on, --skip-replay): replay per toolchain (510 / 493
+  constants), exact law types and recomputed axioms of the 16 theorems; +12 s.
+Mutations (scratch copies): smuggled False used by DecoderProofs.verified -- old Aeneas
+  check.sh ALL CHECKS PASSED, new FAIL "while replaying declaration
+  'DecoderProofs.smuggled'", --skip-replay PASS with "kernel replay SKIPPED".  Same
+  construction in pure-lean Utf8Proofs.lean used by RefDecoder_correct -- old PASS, new
+  FAIL on v4.35.0 and (run alone) on v4.36.0-rc2; --skip-replay PASS, says SKIPPED.

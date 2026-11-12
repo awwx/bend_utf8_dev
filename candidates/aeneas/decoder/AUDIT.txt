@@ -184,3 +184,100 @@ VERDICT
   5. Clean warnings and deprecated names; use pack/unpack round trip for StRel.
   6. Shim: replace `loop {}` panic handler with a trap; optionally check out_len >=
      2*in_len in the shim and return an error code.
+
+RE-AUDIT AFTER IMPROVEMENT PASS (2026-11-12, 04:45-04:58 UTC by `date`, ~14 min)
+Independent hostile re-check of the current tree (Rust with write_out, trapping panic
+handler, decoder.wasm 5487 bytes, step*-based Proofs.lean, Boundary.VerifiedForWrapper).
+Work copy: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/aeneas-reaudit/
+(candidates/{spec-lean,pure-lean,difftest} + aeneas/decoder without target/, lean/build/).
+Nothing in the repo was modified except appending this section.
+
+VERDICT: the claim holds (checked).  Both pinned theorems check, axioms
+[propext, Classical.choice, Quot.sound]; 15/15 semantic Rust mutations make the PROOF fail.
+
+1. Clean-state check.sh: ALL CHECKS PASSED, 52 s wall (user 64 s).  Rebuilt wasm and
+   regenerated Lean (host, wasm32) identical to the committed files; shipped decoder.wasm
+   identical to the repo's.  The original audit's check.sh gaps are fixed (verified by the
+   mutations below): build_pure mkdir; every Lean build error fatal; theorem TYPES pinned
+   by `example`; Realizes body pinned by rfl; Boundary.lean and Utf8Laws.lean sha256-pinned;
+   grep now covers set_option debug.*, opaque, unsafe, #exit.
+
+2. Statement.  Diff vs HEAD: Realizes's body was moved verbatim into
+   RealizesWith D R and Realizes := ∃ R, RealizesWith D R -- definitional, and check.sh
+   step 6 checks Realizes against the full original formula by rfl (I confirmed the rfl
+   check rejects a Boundary whose decode_done clause is weakened to True).  Verified is
+   unchanged.  Nothing weakened.
+   VerifiedForWrapper := ∃ D, D.Correct ∧ ∃ R, RealizesWith D R ∧ CountsBounded D R ∧
+   WrapperCallsCovered D R ∧ WrapperLayoutFits.  The D and R are the SAME inside this one
+   proposition, so it implies Verified on its own; the separate existential in Verified
+   is irrelevant (the pair is equivalent to VerifiedForWrapper alone).  A degenerate R is
+   impossible: R must relate D.start to the actual start value and be preserved by every
+   call with the actual outputs; R may be larger than the reachable set, which is harmless.
+   What it adds over Verified: k <= 2*|in| and k <= 1 (stated now); 2*65536 <= 131072 and
+   1 <= 131072, i.e. the wrapper's sizes meet the preconditions; slices of those sizes exist
+   in the model (Usize.max >= 2^32-1 on both widths); layout arithmetic.  Proofs.lean proves
+   countsBounded and wrapperCallsCovered for ALL D, R with RealizesWith D R, so it is a
+   corollary of Realizes plus arithmetic on the constants -- correct and non-vacuous, but
+   light.  It does NOT establish anything about decoder.mjs or the shim as programs: their
+   link to the constants and call lines is textual (check.sh step 0b greps), and the
+   from_raw_parts lengths, memory reservation, and state hand-back remain trusted (as
+   Boundary.lean says).
+
+3. Rust mutations (copy, perl edit, cargo wasm build copied over decoder.wasm, charon.sh
+   output copied over lean/Decoder, then check.sh --fast; timeout 900 s; none hung).
+   All passed steps 0-4 (so byte identity/regeneration could not object) and FAILED at
+   step 5, building Proofs.lean:
+     w1 write_out 1-arm writes out[k+1]        (Proofs.lean:213)
+     w2 write_out 1-arm returns k+2            (:213)
+     w3 write_out 2-arm swaps c0/c1            (:223)
+     w4 write_out 2-arm drops out[k+1] write   (:221)
+     w5 bad_pending emits cp then U+FFFD       (:157)
+     c1 F4 second byte <= 0x9F                 (:94)    c2 ED second byte <= 0xBF (:94)
+     c3 F0 second byte >= 0x80                 (:94)    c4 E0 second byte >= 0x80 (:94)
+     c5 loop `while i + 1 < len`               (:257)   c6 cp3 lead * 2048       (:123)
+     c7 unpack b1 % 128                        (:310)   c8 bad_pending drops b (no
+        reprocessing)                          (:160)   c9 decode_done 0 for pending (:335)
+     c10 is_lead2 from 0xC0                    (:87)
+   Harmless refactors: h2 write_out `k + 1 + 1` for `k + 2`: whole check.sh PASSES, no
+   proof edit.  h1 decode_done branch flip (`!= 0` then/else swapped): proof fails
+   (Proofs.lean:335, bullets are order-specific); swapping the two 4-line bullets in
+   decode_done_spec makes check.sh pass.  (Without updating the committed Lean/wasm, any
+   Rust edit fails at step 2/3, as designed.)
+
+4. Statement/check-side mutations, check.sh --fast, all FAIL:
+     Boundary 2*in -> 4*in, hash not updated      step 0 hash
+     same, hash updated in check.sh               step 5 (Proofs) -- and it would make
+                                                  WrapperCallsCovered false anyway
+     WrapperCallsCovered clause -> True, rehashed step 5 (Proofs shape).  Note: bodies of
+        CountsBounded/WrapperCallsCovered/WrapperLayoutFits are guarded by the sha256 pin
+        only, not by rfl (low; the pin is the reviewer's control).
+     verified : True (old renamed)                step 6 type mismatch
+     verified_for_wrapper : Verified              step 6 type mismatch
+     `sorry` in decode_done_spec                  step 4 grep
+     `exact sorryAx _ false` (evades grep)        step 5 "declaration uses sorry"
+     set_option debug.skipKernelTC true           step 4 grep
+     CHUNK = (1 << 16) + 1 in decoder.mjs only    step 0b
+     shim out slice `out_len / 2` only            step 0b need_line
+     OutCapacity 262144 in Boundary only (rehash) step 0b
+     stale lean/pure/Utf8StepFacts.lean           step 1
+     decoder.wasm one byte flipped                step 2
+
+5. Axioms (my run of check.sh step 6): verified, verified_for_wrapper, realizes,
+   RefDecoder_correct each [propext, Classical.choice, Quot.sound].  No Lean.ofReduceBool /
+   trustCompiler, so no native_decide or bv_decide anywhere on the path, including inside
+   Aeneas tactics (the library's bv_tac uses bv_decide; Proofs.lean does not call it), and
+   not the library axiom core.slice...get_unchecked_..._spec.  Hand-written and generated
+   files: only maxHeartbeats/maxRecDepth options (generated).  lean/pure/Utf8StepFacts.lean
+   (new, untracked) is identical to pure-lean/Utf8StepFacts.lean.
+
+6. difftest run directly: node candidates/difftest/run.mjs decoder.mjs -> P1/P2/P3 PASS,
+   RESULT: PASS (56 s).  Panic path: calling utf8_decode_buffer with in_len 10, out_len 3,
+   and utf8_decode_done with a pending state and out_len 0, on the shipped decoder.wasm:
+   both throw RuntimeError "unreachable" (trap).  The HEAD (pre-improvement, 5436-byte)
+   wasm on the same calls hangs (killed by timeout 10 s).  Checked and holds.
+
+FINDINGS (no high or medium):
+  low  VerifiedForWrapper is a generic corollary of RealizesWith + constant arithmetic; it
+       says nothing about the JS/shim code beyond check.sh's textual line checks.
+  low  Only the sha256 pin protects the bodies of the three new wrapper predicates.
+  low  An equivalent branch flip in decode_done needs a (trivial) proof edit.

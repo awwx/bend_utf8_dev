@@ -12,7 +12,8 @@
        range of n, continuation bytes 80..BF, value as a base-64 sum).
        encoding_form (what `encoding` computes, as a utf8_form),
        utf8_form_unique.
-   - Byte-range table:  seq_len_cases, lo2_hi2_cases, vp_one_iff,
+   - Byte-range table:  seq_len_cases, lo2_hi2_cases, lead_cases (the two
+       combined: the 9 lead-byte classes that occur), vp_one_iff,
        vs_one_iff, vp_cons2, vs_vp_len, vp_len_lead, seq_len_le4, vp_len,
        vp_app, vs_vp, vs_prefix_free.
    - Central characterization:  vs_form (a valid sequence is the
@@ -200,6 +201,24 @@ Proof.
     lia.
 Qed.
 
+(* The two tables combined: the lead-byte classes that actually occur
+   (9 instead of 5 * 5 combinations). *)
+Lemma lead_cases n :
+  (n <= 0x7F /\ seq_len n = 1%nat /\ lo2 n = 0x80 /\ hi2 n = 0xBF) \/
+  (0xC2 <= n <= 0xDF /\ seq_len n = 2%nat /\ lo2 n = 0x80 /\ hi2 n = 0xBF) \/
+  (n = 0xE0 /\ seq_len n = 3%nat /\ lo2 n = 0xA0 /\ hi2 n = 0xBF) \/
+  (0xE1 <= n <= 0xEF /\ n <> 0xED /\ seq_len n = 3%nat /\ lo2 n = 0x80 /\ hi2 n = 0xBF) \/
+  (n = 0xED /\ seq_len n = 3%nat /\ lo2 n = 0x80 /\ hi2 n = 0x9F) \/
+  (n = 0xF0 /\ seq_len n = 4%nat /\ lo2 n = 0x90 /\ hi2 n = 0xBF) \/
+  (0xF1 <= n <= 0xF3 /\ seq_len n = 4%nat /\ lo2 n = 0x80 /\ hi2 n = 0xBF) \/
+  (n = 0xF4 /\ seq_len n = 4%nat /\ lo2 n = 0x80 /\ hi2 n = 0x8F) \/
+  (((0x80 <= n <= 0xC1) \/ 0xF5 <= n) /\ seq_len n = 0%nat /\ lo2 n = 0x80 /\ hi2 n = 0xBF).
+Proof.
+  destruct (seq_len_cases n) as [[? E]|[[? E]|[[? E]|[[? E]|[? E]]]]];
+  destruct (lo2_hi2_cases n) as [(? & E2 & E3)|[(? & E2 & E3)|[(? & E2 & E3)|
+    [(? & E2 & E3)|(? & ? & ? & ? & E2 & E3)]]]]; rewrite E, E2, E3; lia.
+Qed.
+
 Lemma seq_len_le4 n : (seq_len n <= 4)%nat.
 Proof. destruct (seq_len_cases n) as [[_ ->]|[[_ ->]|[[_ ->]|[[_ ->]|[_ ->]]]]]; lia. Qed.
 
@@ -290,10 +309,10 @@ Ltac lia_mod :=
 Ltac table_arith b1 :=
   repeat match goal with a : byte |- _ => pose proof (bN_bound a); generalize dependent a end;
   intros;
-  destruct (seq_len_cases (bN b1)) as [[? E]|[[? E]|[[? E]|[[? E]|[? E]]]]];
-    rewrite ?E in *; cbn [length] in *;
-  destruct (lo2_hi2_cases (bN b1)) as [(? & E2 & E3)|[(? & E2 & E3)|[(? & E2 & E3)|
-    [(? & E2 & E3)|(? & ? & ? & ? & E2 & E3)]]]]; rewrite ?E2, ?E3 in *;
+  destruct (lead_cases (bN b1)) as [(? & E & E2 & E3)|[(? & E & E2 & E3)|[(? & E & E2 & E3)|
+    [(? & ? & E & E2 & E3)|[(? & E & E2 & E3)|[(? & E & E2 & E3)|[(? & E & E2 & E3)|
+    [(? & E & E2 & E3)|(? & E & E2 & E3)]]]]]]]];
+  rewrite ?E, ?E2, ?E3 in *; cbn [length] in *;
   try (exfalso; lia).
 
 Lemma vs_form s : vs s = true -> utf8_form s (seq_value s) /\ scalar_N (seq_value s).

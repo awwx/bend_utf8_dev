@@ -1,9 +1,16 @@
 /-
 ProofDone.lean -- `decode_start_state` and `decode_done` against the Talos
-small-step semantics, for the literal `decoderModule`.
+small-step semantics, for the literal `decoderModule`; and the state relation.
+Proof style: explicit `Steps` traces with Talos's `wasm_steps`, one per path.
 
-The state relation `Rel` (pending bytes ↔ packed i32) is defined here; see
-`enc`.  Proof style: explicit `Steps` traces (spike style), one per path.
+EXPORTS
+  enc                    packing of the pending bytes into the i32 state
+  Rel                    the state relation (witness for Boundary's R)
+  enc_eq_zero            enc p = 0 ↔ p = []  (|p| ≤ 3)
+  start_ok               decode_start_state returns enc [] and changes nothing
+  doneBody               the body of decode_done (checked against the module by `rfl`
+                         in done_runs' entry configuration)
+  done_runs              decode_done: v = 0 returns out; v ≠ 0 writes U+FFFD at out
 -/
 import DecoderModule
 import Boundary
@@ -50,8 +57,6 @@ theorem start_ok (mem : Mem) (_ : mem.pages ≤ 65536) :
 def doneBody : Program :=
   [.localGet 0, .eqz, .iff 0 0 [.localGet 1, .ret] [] [] [], .localGet 1,
    .const 65533, .store32 0, .localGet 1, .const 4, .add]
-
-theorem done_body_eq : (decoderModule.funcs[8]?.map (·.body)) = some doneBody := by rfl
 
 private def doneEntry (mem : Mem) (v out : UInt32) : Config Unit :=
   ⟨.running

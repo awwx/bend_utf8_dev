@@ -1,5 +1,18 @@
 REPORT: WasmCert-Coq candidate (streaming UTF-8 decoder)
 
+CURRENT STATE (after session 7, the improvement pass, 2026-11-12)
+  Both claims of Boundary.v are proved with exactly the nine WasmCert-Coq library axioms:
+  decoder_module_correct (Theorems.v; unconditional, every call with the unique-outcome
+  guarantee) and decoder_module_applies (NonVacuity.v: the layout fits the fixed 5-page
+  memory, every instantiation result meets the store condition, and instantiation has
+  exactly one result).  check.sh: PASS, 1 min 50 s (was 3 min 29 s).  Current file
+  layout, timings and what changed: STATUS.txt and IMPROVEMENT.txt.  The sections below
+  are the history of sessions 1-5; numbers in them describe the state at that time.
+  (Session 5 fixed an audit finding: through session 4 the output area was 4*len+4 bytes,
+  which made the guarantees require more memory than the module has, so they were
+  vacuous.  Text below that says ">= 327684 bytes" or "4*len+4" describes that defective
+  statement; the FINAL THEOREM section has been updated to the current one.)
+
 OUTCOME
   Running implementation: yes.  decoder.wasm (643 bytes) printed from the Rocq term
   decoder_module by WasmCert-Coq 2.2.1's binary printer; parse-back lemma by vm_compute.
@@ -9,21 +22,24 @@ OUTCOME
   claim CONDITIONALLY on one stated lemma, step_spec (the per-byte refinement).
   Not proved: step_spec; determinism.  Nothing Admitted in the build.
 
-FINAL THEOREM (Theorems.v)
-  decoder_module_correct_if_step : (forall hs, step_spec hs) -> decoder_module_correct
+FINAL THEOREM (Theorems.v; current statement, session 7)
+  decoder_module_correct_proved : decoder_module_correct   (unconditional)
   where (Boundary.v)
   decoder_module_correct := exists D : Decoder, Decoder_correct D /\ forall hs, Realizes hs D
   Realizes hs D := exists R s0 inst a_start a_dec a_done a_mem,
      instantiate empty_store decoder_module [] (s0, frame [] inst, [])   (relational spec,
         includes module validation) /\ the four exports are named in inst_exports /\
-     forall store s with s_funcs = s0's funcs, memory m at a_mem of >= 327684 bytes:
+     forall store s with s_funcs = s0's funcs, memory m at a_mem of >= 196610 bytes:
        start:  call returns some v with R start v, store unchanged;
        decode: for R st v, input bs (|bs| <= 65536) in memory at 0, the call
-               (v, |bs|) reduces to (v', nbytes) with R st' v', where
+               (v, |bs|) returns (v', nbytes) with R st' v', where
                (st', t) = decode_buffer D st bs; memory now holds utf16le t at 65536,
-               nbytes = |utf16le t|, memory changed only in [65536, 65536+4|bs|+4),
+               nbytes = |utf16le t|, memory changed only in [65536, 65536+2|bs|+2),
                memory type and length unchanged, rest of the store unchanged;
-       done:   similarly, utf16le (decode_done D st) at 65536, writes only 4 bytes.
+       done:   similarly, utf16le (decode_done D st) at 65536, writes at most 2 bytes;
+     and each call's result is its only possible outcome (call_returns, session 4).
+  decoder_module_applies := layout_fits /\ instance_memory_fits /\ instantiation_unique
+     (sessions 5 and 7; proved in NonVacuity.v).
   utf16le, mem_holds, mem_frame, byte_as_mem are defined in Boundary.v (10 lines).
   "Call reduces to" = reduce_trans of WasmCert's small-step reduce from
   v_to_e_list args ++ [AI_invoke a] under ANY caller frame, to a list of constants.
@@ -36,8 +52,12 @@ FINAL THEOREM (Theorems.v)
   the calls produce.
 
 WHAT IS TRUSTED / UNVERIFIED BETWEEN THE THEOREM AND NODE
-  1. step_spec (unproved premise) -- the biggest gap today.
-  2. No determinism theorem in WasmCert-Coq 2.2.1: "reduces to C" does not exclude
+  1. [RESOLVED in session 3: step_spec is proved (StepSpec.step_spec_proved) and the
+     top-level theorem is unconditional.]  Session-1 text: step_spec (unproved premise).
+  2. [RESOLVED in session 4: determinism is now proved for the fragment the decoder
+     uses (../determinism) and the unique outcome is part of call_returns; nothing
+     about it is trusted beyond items 3 and 5.  Session-1 text follows.]
+     No determinism theorem in WasmCert-Coq 2.2.1: "reduces to C" does not exclude
      another path (e.g. a trap).  A determinism lemma for the fragment used (no host
      calls, no tables, no SIMD) would make the result the only outcome; cost: the
      opsem has ~70 reduce rules plus label/frame contexts; a full determinism proof is
@@ -66,10 +86,14 @@ DESIGN
   "Inv st /\ v = repr (enc st)" and the loop mirrors RefDecoder.step case by case
   (empty / lead / bad; pending: range check against lo2/hi2, complete -> code point,
   extend, or reject -> FFFD then step_empty).  No module state: memory is a scratch
-  area only.  Output: UTF-16 code units, little endian, at 65536; at most 2 units per
-  input byte, so the output area is 4*len+4 bytes.  Results via multi-value (i32 i32).
+  area only.  Output: UTF-16 code units, little endian, at 65536; over a call at most one
+  unit per input byte plus one unit for bytes pending from an earlier call, so the output
+  area is 2*len+2 bytes (Boundary.out_area; the bound is proved in OutBound.v from the
+  pure layer's decode_units_bound).  (Through session 4 it was 4*len+4, an
+  over-approximation that made the layout exceed the 5-page memory.)
+  Results via multi-value (i32 i32).
 
-PROOF SIZE (non-blank lines)
+PROOF SIZE (non-blank lines; session 1 -- current sizes in IMPROVEMENT.txt)
   Reusable infrastructure: Steps.v 285 (spike, unchanged), Control.v 66 (block/if rules),
     Wp.v 85 (wp layer + wp_step tactic), Mem.v 73 (16-bit store spec, block-update length
     lemma), WpMem.v 50 (wp store rule)  = 559 (274 new).
@@ -97,3 +121,147 @@ SCALING / DIFFICULTY
     one).  For provability I kept branch structure parallel to RefDecoder rather than a
     table-driven DFA, and stored the code point per byte (no batching).  The 64 KiB chunk
     limit in the boundary is a proof convenience (fixed memory, no memory.grow).
+
+SESSION 2 (2026-11-12, EC2, 60-min box from 01:14 UTC): step_spec, case by case
+  Outcome: top-level theorem still CONDITIONAL on step_spec, but step_spec is now
+  split into cases (step_case st b, step_spec_of_cases) and these are proved in the
+  build with no Admitted:
+    step_case_empty     (empty state; ASCII / lead / invalid byte)
+    step_case_reject    (pending state, byte not a valid continuation: U+FFFD + reprocess)
+    step_case_extend    (pending state, byte extends the prefix)
+    step_case_complete2 (byte completes a two-byte sequence; emit_cp both paths)
+    step_case_complete3 (byte completes a three-byte sequence)
+  Missing: completing a 4-byte sequence (cp_code arithmetic for L = 4 and one
+  composition of the same shape), then the final case split.  Estimate 20-30 min.
+  Structure: continuation-style lemmas per Wasm sub-block (empty_code, emit_fffd,
+  emit_cp, range_code, len_code, the pending dispatch) plus pure lemmas on CompCert
+  Int32 of small Z values (shl/shru/and/or/eq -> Z arithmetic; or of disjoint bit
+  ranges = addition, proved symbolically with Z.testbit; no byte enumeration) and
+  range lemmas relating the module's lo/hi/L tests to vp/vs (pending_vp, pending_vs).
+  New proof size: StepEmpty.v 322, StepPending.v 418, StepComplete.v 290 = 1030 non-blank lines
+  in total (much of it reusable sub-block and i32 lemmas).  Check time of the new
+  files: ~21 s (StepComplete.v 16 s, mostly step_case_complete2).  check.sh total
+  1 min 21 s (of which difftest is most).
+  Print Assumptions of the three case lemmas: the same WasmCert library axioms only.
+  Difficulty (JOURNAL): no semantic surprises; friction was ssreflect side-goal order
+  on conditional rewrites (the most frequent error, ~10 occurrences), wp_if wrappers,
+  `/=` over-simplifying, mathcomp vs Stdlib notations, implicit-argument status of
+  section lemmas, and a kernel hang at Qed of step_case_complete2 (the tactics ran
+  in seconds; the kernel unfolded seq_cp / U32_of_N, the bit-record encoding of the
+  spec's U32), fixed by `Local Strategy opaque [seq_cp U32_of_N]`.
+  Other change: Makefile `clean` no longer deletes the tracked decoder_hex.out.
+
+SESSION 3 (2026-11-12, 02:01-02:10 UTC): step_spec finished, top-level theorem unconditional
+  Theorems.v: decoder_module_correct_proved : decoder_module_correct (Boundary.v's type,
+  checked by check.sh by elaborating it against the hash-pinned Boundary.v).
+  Print Assumptions decoder_module_correct_proved: WasmCert-Coq's library axioms only
+  (ClassicalDedekindReals.sig_not_dec, sig_forall_dec, functional_extensionality_dep,
+  Classical_Prop.classic, 5 opaque SIMD_ops.app_v*_str string functions).
+  New: cp_code_ok4 + lor_mid, step_case_complete4 (StepComplete.v), StepSpec.v (the case
+  split, 37 lines).  Both went through at the first or second compile (~3 min in all).
+  check.sh from clean .vo: EXIT 0 in 1 min 42 s (contended), verdict
+  "PASS (modulo determinism): ...".  Remaining caveat: no determinism theorem
+  (separate agent, ../determinism/), so the claim is "the call can reduce to the stated
+  result", not "every reduction does".
+
+  PER-FILE CHECK TIMES (rocq c one file at a time, other agents' builds running):
+    Module.v 0.7  Binary.v 1.3  Steps.v 0.9  Control.v 0.7  Wp.v 0.8  Mem.v 0.8
+    WpMem.v 0.7  Instance.v 0.7  Boundary.v 0.7  Repr.v 0.7  Exports.v 0.9
+    Decode.v 15.6  Theorems.v 0.8  StepEmpty.v 1.4  StepPending.v 3.1
+    StepComplete.v 16.2  StepSpec.v 0.7    -- total ~47 s sequential (each ~0.6 s is
+    rocq start-up and library loading).  Plus the pure layer (../../pure-rocq, ~22 s,
+    built once).  check.sh total ~1.5 min, mostly the difftest harness.
+    Two slow files: Decode.v (loop invariant proof; not investigated) and
+    StepComplete.v (mostly step_case_complete2, despite the Strategy hint; complete3/4
+    are fast -- not investigated).
+
+  PROOF SIZE (non-blank lines): candidate .v files 2572 in all; spec side Boundary.v 131
+    + Module.v 138 (the term); proofs 2303: reusable infrastructure Steps/Control/Wp/Mem/
+    WpMem 559, decoder-specific 1744 (Instance 45, Repr 32, Exports 127, Decode 312,
+    Theorems 39, Binary 10, StepEmpty 322, StepPending 418, StepComplete 402, StepSpec 37).
+    About 7 proof lines per Wasm instruction for the 251-instruction module, much of
+    StepEmpty/StepPending being reusable i32/memory lemmas.
+
+  DECODER-SIDE LEMMAS THAT BELONG IN pure-rocq (no Wasm in them):
+    StepPending.v: pending_lead, lo_next/hi_next + pending_vp, pending_vs, step_reject,
+      step_extend; enc_cases/enc_count/enc_first (with Repr.v's enc, if the packed
+      representation moves too).
+    StepComplete.v: step_complete, seq_cp_bound, utf16le_cp, utf16le_cp_len (the last two
+      are about Boundary's utf16le; they could sit next to it).
+    StepEmpty.v: step_empty_cases, utf16le_ascii.
+    Generic Z bit lemmas (Z_lor_disjoint, lor_pack, lor_mid, lor_swap) belong in a small
+    shared arithmetic file.
+
+  WHERE OPACITY WAS NEEDED AGAINST THE 32-BOOLEAN CODE POINT (spec's U32 record):
+    1. StepComplete.v, `Local Strategy opaque [seq_cp U32_of_N]` before
+       step_case_complete2/3/4.  Without it the Qed of step_case_complete2 did not finish
+       within 60 s (two attempts; the tactic script itself finished in seconds).  With it,
+       Qed < 1 s.  The kernel was evidently trying to decide a conversion by unfolding
+       seq_cp (= U32_of_N (seq_value s)), i.e. computing 32 N.testbit's of a symbolic
+       value, instead of reducing `step`.
+    2. Session 1's hang ("unfolding a unary 65536", `/=` on N.of_nat (Z.to_nat 65536))
+       is a different trap (unary nat), not the U32 record.
+    No other place needed it.  The tactic side never touched the record because the
+    bridge lemma seq_cp_value (U32_to_N (seq_cp s) = seq_value s) was used to rewrite
+    early; the kernel does not see those rewrites as a reason not to unfold.  This is
+    evidence that the bit-record U32 in the translated spec costs kernel time in any
+    downstream proof that keeps U32 terms in goals; an idiomatic spec (U32 as N or Z
+    with a bound) would remove this class of problem.
+
+  WHAT A SKILLED-USER IMPROVEMENT PASS SHOULD CHANGE
+    - One general "or of disjoint bit fields is a sum" lemma (or bitwise reasoning via a
+      small reflective normalizer for Z.lor/Z.land/shifts of bounded values) instead of
+      Z_lor_disjoint + lor_pack + lor_mid + hand reordering with lor_swap in cp_code_ok3/4.
+    - A symbolic-execution tactic that also closes the `stk = [::] /\ wp _ _ _ [::] _`
+      wrappers and normalizes `set_nth`/`N.to_nat`, plus a hint database of the i32 value
+      lemmas (eq_val, ltu_val, shl_val, ...) with their side conditions discharged by a
+      single solver, so path proofs need no hand-placed rewrites.  Most compile rounds this
+      session went to side-goal order of conditional rewrites.
+    - State the Wasm sub-block lemmas over a record of locals rather than 11-element list
+      literals; complete2/3/4 are near-copies that a lemma generic in the sequence length
+      (with cp_code_ok_L) would merge.
+    - Investigate the two slow files (Decode.v 15.6 s, step_case_complete2).
+    - Move the pure lemmas above into pure-rocq; replace the U32 bit record in the spec
+      translation (memory note: idiomatic rewrite later, when the user asks).
+
+SESSION 4 (2026-11-12, 02:15-02:30 UTC): unique-outcome guarantee in the claim
+  Boundary.v (sha256 now in check.sh): call_returns hs s a args s' res :=
+    forall f, let c := (hs, s, f, args ++ [invoke a]) in let d := (hs, s', f, res) in
+      reduce_trans c d /\ (forall c', reduce_trans c c' -> reduce_trans c' d) /\
+      (forall run, run 0 = c -> ~ forall n, reduce_tuple (run n) (run (S n))).
+  The header's CAVEAT paragraph is replaced by one sentence saying this.  The third
+  conjunct of ../determinism's proposal ("every reachable irreducible configuration is
+  d") is implied by the second; that implication is machine-checked as
+  ReduceDet.still_reaches_stuck_is_target (../determinism, no premises).
+  Build: ../determinism (-Q ../determinism Determinism in _CoqProject) is a dependency;
+  it depends only on coq-wasm (DecoderInstance.v and decoder_call_outcome moved here as
+  DetInstance.v).  Proof change: one lemma, Exports.call_of_wp (new premise
+  s_funcs s = s_funcs s0, discharged by the existing Hfuncs at the 4 call sites by `//`).
+  Theorems.v unchanged.  V1Implied.v: decoder_module_correct -> decoder_module_correct_v1
+  (replaced in session 5 by PrevImplied.v).
+  Print Assumptions decoder_module_correct_proved: unchanged (WasmCert-Coq library
+  axioms only).  check.sh from clean: EXIT 0, 1 min 52 s; verdict "PASS: ... including
+  the unique-outcome guarantee ...".  Mutations: v1 Boundary.v -> FAIL (hash pin);
+  BI_global_set removed from bi_ok (still builds) -> FAIL (pinned statements differ).
+
+SESSION 5 (2026-11-12, 02:50-03:50 UTC box): audit fix
+  Boundary.v: out_area len = 2*len + 2 (was 4*len + 4); plain-language layout comment; new
+  final section with layout_fits, instance_memory_fits, decoder_module_applies.
+  New files: OutBound.v (pure output bound; 101 non-blank lines), NonVacuity.v (39),
+  PrevImplied.v (187, replaces V1Implied.v 112; mostly copied statement text).
+  Proof edits: Decode.v (step_spec precondition o + 2 + pend st, exact frame in writes,
+  loop invariant with the pending credit; +9 lines net), StepEmpty.v (step_case
+  precondition; wr_writes simpler), StepPending.v / StepComplete.v (one line per pending
+  case: o + 4 from the new precondition), Exports.v (two constants).
+  Check time added: OutBound.v < 1 s, NonVacuity.v ~19 s (the cbn of the relational
+  instantiate's alloc_module; not optimised), PrevImplied.v < 1 s; pure layer now rebuilt
+  each run (~22 s); rocqchk ~70 s.  check.sh total about 3.5 min (see JOURNAL).
+
+SESSION 7 (2026-11-12, from 03:34 UTC): improvement pass -- see IMPROVEMENT.txt
+  Boundary.v: instantiation_unique added to decoder_module_applies (statement only;
+  strengthening).  Pure lemmas moved to ../../pure-rocq/Utf8StepFacts.v; the reusable
+  symbolic-execution files and the i32 lemmas moved to ../symexec; seq_cp sealed once in
+  the pure layer (Global Opaque) instead of a Local Strategy here; PrevImplied.v,
+  wip/StepWIP.v, Assumptions.v removed; slow proofs fixed (Decode.v 15 s -> 1 s,
+  StepComplete.v 16.6 s -> 2 s, NonVacuity.v 17 s -> 0.6 s); rocqchk restricted to the
+  development's own libraries (FULL_ROCQCHK=1 for all dependencies).

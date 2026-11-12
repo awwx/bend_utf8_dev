@@ -1,0 +1,151 @@
+IMPROVEMENT PASS ON candidates/aeneas/decoder (2026-11-12, EC2, 03:35-04:00 by `date`)
+
+Goal: what a skilled Aeneas/Lean user would deliver -- same pinned theorems, proof
+built on Aeneas's own automation, Rust shaped naturally, faster where possible.
+Unchanged: Boundary.lean (hash-pinned, check.sh step 0), the spec, the shared pure
+layer and its copies, decoder.mjs, the exported API and memory layout.
+`DecoderProofs.verified : Boundary.Verified` and
+`DecoderProofs.verified_for_wrapper : Boundary.VerifiedForWrapper` keep their names and
+types (check.sh step 6: `example`, rfl and #print axioms checks).
+Axioms: propext, Classical.choice, Quot.sound.  No sorry, native_decide, bv_decide;
+bv_tac is not used.
+
+*** THE RUST CORE AND THE SHIPPED .wasm CHANGED (see "RUST" and "WASM" below) ***
+    decoder.wasm 5436 -> 5487 bytes; the generated Lean was regenerated; check.sh's
+    host = wasm32 = proved-copy identity and rebuilt-wasm = shipped identity pass;
+    difftest full PASS.
+
+RESULT (check.sh from clean state: target/ and lean/build/ removed)
+  ALL CHECKS PASSED, 53 s wall / 69.6 s user (before: 53 s / 70.1 s).  The full check
+  is dominated by the difftest harness (~33 s) and the shared pure layer (~10 s);
+  this candidate's own Lean is ~7 s wall, so the total hardly moves.
+
+PER FILE, before -> after (same contended machine, back-to-back, two runs each;
+CPU = user+sys; each file includes ~1.0 s of loading the Aeneas/Mathlib oleans)
+
+  file                 CPU before  CPU after  wall before  wall after  lines        theorems
+  Decoder/Types.lean      1.3         1.3        1.3          1.3        (generated)
+  Decoder/Funs.lean       1.9         1.9        1.7          1.7      443 -> 448 (generated)
+  Boundary.lean           1.6         1.6        1.6          1.5      192 (unchanged)
+  Proofs.lean            11.2         9.8        4.5          3.7-4.7  547 -> 450   52 -> 55
+    of which before the non-vacuity section 9 (unchanged):     467 -> 370 incl. a new
+    25-line header; code lines (no comments/blank) 446 -> 334 for the whole file.
+  Rust safe core: 115 -> 122 non-blank non-comment lines (write_out added).
+
+  Proofs.lean per-declaration elaboration (trace.profiler, contended), before -> after:
+    second_ok   3.1 -> 0.1 s      loop          2.2 -> 0.7-0.9 s
+    unpack      1.8 (+ pendRel_congr) -> 1.0-1.4 s (one lemma, gives PendRel directly)
+    decode_buffer 1.4 -> 0.2 s    step          0.7 + step_fresh 0.9 -> 1.3 + 0.3 s
+    cp2/3/4 0.4/0.7/0.9 -> 0.3/0.5/0.7 s      decode_done 0.8 -> 0.75 s
+  No single tactic call above ~0.5 s remains.
+
+DIAGNOSIS (what was slow and why)
+  - second_ok_eq (3.1 s, the largest): `split_ifs` splits the if-chains on BOTH sides
+    (Rust model and Utf8Ref.secondOk), then simp_all runs on every combination.  The two
+    chains have the same conditions, so splitting is unnecessary: rewriting
+    `if c then ok x else ok y` to `ok (if c then x else y)` (lemma ite_ok) and the U8
+    comparisons to Nat makes both sides the same term for simp.  Same one-liner now
+    proves every byte-class predicate.
+  - loop_spec (2.2 s): three near-copies of the emit code (0, 1, 2 code points), each
+    with a manual `rcases x with ⟨xa, back⟩; subst` around Slice.index_mut_usize's back
+    function, because step* stops at an `if` in bind position
+    (`let (out1, k1) <- if o.n >= 1 then ...`) and at the `let (_, index_mut_back) := x`
+    pattern.  Cause in the Rust: the nested `if o.n >= 1 { out[k] = ..; if o.n >= 2 {..} }`
+    shares the first write between two branches, so Aeneas hoists it as an index_mut
+    with a back function.  Fixed in the Rust (below), not in the proof.
+  - unpack_spec + decode_buffer_eq (1.8 + 1.4 s): scalar_tac on div/mod facts with all of
+    step*'s hypotheses in context.  scalar_tac costs ~0.2-0.3 s per call in a large
+    context even for `x.val < 256`; now one omega call per byte field on Nat equations,
+    bounds from hBounds, casts by UScalar.cast_val_eq.
+  - A rewrite cycle in the old PendRel (`n = s.length` and, after substitution,
+    `s = take n ..`) made simp_all/scalar_tac hit max recursion as soon as the proof was
+    driven by step* (which substitutes).  PendRel is now `n <= 3 ∧ s = [b0,b1,b2].take n`
+    (no cycle; no longer demands that unused bytes are 0 -- nothing needed that).
+
+TOOL AUTOMATION: before and after
+  Installed nightly: spec attribute `@[step]` (`progress` is a deprecated alias), tactics
+  `step`, `step*` (repeated step + split), `scalar_tac`, `simp_scalar`, `agrind`; loops
+  via `loop.spec_decr_nat` (Aeneas/Std/WP.lean).  No tutorial or example project is
+  shipped in ~/aeneas-nightly; the Tests under Aeneas/Tactic/Step/Tests show the
+  intended style: spec lemmas `f x ⦃ r => P r ⦄` (with tuple patterns `⦃ a b => .. ⦄`)
+  tagged @[step], proved by `unfold f; step*`.
+  Before: no lemma tagged @[step] (6 spec-form lemmas, cp2-4, loop, pack, unpack, used via spec_ok); predicates were
+  `= ok` equations proved by unfold/split/simp/scalar_tac; the step refinement unfolded
+  every callee and case-split the reference by hand (4 copy-paste branches); the loop
+  body was driven partly by hand; entry points used `spec_ok` + manual `rw [.., bind_ok]`.
+  After: 27 @[step] spec lemmas, one per Rust function (is_cont .. vs4, cp2-cp4, emit,
+  hold, step_fresh, bad_pending, step, write_out, decode_buffer_loop, pack, unpack,
+  decode_buffer, decode_done), each in the ⦃ ⦄ form that step* consumes; every caller is
+  proved by `unfold f; step*` followed by the non-Rust reasoning (lists, Nat).
+  Examples: step_spec is 4 cases x step* with one closing combinator; the loop body is a
+  single step* (it discharges write_out's preconditions itself), leaving only the
+  reference-side `decodeBuffer_snoc` bookkeeping; decode_buffer_spec is `step*` plus one
+  `exact`.  `spec_ok` remains only at the boundary (Boundary states `= ok`).
+  loop.spec_decr_nat with an explicit invariant is still how the loop is proved; that
+  is the documented route (its docstring: "meant to derive lemmas").
+
+RUST: what changed and why
+  1. decode_buffer's writes moved into
+       fn write_out(out: &mut [u32], k: usize, o: Out) -> usize {
+           match o.n { 0 => k, 1 => { out[k] = o.c0; k + 1 }
+                       _ => { out[k] = o.c0; out[k + 1] = o.c1; k + 2 } } }
+     and the loop body is `let o = step(p, input[i]); k = write_out(out, k, o); ...`.
+     Plain Rust, arguably clearer (one function per job).  Generated Lean: loop body
+     31 -> 17 lines, straight-line (no if in bind position); write_out is 3 match arms of
+     Slice.update (no index_mut_usize / back function).  Effect on the proof: the three
+     loop cases and the rcases/subst dance disappeared.  An early-return version
+     (`if o.n == 0 { return k; } out[k] = ..; if o.n == 1 ..`) still produced the hoisted
+     index_mut_back; the `match` did not.
+  2. The one-boolean helper functions (is_lead_multi, vs2, vsp2, vs3, vsp3, vs4) were
+     KEPT, after testing the alternatives with this Charon/Aeneas nightly (scratch, not
+     shipped):
+     - inlining `is_lead2(b0) && second_ok(b0, b)` and the `||` chain into step's `if`
+       for the one-pending case: that branch of `step` grows from 9 to ~50 lines, the
+       continuation (hold / bad_pending) duplicated 5 times, with re-tests of already
+       known Bools (`if b1 then if b2 ..` inside the `else` of `if b2`);
+     - `match b { 0x00..=0x7F => .., 0xC2..=0xF4 => .., _ => .. }` in step_fresh: also
+       duplicated continuations plus a dead `0 <= b` branch; `matches!(b, 0x80..=0xBF)`
+       in is_cont is fine (a single tail expression).
+     The rule that holds: a compound condition is fine as a function's tail value and
+     duplicates code when it guards a branch with a continuation.  The helpers also
+     mirror Utf8Ref's isVS/isVSP definitions one to one, so each gets a one-line spec;
+     a skilled user would write them anyway.  Gain from changing them: negative.
+  3. Panic handler: see WASM.
+
+WASM
+  The shim's #[panic_handler] looped (`loop {}`): an out-of-contract call (failed bounds
+  check) would hang the instance.  Now
+      #[cfg(target_arch = "wasm32")] core::arch::wasm32::unreachable();
+      #[cfg(not(target_arch = "wasm32"))] loop {}
+  (the non-wasm branch exists only because Charon also compiles the crate for the host;
+  the shim is excluded from translation).  Rebuilt: decoder.wasm 5436 -> 5487 bytes
+  (both changes together); `wasm-tools print` shows rust_begin_unwind is now a single
+  `unreachable` instead of `loop br 0`.  difftest full PASS (P1/P2/P3).  check.sh step 0b's
+  verbatim shim lines are unchanged and pass.
+
+AUDIT SUGGESTIONS (AUDIT.txt section 5)
+  4 (factor the emit cases; step lemma for index_mut + back): done, via the Rust
+    write_out instead of a lemma about the generated shape.
+  5 (warnings, deprecated names): done; no warnings (if_pos -> ite_eq_left,
+    List.take_succ -> List.take_add_one, unused simp args removed).  StRel via a pack
+    round trip: not done -- StRel keeps the packing formula and only pack_spec/unpack_spec
+    mention it, so a different packing touches StRel + those two lemmas either way.
+  6 (shim): panic handler done; an out_len check in the shim was not added (API/ABI
+    unchanged by brief).
+  1-3 (check.sh, caching, pure layer) were done in earlier passes.
+
+NOTHING TO MOVE TO THE PURE LAYER
+  The only reference-side lemmas added (ref_step_bad, decodeBuffer_snoc, bytes_take_succ)
+  are small; ref_step_bad and decodeBuffer_snoc are pure Utf8Pure facts and could live in
+  pure-lean/Utf8Proofs.lean in a follow-up (Talos's proof would use the same two).
+
+WHAT A FURTHER PASS COULD DO
+  - Proofs.lean is ~9.8 s CPU / ~4 s wall, of which ~1 s is the import.  The remaining
+    cost is spread (step_spec 1.3 s, unpack 1.0-1.4, cp4 0.7, decode_done 0.75, loop 0.7):
+    step* itself on 4 cases, and scalar_tac's large contexts.  Clearing step*'s
+    hypotheses before arithmetic, or proving cp2-cp4 by one generic Nat lemma, might
+    save another 1-2 s CPU; not worth much against the 33 s harness.
+  - check time overall: the harness (~33 s) dominates; `--fast` runs it with --no-huge.
+  - The step_spec closing combinator (`first | simp .. | rw [step_nil] .. |
+    rw [ref_step_bad ..] ..`) picks per goal; three named reference lemmas per case
+    shape would be more explicit but longer.

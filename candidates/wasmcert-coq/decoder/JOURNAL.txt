@@ -65,3 +65,232 @@ JOURNAL (WasmCert-Coq decoder candidate)
          appear as `Wasm_int.int_sub i32m ...` (not Int32.isub), so rewrite lemmas must be
          stated in that form; set_nth at index (N.to_nat 0) not reduced by the tactic's cbn.
 15:34    Stopped.  Elapsed: 45 min of the 60 min box.
+
+==== Session 2 (EC2, 2026-11-12 UTC; time box 60 min, start 01:14:04) ====
+01:14  Read AGENTS/HANDOVER/STATUS/REPORT/JOURNAL/Boundary, Module.v, Decode.v, Wp*.v, WIP.
+       Plan: split step_spec as step_case st b (per state and byte), with cases
+       empty state (3 byte classes) / pending + reject / pending + extend / pending +
+       complete (L = 2, 3, 4).  Wasm sub-block lemmas in continuation style
+       (empty_code_ok, emit_fffd_ok, emit_cp_ok, range_code_ok, len_code_ok,
+       pending_split) + pure arithmetic lemmas on repr of small Z (no Wasm).
+01:17-01:24 StepEmpty.v: Z_lor_disjoint (symbolic, replaces the WIP's 256-case
+       or_lead enumeration), wr (exact-bytes memory write) + wr_app, store16_wr,
+       wp_store16_o, wp_load8, empty_code_ok (3 paths), step_case_empty.  DONE in ~10 min.
+       Snags (each 1-3 compile rounds):
+       - ssreflect `rewrite L; last by tac`: the side condition is NOT last here; I
+         guessed wrong ~6 times.  Fixed by passing proofs explicitly
+         (`rewrite (L _ H ltac:(lia))`) or `try lia`.  Biggest recurring friction.
+       - `lia` closes Z.ltb/Z.leb goals itself, so `rewrite ltu_val; try lia. by move/..`
+         failed with "No such goal".
+       - `/=` simplified app_relop to `~~ ltu`, breaking later rewrites (as in session 1).
+       - wp_if leaves one `stk = [::] /\ wp _ _ _ [::] Q` wrapper per enclosing if;
+         added a wp_close tactic.  The session-1 "Unable to find an instance for x"
+         was exactly this (split hit the existential after the wrapper was gone).
+       - Section-local Context needed for mem_holds (BlockUpdateMemory instance).
+       - Byte.unsigned_repr needs the range; used unsigned_repr_eq instead.
+       - lia sees `step [::] b` and `step_empty b` as different atoms.
+       - mathcomp `<= _ <=` chains inside %coq_nat are still mathcomp's bool leq.
+01:26-01:35 StepPending.v: shl/shru/and/eq on small values, enc_count, enc_first
+       (Z.div_mod_to_equations; lia), pending_lead / pending_vp / pending_vs (pure),
+       step_code_pending, range_code_ok (16 if-combinations closed by one tactic line),
+       pending_split, step_case_reject.  DONE.
+       Snags: empty_code_ok needed o+4 < 2^32 at o+2; relaxed the lemma to o < 2^32
+       (it never needed more).  Lemma with `let`s in the statement could not be
+       `apply:`ed; restated without lets.  `@lemma _ _ _ hs ...` needed outside the
+       section (non-maximal implicits), plain (m1 := m1) inside.
+01:35-01:39 lor_pack, extend_arith, len_code_ok, step_case_extend.  DONE.
+01:40-01:44 StepComplete.v: emit_cp_ok (both paths, surrogate arithmetic),
+       cp_code_ok2 (2-byte code point).  N-level mod/div inside Z.of_N: zify+lia
+       failed; N.Div0.mod_add rewrite worked.
+01:44-01:48 step_case_complete2 composition: `apply: (emit_cp_ok (m1 := m1))` HUNG
+       (>2 min, killed the rocqworker by PID; again with explicit goals, 60 s timeout).
+       Not diagnosed; suspected unification unfolding U32_to_N (seq_cp _) (a record of
+       32 booleans) or the frame.  Moved to wip/StepCompleteWIP.v.
+01:48-01:55 Makefile clean fix, check.sh/expected update, STATUS/REPORT, check run.
+01:50-01:54 Back at the parked lemma while check.sh ran: the `apply:` was not the
+       problem.  With `refine (emit_cp_ok hs ... (u := ...) ...)` the whole script ran
+       to "no goals" in seconds; the hang was the KERNEL at Qed (> 60 s).  Guess: kernel
+       conversion unfolding seq_cp / U32_of_N (the spec's 32-boolean code point) of a
+       symbolic value.  `Strategy opaque [seq_cp U32_of_N]` -> Qed in < 1 s.  So
+       session 1's "hang from unfolding" and this one are the same family: the
+       bit-record representation of U32 in the spec translation is a performance trap
+       for the kernel, not only for tactics.  Moved the lemma into StepComplete.v
+       (Local Strategy), deleted the wip file; step_case_complete2 is in the build.
+01:55  check.sh rerun from clean .vo state with the new expected output.
+01:56-01:59 cp_code_ok3 + step_case_complete3 in a scratch file, then into the build.
+       Snags: Stdlib `++` (ListNotations in Module.v) inside cp_code needed `cbv [app]`;
+       nested ifs leave two wrappers; or_val's side goal `small (Z.lor ..)` cannot be
+       closed by lia, so the inner or had to be turned into a sum before the outer
+       or_val; N2Z.inj_* had to be rewritten twice for nested terms.
+       Stopped proving at 01:59 (4-byte case and final assembly left) to leave time
+       for the clean check.sh run and the records.
+02:01 Session end (elapsed 47 min). Final check.sh from clean .vo: EXIT 0, PARTIAL, 1 min 26 s.
+
+==== Session 3 (2026-11-12 UTC; up to 60 min, start 02:01:17) ====
+02:01  cp_code_ok4 with a new general lemma lor_mid (or-ing a bit field into a + h*2^k):
+       compiled at the FIRST attempt (copied the structure of cp_code_ok3).
+02:02  step_case_complete4 by textual substitution from complete3: first attempt.
+       StepSpec.v (case split; step_case_of_inv to use the Inv premise): first attempt.
+       Theorems.v: decoder_module_correct_proved : decoder_module_correct.
+02:03  check.sh: top-level type check against Boundary.v (Definition with the expected
+       type), Print Assumptions of the top theorem in check.expected.txt (only additions vs
+       the previous expected output; same library axioms), PASS-modulo-determinism verdict.
+02:05  check.sh from clean .vo: EXIT 0, 1 min 42 s.  Per-file times measured.
+02:07-02:10 STATUS/REPORT/JOURNAL.  No difficulties this session: all the friction had
+       been in building the sub-block lemmas and tactics in session 2.
+CUMULATIVE agent time on this candidate's proofs (journals): session 1 45 min, session 2
+       47 min, session 3 ~9 min = ~1 h 41 min (excluding toolchain setup, 33 min on the old
+       VM, and the shared pure layer's own sessions).
+
+==== Session 4 (2026-11-12 UTC; start 02:15:54) ====
+02:16  Read determinism REPORT section 8.  Plan: new call_returns with two added conjuncts
+       (reach-d-from-everywhere, no infinite run); prove via call_of_wp only.
+02:17  ../determinism: DecoderInstance.v moved out (decoder_bodies_ok, s0_funcs_ok,
+       decoder_call_cfg_ok, decoder_call_outcome -> decoder/DetInstance.v); Main.v,
+       _CoqProject, Assumptions.v, check.sh, Makefile no longer mention ../decoder.
+       Added ReduceDet.still_reaches_stuck_is_target.  Its check.sh: ALL PROVED, 19 s.
+02:18  Boundary.v call_returns + header; Exports.call_of_wp gets the s_funcs premise and
+       the two new conjuncts from decoder_call_outcome: first compile.  V1Implied.v:
+       two small fixes (explicit section args; `repeat split` split mem_frame too).
+02:21  check.sh: builds ../determinism from clean, pins its statements and the fragment
+       definitions, the v1 implication and v1 definitions; new check.expected.txt
+       (only additions; top-level assumptions unchanged).
+02:23  Cleaned ignored build output in decoder/ and determinism/ (git clean -X, 149 files);
+       check.sh: PASS, 1 min 52 s.  Mutations: old Boundary.v -> FAIL hash; bi_ok without
+       BI_global_set -> builds, FAIL on pinned bi_ok text.  Both restored (cmp).
+02:29  Final clean run: check.sh PASS, 111 s.  determinism/check.sh ALL PROVED.  End 02:30 (~14 min).
+
+==== Session 5 (2026-11-12 UTC; 60-min box, start 02:50:15): audit fix ====
+02:50  Read AUDIT.txt (critical: out_area 4*len+4 makes mem_bytes_needed = 327684 > 327680,
+       the module's fixed 5 pages, so every per-call guarantee was vacuous for the real
+       module), Boundary/Decode/Step*/Exports/V1Implied, the auditor's Vac.v.
+02:52  Worked out the real bound before editing.  Per byte, out + pend' <= 2 + pend with
+       pend = 0 (nothing pending) or 2 (something pending): empty state 2 bytes or a new
+       pending byte; extend 0; complete <= 4 against a credit of 2; reject = U+FFFD (2) +
+       reprocess (2 bytes, or a new pending byte).  Summed: out <= 2*len + pend st0 <=
+       2*len + 2.  So 2*len+2 is true and tight (pending [C2] then "A": 4 bytes for 1 byte).
+       Also found that step_spec's old precondition o + 4 <= mem length is NOT derivable
+       from the tighter area at the last byte from the empty state (o can be OUT + 2k + 2
+       after an earlier reject), so step_spec needed o + 2 + pend st, and its frame
+       ([o, o+4)) had to become exact ([o, o+|output|)).
+02:55  OutBound.v (pure; first compile errors: lia does not unfold bN; step_acc needed an
+       explicit equation).  Boundary.v: out_area 2*len+2, layout comment in plain words,
+       final section decoder_module_applies := layout_fits /\ instance_memory_fits.
+       Python string escaping ate three "/\" line ends in the first edit (caught by the
+       compiler).  instance_memory_fits needs "forall hs, exists ..." for the existence
+       half: WasmCert's relational instantiate contains an existential host state.
+02:57  NonVacuity.v: universal half (EVERY instantiation result) by unfolding alloc_module;
+       compiled at the third attempt.  This ties it to the s0 inside Realizes without
+       needing a determinism lemma for instantiate (the library has only soundness of
+       interp_instantiate).
+02:58-03:01  Decode/Step*/Exports edits.  One real snag: in Decode.v's mathcomp context,
+       `+` inside %coq_nat is ssrnat's addn, which lia does not understand; the loop
+       invariant must be written with Nat.add/Nat.mul (as the old one did with Nat.mul).
+       Build complete at 03:01.  V1Implied.v still compiled unchanged -- because its "v1
+       text" used Boundary's out_area/mem_bytes_needed by name, so it silently changed
+       meaning.  Replaced by PrevImplied.v with the old constants copied under _prev names:
+       current -> prev (session 4) -> v1.
+03:02-03:05  check.sh: pure layer rebuilt from clean by its own check.sh; @-explicit,
+       fully qualified type checks of both claims; Locate pinned; rocqchk (first run
+       failed only because -silent suppresses the success line; dropped -silent).
+03:09  check.sh PASS (3 min 29 s).
+03:10-03:14  Mutations in a scratch copy (all restored, cmp'd):
+       old out_area in Boundary.v -> FAIL hash pin; with the pin updated, NonVacuity.v
+       fails (layout_fits); module memory PAGES 5 -> 2 -> NonVacuity.v fails, while
+       Theorems.vo (the main claim) STILL BUILDS, i.e. the old class of defect is caught only
+       by the new claim; ASCII store moved to o+4 -> StepEmpty.v fails; done also storing at
+       OUT+2 (outside its new 2-byte area, inside the old 4-byte one) -> Exports.v fails.
+       Caveat: the proofs are syntax-directed, so any code mutation breaks them; these two
+       do not isolate the frame argument.
+       determinism/check.sh: ALL PROVED.
+
+HOW THE DEFECT GOT PAST THREE AUTHORING SESSIONS (candidly)
+  - Session 1 chose 4*len+4 as an easy over-approximation ("at most 2 units per input
+    byte") and the memory size (5 pages) separately; nobody did the addition.  The
+    arithmetic 65536 + 4*65536 + 4 = 327684 vs 5*65536 = 327680 differs by 4 bytes, which
+    reads as "about 5 pages".  REPORT even printed ">= 327684 bytes" without comparing.
+  - Nothing in the build connected Boundary's constants to the module's memory: Realizes
+    only assumes a large enough memory, and an over-generous assumption makes proofs
+    EASIER, so no proof ever pushed back.  The difftest exercised the real module, which
+    is correct, so it passed too.
+  - Sessions 2-4 worked inside the per-byte proofs and on determinism, taking Boundary as
+    reviewed; the checks (hash pin, exact type, assumptions) all guard against weakening
+    the statement or the proof, none against the statement being unsatisfiable.
+  - Lesson, now encoded: every hypothesis of a top-level claim about a concrete artefact
+    needs a machine-checked instance (decoder_module_applies), pinned like the claim.
+03:18  Cleaned ignored build output (git clean -X in decoder/, determinism/, pure-rocq/), then
+       check.sh from clean: PASS, 3 min 29 s (log in check_run.log).  End 03:18 (~28 min).
+
+SESSION 7 (improvement pass), 2026-11-12, from 03:34 UTC  (agent: improvement pass A+B)
+03:34  Read STATUS/AUDIT/check.sh.  Baseline per-file timing in a scratch copy
+       (sequential rocq c -time, /usr/bin/time; contended by other agents' Lean builds).
+       Surprise: NonVacuity.v takes 16.9 s CPU (not listed among the slow files before):
+       `cbn` of the instantiation result, `rewrite mem_make_length` and Qed (6.5 s) on goals
+       that contain the whole module term.
+03:36  A.1: Boundary.v gets instantiation_unique (any two results of instantiate are
+       equal), conjoined into decoder_module_applies.  Proof (NonVacuity.v) by the
+       auditor's route: alloc_module fixes store and instance.  First attempt failed on
+       ssreflect `have ->` (rewrote before `subst f`), second on an explicit argument.
+       instance_memory_fits_proved rewritten through the new instantiate_decoder_result
+       (rewrite to s0/inst0 first, never cbn the module): NonVacuity.v 16.9 s -> 0.6 s.
+03:38-03:43  A.2-A.4.  Module.v comment fixed (term untouched).  PrevImplied.v archived to
+       archive/ (it was untracked, so deleting would lose it), removed from the build,
+       check.sh and expected output; wip/StepWIP.v (tracked, obsolete first draft of
+       emit_fffd_ok) git-rm'd.  New pure-layer file pure-rocq/Utf8StepFacts.v with the step
+       equations, pending-state ranges, seq_cp_bound, ref_decode_buffer_snoc and the output
+       bound counted in UTF-16 units.  Difficulties: (1) named arguments `(st := ..)` work
+       only for implicit arguments, and the decoder files had Set Implicit Arguments while
+       the pure layer does not -- call sites rewritten positionally; (2) `++` means
+       seq.cat under ssreflect and List.app in the pure layer; `rewrite` does not identify
+       them, so Decode.v keeps a one-line utf16le_cat alias next to OutBound's utf16le_app.
+03:44  Decode.v: the 6.8 s + 3.5 s + 3.8 s (Qed) of decode_correct were one `rewrite /=`
+       (ssreflect simpl) on a 2-element goal containing Int32.repr (OUT + ...): simpl
+       evaluates repr/modulus arithmetic on the 65536 literal.  Replaced by `change` +
+       i32_isub_repr + Z.add_simpl_l: Decode.v 15.1 s -> 1.1 s.
+03:44  StepComplete.v: 14 of its 16.6 s were utf16le_cp_len, the same pattern (`/=` after
+       rewriting utf16le of a symbolic code point: simpl on (0xD800 + (c-0x10000)/0x400)
+       mod 256 etc.).  It duplicated OutBound.utf16le_one_len (without a premise); removed.
+03:45-03:47  Opacity workaround.  Without `Local Strategy opaque [seq_cp U32_of_N]` the Qed of
+       step_case_complete2 still hangs (killed after > 2 min).  Opaque seq_cp alone, or
+       U32_of_N alone, suffices (2.3 s each).  `Global Opaque seq_cp` at the end of
+       pure-rocq/Utf8Proofs.v (after every pure proof; downstream uses only seq_cp_value*)
+       removes the need for any Strategy in the decoder: StepComplete.v 2.2 s, no
+       per-file workaround.  Checked that a non-Local Strategy/Opaque survives Require.
+03:48-03:51  I32.v: the i32/Z helper lemmas from Decode/StepEmpty/StepPending/StepComplete
+       collected in one file (no statement changed); bN_bZ/bN_lt/small_byte/small_enc to
+       Repr.v; duplicate bN_le removed; the Ltacs small_tac / wp_if_bool, which were
+       copied in StepPending.v and StepComplete.v because Ltac in a section does not
+       survive it, now defined once at top level of StepEmpty.v.  All compiled first time.
+03:50  Reusable files (Steps, Control, Wp, Mem, WpMem, I32) moved to ../symexec (logical
+       path SymExec, own _CoqProject/Makefile/STATUS); check.sh builds it from clean,
+       greps it and rocqchks it.  Assumptions.v (dead; superseded by CheckTop) removed.
+03:51  rocqchk: the old call re-checked all of coq-wasm, mathcomp and CompCert every run
+       (~70 s).  Now every library of this development is checked with -norec (12 s);
+       FULL_ROCQCHK=1 restores the full re-check.  Documented in check.sh and the verdict.
+03:52-03:54  First full check.sh (scratch copy, clean): PASS, 115 s wall.
+03:54  check.expected.txt: the only change is the removal of the PrevImplied section
+       (lines 656-913); diff checked: 258 lines removed, none added.
+03:55  Tested whether utf16le_cp_len's slowness was the bit record: `Opaque U32_to_N`
+       does not help (same 13 s); it is simpl on N literal arithmetic.
+03:56-03:57  step_case_complete2/3/4 were near-copies (diff: only the list literal and the
+       cp_code_ok lemma).  Replaced by one step_case_complete b1 r b with the cp_code
+       result as a hypothesis; the three named cases are one-line instances (names and
+       statements kept, they are printed in check.expected.txt).  Second compile passed
+       (first failed: the false branch of the count test needed Z.eqb_neq instead of cbn
+       on concrete numbers).  StepComplete.v 394 -> 328 lines.
+03:58  wr_app: `rewrite O2; [lia|]` depended on the order of the side goal; now
+       `rewrite (O2 q ltac:(lia))`.
+04:01-04:03  Final check.sh from clean (git clean -X of decoder, symexec, determinism,
+       pure-rocq; no .lia.cache): PASS, 112 s wall, 121 s CPU.
+04:03-04:06  Utf8Bridge.v: found that the per-file numbers of the previous passes were
+       taken with a warm .lia.cache: from scratch the file is 11.1 s, not 8.5 s.  Probe:
+       in vs_form, table_arith (5 x 5 table branches, lia discarding each impossible one)
+       0.72 s vs the final lia with N subtraction 0.17 s -- the previous agent's guess
+       (N subtraction) is not the main cost.  New lemma lead_cases (the 9 lead-byte
+       classes that occur, proved once from seq_len_cases and lo2_hi2_cases), used by
+       table_arith: 11.1 s -> 9.9 s (no cache, same load).  Statements unchanged.
+04:06  Second final check.sh from clean started.
+04:05-04:07  Second final check.sh from clean (after lead_cases): PASS, 109.5 s wall,
+       118.4 s CPU.  check_run.log updated.  FULL_ROCQCHK's command run by hand: 
+       "Modules were successfully checked" (full 60.23 59.62 s wall/user).
+END OF SESSION 7: 04:08 UTC (34 min of the 75-min box).  Remaining ideas: IMPROVEMENT.txt.

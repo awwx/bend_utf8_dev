@@ -121,6 +121,22 @@ pub fn pack(p: Pend) -> u32 {
 
 pub fn decode_start_state() -> u32 { 0 }
 
+/// Writes the `o.n` (0..2) code points of `o` to `out[k..]`; returns the new count.
+fn write_out(out: &mut [u32], k: usize, o: Out) -> usize {
+    match o.n {
+        0 => k,
+        1 => {
+            out[k] = o.c0;
+            k + 1
+        }
+        _ => {
+            out[k] = o.c0;
+            out[k + 1] = o.c1;
+            k + 2
+        }
+    }
+}
+
 /// Decode `input` from `state`; writes the code points to the front of
 /// `out` (needs `out.len() >= 2 * input.len()`), returns the new state and
 /// the number of code points written.
@@ -130,14 +146,7 @@ pub fn decode_buffer(state: u32, input: &[u8], out: &mut [u32]) -> (u32, usize) 
     let mut k: usize = 0;
     while i < input.len() {
         let o = step(p, input[i]);
-        if o.n >= 1 {
-            out[k] = o.c0;
-            k += 1;
-            if o.n >= 2 {
-                out[k] = o.c1;
-                k += 1;
-            }
-        }
+        k = write_out(out, k, o);
         p = o.p;
         i += 1;
     }
@@ -185,8 +194,13 @@ mod shim {
         super::decode_done(state, out)
     }
 
+    /// Trap (Wasm `unreachable`) on a panic, e.g. an out-of-contract call that fails a
+    /// bounds check.  (On other targets, used only for Charon's host translation, loop.)
     #[panic_handler]
     fn panic(_: &core::panic::PanicInfo) -> ! {
+        #[cfg(target_arch = "wasm32")]
+        core::arch::wasm32::unreachable();
+        #[cfg(not(target_arch = "wasm32"))]
         loop {}
     }
 }

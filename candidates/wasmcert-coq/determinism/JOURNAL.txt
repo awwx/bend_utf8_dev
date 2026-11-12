@@ -1,0 +1,123 @@
+JOURNAL (determinism lemma for WasmCert-Coq 2.2.1).  Times UTC.  Start 01:14:38.
+
+01:15-01:18 Spike.  Read opsem.v (712 lines), interpreter_ctx.v, contexts.v,
+  properties.v.  Findings: the interpreter (interpreter_ctx.v) is
+  proof-carrying with SOUNDNESS only (RSC_normal carries a reduce_ctx
+  proof); no completeness direction exists, so route (B) gives nothing for
+  determinism.  No reduce_det / *_unique lemma in 2.2.1.  BUT: git history
+  of the reference checkout has branches origin/iris-wasm-native and
+  origin/iris-wasm-opam (Iris-Wasm, 2023, Wasm 1.0 semantics of an older
+  WasmCert) containing a complete reduce_det proof: iris_wasm_determ.v (533
+  lines) + reduce_det/*.v (~1100 lines) + first_instr.v (325) +
+  iris_reduce_properties.v (2012) + lfilled_reduce.v (646).  Its statement
+  is "equal, OR first instruction is grow_memory, OR all three are traps
+  at a first_instr position with equal stores".  That confirms two things
+  I had derived from reading opsem.v: trap propagation (rs_trap) is
+  nondeterministic in shape, and decomposition is the bulk of the work.
+  It cannot be reused as is: the 2.x semantics changed lholed/lfill
+  (inductive indexed context + Fixpoint, not a lfilled predicate), AI_local
+  -> AI_frame, host state, Wasm 2.0 rules (tables, refs, bulk memory, SIMD,
+  tail calls).  Route chosen: (A)/(C) hybrid = port the Iris-Wasm proof
+  structure to 2.2.1 on a trap-free fragment.
+01:19 Fragment.v first compile failed: funcinst needs the host typeclass
+  context (forgot `Context `{ho: host}`).  Fixed by a Section.
+01:20-01:24 ReduceDet.v: statements as Prop definitions; const_irreducible
+  proved; corollary (unique_outcome, no_infinite_run,
+  maximal_run_ends_in_result, deterministic_outcome_if) proved from the
+  three statements.  Friction (all small, ~10 compile cycles): ssreflect
+  `case:` on clos_refl_trans_1n does not substitute the index into
+  hypotheses left in the context (had to generalize HR); wrong binder
+  names for rt1n_trans (y z order); implicit-argument inference failing
+  when the first explicit argument is `cfg_ok s es` against `cfg_ok_c ?c`
+  (fixed with @ and explicit tuple); `x && false` left by /= needs andbF.
+  File named Determinism.v under logical root Determinism gave a
+  masking-absolute-name warning; renamed ReduceDet.v.
+01:25 DecoderInstance.v: funcs_ok s0 and bodies by vm_compute (instant).
+01:25-01:30 Trapped.v: trapped_step_preserved PROVED (general, any store).
+  Approach: a Fixpoint first_nc (first non-value instruction) and
+  trapped_iff : trapped es <-> first_nc es = Some e /\ trapped_head e;
+  then one generic tactic computes first_nc of each rule's left-hand side.
+  Only r_label (hole content is not a value list -> it is itself trapped,
+  via const_irreducible_gen) and r_frame needed manual steps.  Gotchas:
+  `all:` on zero focused goals silently succeeds (my debug print appeared
+  under the wrong label); Ltac-internal ssr intro names (Hx) not visible;
+  `$V (VAL_ref r)` simplifies to vref_to_e r, needed is_const_vref.
+01:30-01:33 Preservation.v: fragment_step_preserved PROVED.  One generic
+  tactic (split cfg_ok, simplify es_ok of the left-hand side, refute or
+  rebuild).  Gotchas: ssreflect `rewrite ... in *` fails with "assumptions
+  should be named explicitly" when intros created auto-named hypotheses
+  (had to rewrite only the one hypothesis); `?` intro patterns inside Ltac
+  likewise (use `fresh`); `/=` unfolds es_ok on cons, so lemmas stated with
+  es_ok stop matching (es_ok_label/es_ok_frame helpers).
+01:34 check.sh: verdict line probes each statement by compiling
+  `Check (X_proved : X)`, so the verdict cannot drift from the build.
+01:34-01:43 Focus.v: reduce_focus_first_gen PROVED (a step from
+  vs ++ e :: rest with e the first non-value, not a trap, is a step of
+  vs ++ [e] followed by rest).  ~25 compile cycles, the most of the
+  session.  Time sinks: (1) ssr `have [..] := lemma _ He HX` cannot leave
+  `_` premises (used destruct with ltac:(...)); (2) v_to_e_split_eq takes
+  `~ is_const e` (Prop) while I carry `is_const e = false`; (3) an
+  `all:` tactic whose error was reported at a misleading place: I spent
+  ~5 min convinced two syntactically identical goals (Set Printing All)
+  refused reflexivity; in fact `apply: (r_label ...)` left the two lfill
+  equations as goals, and the bullet structure meant my `all:` line ran
+  on a different goal set than I thought.  Fixed with explicit `+`
+  sub-bullets.  Backed up once (wip -> build once it was closed).
+01:43-01:46 STATUS.txt, REPORT.txt, header updates; check.sh from clean:
+  PARTIAL (only reduce_det_fragment missing), 8 s build.  Stopped proof
+  work at 01:46 rather than start step 1 of the remaining plan
+  (reduce_strip_vals) with ~25 min left: it needs a "base step" notion
+  (a step not ending in r_label) that I would want to design carefully
+  rather than rush.  Overall: no conceptual blockage; all difficulty was
+  ssreflect/Ltac mechanics, and the library's v_to_e_split_eq plus a
+  first_nc Fixpoint carried the list reasoning.
+
+=== UNIT 2 start 01:46:24 ===
+01:47-01:54 HeadStep.v: an explicit inductive head_step (43 constructors,
+  one per fragment rule, each with a free values prefix) and
+  head_step_complete PROVED (every reduce step of values ++ [e] is a
+  head_step).  Did not look at Iris-Wasm for this: their structure is
+  "only_one" tactics per rule; I chose an explicit relation instead so
+  determinism becomes inversion.  Snags: econstructor does not backtrack
+  across constructors (generated a `first [solve [eapply C; eauto] | ...]`
+  over all 43 names with python); `change (... = _) in H` fails with a
+  wildcard RHS, needs the RHS bound (?R); hypothesis names lost through
+  `case: Hs HX => ...; intros` (match on shape instead).
+01:54-01:57 Det.v: cat_suffix_eq, set_nth_irrelevant, lfill_nl_unique,
+  br_stuck, return_stuck.  Snags: (1) passing `erefl` for `is_const e =
+  false` before the argument that determines e fails ("erefl has type
+  is_const ?x = is_const ?x") -- elaboration is left to right; fixed with
+  wrapper lemmas taking the determining hypothesis first (head_step_of,
+  lfill_nl_unique_eq).  (2) A lemma `basic_not_label b : forall n c LI,
+  AI_basic b <> AI_label n c LI` under Set Implicit Arguments made n c LI
+  implicit, so `basic_not_label _` was applied to the equality and had
+  type False; needed @.  (3) Errors inside a `match goal` branch surface
+  as "No matching clauses for match", which hid both of the above for a
+  few cycles; testing the branch body alone in a scratch copy found them.
+01:57-01:59 head_step_det: `case: H1 ... => *; inversion H2` over 43x43
+  pairs runs in ~4.6 s; a generic simplifier closed all but ~22 goals,
+  then one tactic each for: br_table range exclusivity (lia), consumed
+  value counts (cat_suffix_eq + lia on lengths), value lists don't step,
+  br/return-filled contexts don't step / are uniquely decomposed, inner
+  steps (induction hypothesis), local.set frame equality.
+01:59-02:00 assembly by induction on nesting size; one restructure
+  (`have := lemma _ _ H1 H2` with holes does not leave the holes as goals
+  in a way `case:` can use; switched to `have E : ... by apply: lemma`).
+02:00 reduce_det_fragment PROVED.  02:00-02:05 Main.v (unconditional
+  corollaries), check.sh probes re-typing the intended statements, docs.
+How much the Iris-Wasm proof helped: little, directly.  In unit 1 its
+  statement confirmed the trap issue and the overall shape (case analysis
+  per rule with an induction on nesting size, length_rec); I never read
+  its proof bodies.  The explicit head_step relation (my choice) replaced
+  their lfilled/first_instr machinery and made the r_label overlap a
+  single completeness lemma.
+Stop: finished at 02:05, 19 min into the 60-min unit; clean stop because
+  the goal is met and further work (fragment extensions, Boundary.v) needs
+  a user decision.
+
+==== Decoder integration (2026-11-12 02:15-02:30 UTC, agent working in ../decoder) ====
+02:17  DecoderInstance.v and Main.decoder_call_outcome moved to ../decoder/DetInstance.v;
+       -Q ../decoder removed from _CoqProject, check.sh, Assumptions.v; Makefile comment.
+       New: ReduceDet.still_reaches_stuck_is_target (first conjunct of
+       deterministic_outcome implies the third, any configurations).  check.sh probes it;
+       its FAIL (end-result probe) branch now exits 1.  ./check.sh: ALL PROVED, 19 s.

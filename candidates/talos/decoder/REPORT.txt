@@ -1,16 +1,23 @@
 Talos candidate: report (facts for the evaluation)
 
 OUTCOME
-  Partial, inside the 60-minute box.  Running module + wrapper pass the full
-  difftest.  Boundary.lean written.  All Wasm-semantics work is proved: every
-  export terminates without trapping and computes a Wasm-level model (fold of a
-  per-byte model function, plus explicit memory writes).  NOT proved: the pure
-  refinement of those models to RefDecoder and the memory-layout lemmas, so the
-  top-level statement `ShippedModuleCorrect` (Boundary.lean) is NOT proved.
-  See STATUS.txt for the exact missing statements.
+  Complete after two sessions.  First session (42 min): module, wrapper,
+  Boundary.lean, all Wasm-semantics reasoning.  Second session (about 13 min of
+  proof work, 2026-11-12): the pure refinement of the Wasm-level models to
+  RefDecoder (ProofRefine.lean), memory-layout lemmas and assembly
+  (ProofMain.lean).  The top-level statement `ShippedModuleCorrect`
+  (Boundary.lean, unchanged) is proved as Utf8Wasm.shippedModuleCorrect, axioms
+  propext / Classical.choice / Quot.sound only.  The 2^32 edge case the first
+  session flagged turned out true as stated and is proved as stated (STATUS.txt).
+  Third session (2026-11-12, non-vacuity): second pinned claim
+  ShippedWrapperCovered (Boundary.lean) proved as Utf8Wasm.shippedWrapperCovered:
+  every call decoder.mjs makes (input at 0, at most 1 MiB, output at 1 MiB, on
+  the module's 160-page memory) meets every condition of the guarantees, so they
+  are not vacuous for the shipped module as used.  check.sh compares the
+  wrapper's constants and the module's memory size with Boundary's.
 
 1. THE THEOREMS
-  Target (Boundary.lean, unproved):
+  Target (Boundary.lean, proved as Utf8Wasm.shippedModuleCorrect):
     ShippedModuleCorrect : ∀ m, Decoder.Wat.decodeForVerification printedWat = .ok m →
                              ∃ D : Decoder, D.Correct ∧ Realizes m D
     printedWat := include_str "decoder.printed.wat" (= wasm-tools print decoder.wasm,
@@ -30,9 +37,21 @@ OUTCOME
     stepM_nil   : per-byte model = RefDecoder.step when nothing is pending.
     done_runs   : decode_done(v,out) returns out / writes 0xFFFD and returns 4+out.
     buffer_runs : decode_buffer(v,inp,len,out) under inp+len <= out,
-                  out + 8*len <= pages*65536, out + 8*len < 2^32: returns
+                  out + 8*len <= pages*65536 (second session: the extra
+                  out + 8*len < 2^32 was removed): returns
                   [(runM ..).1, (runM ..).2.1], final store storeWith (runM ..).2.2,
                   runM = left fold of the model `stepM` over bytesAt mem inp len.
+    stepM_enc   : stepM (enc p) x = (enc (step p x).1, (step p x).2), |p| <= 3.
+    runM_enc    : runM over a buffer = enc / end pointer / writes of decodeBuffer.
+    buffer_ok, done_ok, start_ok' : Boundary's BufferOk / DoneOk / StartOk.
+    shippedModuleCorrect : ShippedModuleCorrect.
+    shippedWrapperCovered : ShippedWrapperCovered := ∃ m, decode printedWat = .ok m ∧
+                  WrapperCallsCovered m (initial memory 160 pages = the store the
+                  guarantees start from; input [0, 1 MiB) before output
+                  [1 MiB, 9 MiB) inside 10 MiB; StartOk / BufferLayout (every
+                  len <= 1 MiB) / DoneOk memory conditions on every 160-page
+                  memory; sameOutside keeps 160 pages).  The state condition
+                  chains through StartOk / BufferOk conclusions.
   #print axioms (Axioms.lean): propext, Classical.choice, Quot.sound for all.
 
 2. TRUSTED / UNVERIFIED BETWEEN THE (TARGET) THEOREM AND NODE
@@ -55,11 +74,12 @@ OUTCOME
      output code point being a scalar: pure-lean decoded_scalar); decode_done
      uses the same output area.  Memory is declared 160 pages (10 MiB) in the
      module so the wrapper never grows it; the layout contract
-     (1 MiB + 8 * 1 MiB <= 160 pages) is satisfied by construction.
+     (1 MiB + 8 * 1 MiB <= 160 pages) is proved (ShippedWrapperCovered) for
+     the constants on decoder.mjs's three "// LAYOUT" lines, which check.sh
+     compares with Boundary.lean; that the code uses them that way is read, not
+     proved.
   g. Lean kernel, include_str, the copied `decoderWat%` elaborator (not trusted:
      its output is re-derived in the kernel).
-  h. Until the missing pure lemmas are proved: the claim that stepM/runM/enc
-     refine RefDecoder is tested only (difftest), not proved.
 
 3. SIZE
   decoder.wat 160 lines; printed module 385 instructions (excluding end/else),
@@ -67,8 +87,14 @@ OUTCOME
   DecoderModule boilerplate): ProofMach 92, ProofFuncs 91, ProofStep 71,
   ProofLoop 183, ProofBuffer 34, ProofDone 100 = 571 lines, about 1.5 lines per
   Wasm instruction for the Wasm-semantics part (spike: about 7 per loop
-  instruction).  ProofModel (partial refinement) 85 lines.  Boundary.lean 150 lines (mostly comments).  The unfinished pure
-  refinement is not counted; I estimate another 300-600 lines.
+  instruction).  ProofModel (partial refinement) 85 lines.  Boundary.lean 150
+  lines (mostly comments).  Second session: ProofRefine 256 lines (per-byte
+  refinement), ProofMain 204 lines (layout + assembly), ProofLoop +17 lines for
+  the 2^32 edge.  Total proof files now 1,128 lines (first session's estimate for
+  the remainder was 300-600 lines; actual about 480).
+  Third session (non-vacuity): Boundary.lean +79 lines (mostly comments),
+  ProofWrapper.lean 40 lines, check.sh +47 lines; check time +about 1 s of Lean
+  (clean check.sh 3 min 49 s vs 3 min 41 s before, within noise).
 
 4. BUILD AND RE-CHECK TIMES (4 cores, another proof agent running)
   - Talos framework (pre-built in setup): 14 min, 3.9 GB.
@@ -85,6 +111,10 @@ OUTCOME
   - Pure layer copy: about 3 min (Utf8Table dominates).
   - difftest full run: about 2 min.
   - check.sh total: 8 min 05 s wall (Lean part about 6 min, difftest 110 s).
+  - Second session, on the EC2 instance (8 vCPU, contended): check.sh 2 min 06 s
+    wall from a clean build directory; Lean about 95 s (ProofFuncs 47 s,
+    ProofStep 18 s, DecoderModule 15 s, pure layer 6 s, ProofRefine 1 s,
+    ProofMain 1 s); difftest 32 s.
 
 5. SCALING
   - What made it scale: (i) `Reach` hides traces; (ii) a symbolic-execution
@@ -101,8 +131,13 @@ OUTCOME
     (as in the spike), about 100 lines for this loop.
   - For a larger component the Wasm side looks manageable with this machinery;
     the kernel-checked decode and the per-function elaboration time are the
-    limits.  The model-to-spec refinement is ordinary Lean and is where most of
-    the remaining effort is.
+    limits.  The model-to-spec refinement turned out to be ordinary Lean that
+    went quickly (about 10 minutes) once stated through toNat: a little-endian
+    value `packN` of the byte list, one lemma per packing step, and one central
+    lemma (packed_seq) giving vsB/vspB/cpV of a packed list as isVS/isVSP/cpOf.
+    The Bool range goals that stalled the first session were closed by small
+    single-purpose lemmas (lead*_eq: `Bool.eq_iff_iff`, simp to toNat, omega)
+    used as rewrite rules, instead of a generic tactic on the whole goal.
   - Licence: Talos is AGPL-3.0 (proof artefacts depend on it; the .wasm does not).
 
 6. WHAT PUSHED THE IMPLEMENTATION

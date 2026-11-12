@@ -1,4 +1,5 @@
-STATUS (pure-rocq, Rocq 9.2.0, stdlib only)   -- updated 2026-11-11 after the improvement pass
+STATUS (pure-rocq, Rocq 9.2.0, stdlib only)   -- updated 2026-11-11 after the improvement pass;
+  2026-11-12: Utf8StepFacts.v added and seq_cp sealed (see "2026-11-12" below)
 (see IMPROVEMENT.txt for before/after numbers; JOURNAL.txt for history)
 
 CURRENT STATE: FULLY CHECKED.  ./check.sh prints "ALL CHECKS PASSED"; about 22 s
@@ -6,6 +7,15 @@ CURRENT STATE: FULLY CHECKED.  ./check.sh prints "ALL CHECKS PASSED"; about 22 s
   rest is rocq makefile + Print Assumptions).  No Admitted/admit/Axiom/Parameter/
   Abort.  Print Assumptions: "Closed under the global context" for all 15
   <law>_proved, RefDecoder_correct and step_output_ok.
+  2026-11-12 (check-script parity fix): check.sh now has three guards (header of
+  check.sh): (1) Print Assumptions "Closed under the global context" for the 15 laws,
+  RefDecoder_correct and EVERY top-level declaration of Utf8Ref/Bridge/Proofs/StepFacts
+  (list generated from the sources; 162 in all, compiled as 4 parallel parts);
+  (2) rocqchk -o on the five Utf8 modules: the context's axiom list may contain only the
+  26 Stdlib/Corelib module-type parameters, no type-in-type / unsafe fixpoint / assumed
+  positivity; (3) holes.pl (also used by ../wasmcert-coq/decoder/check.sh): fuller word
+  list (Axioms, Parameters, Conjecture, Primitive, bypass_check, any Unset but two,
+  Hypothesis/Variable/Context outside a Section, ...).  About 35 s wall from clean.
 
 Files
   Utf8Laws.v   byte-identical copy of ../spec-rocq/Utf8Laws.v (Makefile re-copies and cmp's it)
@@ -13,17 +23,28 @@ Files
                second_ok), vp (valid prefix test), vs (valid sequence test), seq_value,
                seq_cp, State := list byte, step_empty, step, step_acc, ref_decode_buffer
                (fold_left of step_acc), ref_done, RefDecoder, ref_decode
-  Utf8Bridge.v bit-level spec -> arithmetic, symbolically (no enumeration):
+  Utf8Bridge.v bit-level spec -> arithmetic, symbolically (no enumeration; lead_cases
+               combines the byte-range tables since 2026-11-12):
                U32 <-> N (U32_to_of, U32_of_to, U32_to_N_inj, is_unicode_scalar_iff),
                utf8_form (UTF-8 layout of a number) and encoding_form (what `encoding`
                computes), byte-range table lemmas, vs_form / form_vs, encodes_iff,
                completion, pending_completion.  Header lists every export.
   Utf8Proofs.v all laws, RefDecoder_correct, streaming/refinement lemmas, downstream
                lemmas; re-exports Utf8Bridge (Require Export).  Header lists exports.
-  check.sh     make + hole grep + Print Assumptions
+               Ends with `Global Opaque seq_cp` (see 2026-11-12 below).
+  Utf8StepFacts.v  downstream facts for implementations refining RefDecoder (moved here
+               from ../wasmcert-coq/decoder on 2026-11-12): step_reject, step_extend,
+               step_complete; pending_lead, lo_next/hi_next, pending_vp, pending_vs;
+               seq_cp_bound; ref_decode_buffer_snoc; UTF-16 output size: cp_units,
+               text_units, text_units_app, cp_units_le2, FFFD_units1, pending_units,
+               step_empty_units_bound, step_units_bound, fold_units_bound,
+               decode_units_bound, ref_done_units_bound.  Header lists exports.
+  check.sh     make + holes.pl + Print Assumptions (all declarations) + rocqchk -o context
+  holes.pl     hole/checker-weakening search shared with ../wasmcert-coq/decoder/check.sh
 
 LOAD PATH FOR DOWNSTREAM: -Q /root/bend/utf8/candidates/pure-rocq Utf8
-  (modules Utf8.Utf8Laws, Utf8.Utf8Ref, Utf8.Utf8Bridge, Utf8.Utf8Proofs).
+  (modules Utf8.Utf8Laws, Utf8.Utf8Ref, Utf8.Utf8Bridge, Utf8.Utf8Proofs,
+  Utf8.Utf8StepFacts).
   Utf8Check.v and the stub-build/ directory (a build with the two slow
   enumeration lemmas Admitted) no longer exist: the whole check takes seconds.
 
@@ -54,3 +75,22 @@ Other downstream lemmas (same names and statements as before the pass):
   scalar_bounds, vs_fB, vs_nil.
 
 Not done / possible next steps: see IMPROVEMENT.txt.
+
+2026-11-12 (WasmCert decoder improvement pass; ../wasmcert-coq/decoder/IMPROVEMENT.txt)
+  - Utf8StepFacts.v (new, 188 lines, 16 lemmas, no axioms): the decoder-side pure lemmas
+    moved here.  The output bound is now stated in UTF-16 code units (text_units,
+    pending_units: decode_units_bound says units out + pending' <= |bytes| + pending);
+    the decoder converts units to bytes.  check.sh prints Print Assumptions for 10 of its
+    lemmas: 27 "Closed under the global context" in all (was 17).
+  - `Global Opaque seq_cp` at the end of Utf8Proofs.v.  seq_cp s = U32_of_N (seq_value s)
+    is a record of 32 N.testbit's; downstream must use seq_cp_value / seq_cp_value1..4 /
+    seq_cp_bound.  Without it the kernel unfolded seq_cp in the decoder's Qeds (> 60 s);
+    this replaces the decoder's per-file Local Strategy.  No proof in this directory
+    after that line, so nothing here is affected.
+  - Utf8Bridge.v: 11.1 s from scratch (the ~9 s quoted above was with a warm
+    .lia.cache).  In vs_form, table_arith (5 x 5 table branches, lia discarding each
+    impossible one) takes 0.72 s and the final lia with N subtraction 0.17 s, so N
+    subtraction is not the main cost.  New lemma lead_cases (the 9 lead-byte classes
+    that occur) used by table_arith: 11.1 s -> 9.9 s.  No statement changed.
+    encoding_form (~1.9 s) destructs the 32-boolean record and splits on the shape bits.
+  - Utf8Laws.v untouched (byte-identical to the spec).

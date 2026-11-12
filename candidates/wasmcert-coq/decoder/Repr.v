@@ -5,6 +5,7 @@ From Stdlib Require Import ZArith NArith List Lia.
 From Stdlib Require Strings.Byte.
 From Wasm Require Import numerics.
 From Utf8 Require Import Utf8Laws Utf8Ref Utf8Proofs.
+From SymExec Require Import I32.
 Import ListNotations.
 
 Definition bZ (b : Byte.byte) : Z := Z.of_N (Byte.to_N b).
@@ -37,3 +38,15 @@ Proof.
     try pose proof (bZ_range b1); try pose proof (bZ_range b2); try pose proof (bZ_range b3);
     split; intros; try discriminate; try lia; try reflexivity.
 Qed.
+
+Lemma bN_bZ b : bZ b = Z.of_N (bN b).
+Proof. reflexivity. Qed.
+
+Lemma bN_lt b : (bN b < 256)%N.
+Proof. pose proof (bZ_range b). unfold bZ in H. unfold bN. lia. Qed.
+
+Lemma small_byte b : small (bZ b).
+Proof. pose proof (bZ_range b). unfold small. rewrite modulus_val. lia. Qed.
+
+Lemma small_enc st : small (enc st).
+Proof. pose proof (enc_range st). unfold small. rewrite modulus_val. lia. Qed.

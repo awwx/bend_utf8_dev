@@ -1,0 +1,202 @@
+REPORT: a reusable determinism lemma for WasmCert-Coq 2.2.1 (coq-wasm)
+
+UPDATE 2026-11-12 02:15-02:30 UTC (decoder integration; sections 5-8 below
+are the earlier text): the section-8 proposal is APPLIED, with two of its
+three conjuncts (the third, "every reachable irreducible configuration is
+d", follows from the first; proved here as
+ReduceDet.still_reaches_stuck_is_target).  The decoder-specific pieces
+(DecoderInstance.v: decoder_bodies_ok, s0_funcs_ok, decoder_call_cfg_ok;
+Main.decoder_call_outcome) moved to ../decoder/DetInstance.v, so this
+directory depends only on coq-wasm (no -Q ../decoder any more).
+../decoder/check.sh builds this directory from clean and pins
+reduce_det_fragment_proved, fragment_deterministic_outcome,
+deterministic_outcome and the fragment definitions by their printed text.
+Unit 2026-11-12 01:14:38-02:14 UTC.  Rocq 9.2.0, switch wasmcert.
+Reference checkout candidates/wasmcert-coq/ref-WasmCert-Coq is at tag
+v2.2.1; opsem.v, interpreter_ctx.v, contexts.v, properties.v are
+byte-identical (cmp) to the installed sources under the opam switch.
+
+1. WHAT THE LIBRARY PROVIDES (spike, ~5 min)
+  - No determinism theorem, no *_det / *_unique lemma for reduce in 2.2.1.
+  - Interpreter: interpreter_ctx.v (there is no interpreter_func.v in
+    2.2.1).  run_one_step_ctx returns a run_step_ctx_result whose
+    RSC_normal constructor CARRIES a reduce_ctx proof: soundness only
+    (interpreter step => reduce), under the hypothesis
+    host_application_impl_correct.  RSC_error carries "not typable".
+    There is NO completeness direction (reduce step => the interpreter's
+    step) and no progress-to-completeness link, so route (B) gives nothing
+    for determinism: one would have to prove completeness, which is the
+    same decomposition work as (A).
+  - Typing: type_preservation.v (2125 lines) and type_progress.v (55
+    lines) exist (not read in detail); not needed here -- the
+    determinism argument needs no typing.
+  - Contexts: contexts.v has v_to_e_split_eq (unique values/non-value
+    split -- used), reduce_focus*, ctx_* lemmas for the interpreter's
+    context representation.  properties.v has lfill_const,
+    lfill_singleton_invert, reduce_not_nil, v_to_e_cat, v2e2v, ve_inj,
+    const_list_* -- used where convenient.
+  - PRIOR WORK FOUND: branches origin/iris-wasm-native and
+    origin/iris-wasm-opam of the WasmCert-Coq repository (Iris-Wasm,
+    2023, on the OLD Wasm 1.0 semantics) contain a complete reduce_det:
+    theories/iris/helpers/iris_wasm_determ.v (533 lines) + reduce_det/*.v
+    (13 files, ~1100 lines) + first_instr.v (325) + lfilled_reduce.v
+    (646) + iris_reduce_properties.v (2012).  Statement: results equal,
+    OR the first instruction is grow_memory, OR all three are traps at a
+    first_instr position with equal stores.  Not reusable as is (lfilled
+    predicate vs the 2.x indexed lholed + Fixpoint lfill, AI_local ->
+    AI_frame, host state, many new Wasm 2.0 rules), but it confirms the
+    proof shape and the trap issue below, and is a guide for the rest.
+
+2. NONDETERMINISTIC RULES OF reduce (opsem.v), enumerated
+  Genuinely nondeterministic:
+  - r_invoke_host_success, r_invoke_host_diverge: host_application is an
+    arbitrary relation (host.v: "This can be non-deterministic").
+  Nondeterministic in the SHAPE of the result, not in the outcome:
+  - rs_trap (trap propagation) overlaps itself under r_label and overlaps
+    rs_label_trap / rs_local_trap: e.g. [c1; c2; trap; e] steps to [trap]
+    directly or to [c1; trap; e] by r_label around [c2; trap] -> [trap].
+    All results are trap configurations (trapped_step_preserved), but they
+    are not equal, so literal step determinism fails as soon as AI_trap is
+    present.  Hence the fragment excludes AI_trap and the corollary
+    handles trapped configurations separately.
+  Deterministic in this mechanisation (worth knowing; the Wasm spec is
+  looser): memory.grow and table.grow (smem_grow / stab_grow are
+  functions; the spec allows a nondeterministic failure, WasmCert fixes
+  it), all float operations (numerics.v makes NaN results deterministic),
+  SIMD (opaque but total functions app_v*), ref.is_null, select,
+  local.set (the frame f' is pinned by its two fields; the default vd is
+  irrelevant because the index is checked in range).
+  Not nondeterminism but the proof burden: r_label lets a step be
+  presented with different contexts (values pushed into the context or
+  consumed by the rule; nested labels).  All presentations give the same
+  result; proving that is the decomposition work.
+  So the fragment excludes floats/SIMD/grow/tables only to keep the case
+  analysis small, not because they are nondeterministic.
+
+3. ROUTE CHOSEN AND WHY
+  (A)/(C) hybrid: direct proof on reduce, structured like the Iris-Wasm
+  proof but reorganised around a "first non-value instruction" view:
+   - Fixpoint first_nc (Trapped.v) instead of reasoning on raw list
+     equations; its rewrite lemmas let one generic tactic dispatch the
+     ~100 rule cases of each induction (this is what made Trapped.v and
+     Preservation.v quick: ~5 min each).
+   - Focus.reduce_focus_first_gen removes the "rest" of the list from any
+     step; what remains is determinism of steps of values ++ [e], by cases
+     on e (basic instruction / label / frame / invoke).
+  (B) rejected: no completeness theorem exists (section 1).
+  The corollary is proved abstractly from three statements, so the
+  plumbing to reduce_trans and to the decoder is finished and checked
+  now, independently of the remaining determinism proof.
+
+4. THE FRAGMENT (Fragment.v; decidable; see STATUS.txt for the list)
+  Preserved by reduction up to trapping, INCLUDING the administrative
+  instructions that appear during execution: labels and frames are in
+  the predicate recursively, and AI_invoke a is allowed because funcs_ok
+  constrains every closure in the store (native, fragment body); s_funcs
+  never changes in the fragment (fragment_step_preserved, proved).
+  No typing hypothesis is required anywhere.
+  The decoder is inside it (decoder_bodies_ok and s0_funcs_ok by
+  vm_compute; instruction inventory checked: i32.const, local.get/set,
+  i32.add/sub/and/or/shl/shr_u, i32.eq/lt_u/le_u/ge_u, i32.eqz,
+  i32.load8_u, i32.store16, if, block, loop, br, br_if; no call, no
+  globals, no grow, no tables, no floats, no SIMD, no imports).
+  A future module in the same style (integers, globals, one fixed linear
+  memory, direct calls, no imports) is covered unchanged; call_indirect
+  and tables would need adding (they are deterministic too).
+
+5. HOW IT PLUGS INTO THE DECODER'S BOUNDARY (unit 2: now unconditional,
+   as Main.decoder_call_outcome; exact proposed wording in section 8)
+  Boundary.v's call_returns hs s a args s' res is
+    forall f, reduce_trans (hs, s, f, v_to_e_list args ++ [AI_invoke a])
+                           (hs, s', f, v_to_e_list res)
+  for stores s with s.(s_funcs) = s0.(s_funcs).  decoder_call_outcome_if
+  (now proved unconditionally as Main.decoder_call_outcome) turns every such fact into
+  deterministic_outcome: every reachable configuration still reaches the
+  result (so no trap and no other result is reachable), there is no
+  infinite reduction sequence, and every stuck reachable configuration
+  is the result.  To state that in the reviewed boundary, Boundary.v
+  would replace call_returns by
+    call_returns hs s a args s' res /\
+    forall f, deterministic_outcome (hs,s,f,...) (hs,s',f,...)
+  (or define deterministic_outcome there); the proof in Theorems.v then
+  adds one line per export using Main.decoder_call_outcome with Theorems'
+  witness Instance.s0 (decoder_call_cfg_ok needs s_funcs = s0's, which
+  Realizes already assumes).  Boundary.v was not touched (another agent
+  is working in ../decoder, and it is a user-reviewed file).
+
+6. RESULT OF UNIT 2 (01:46-02:05): reduce_det_fragment PROVED
+  The plan of unit 1 worked as written, in ~16 minutes of proof work:
+   - HeadStep.v: an explicit inductive head_step with one constructor per
+     fragment rule (43), each carrying a free prefix of values, and
+     head_step_complete: every reduce step of values ++ [e] is a
+     head_step.  This absorbs r_label: its LH_base case shrinks the values
+     prefix, its LH_rec case becomes hs_label_inner.
+   - Det.v: lfill_nl_unique (context + values + br/return is uniquely
+     decomposed), br_stuck / return_stuck (via Focus + head_step_complete),
+     head_step_det (one inversion over 43x43 constructor pairs, 4.6 s;
+     generic tactic for value-list splits and functional side conditions,
+     then 6 targeted tactics for block/loop/invoke arity, label/frame
+     cross cases and local.set), and the assembly by induction on the
+     nesting size of the list.
+  Main.v then states the corollaries unconditionally.
+  Size: 1548 lines total (unit 1: ~640; unit 2: HeadStep 307, Det 284,
+  Main 45, small edits).  Check: 14 s clean build (contended).
+  The earlier "multi-week" guess for route (A) was far off for an agent;
+  the Iris-Wasm proof (~1600 lines of determinism proper, ~4600 with
+  helper files that also serve other purposes) was larger, mainly
+  because it proves determinism for the whole language with traps and
+  reasons on lfilled predicates rather than an explicit head-step
+  relation.
+
+7. CHECK
+  ./check.sh: clean build (14 s wall, contended), grep for
+  Admitted/admit/Axiom/Parameter/Abort in every file of _CoqProject,
+  the statements and Print Assumptions of the main results, a probe
+  `Check (X_proved : X)` for each of the three statements, a probe that
+  the two end results have exactly the intended statements (re-typed in
+  the probe, not copied from the build), and the verdict line
+  (ALL PROVED / PARTIAL / FAIL).  Builds only against the
+  installed coq-wasm; [until 02:17: DecoderInstance.v read ../decoder/Module.vo and
+  Instance.vo read-only; it has since moved to ../decoder/DetInstance.v].
+  Build outputs are covered by candidates/.gitignore (*.vo, *.glob,
+  .*.aux, Makefile.coq*); nothing added to .gitignore.
+  Installed: nothing.
+
+8. PROPOSAL FOR THE USER: stating the unique outcome in Boundary.v
+  (Not applied: Boundary.v is the user's file, and another agent is
+  working in ../decoder.)  Replace the definition of call_returns and the
+  CAVEAT paragraph in Boundary.v by:
+
+    (** Calling function address [a] with arguments [args] in store [s]
+        (any host state, any caller frame) returns [res] with store [s'],
+        and that is its only outcome: some reduction sequence reaches the
+        result; every configuration reachable from the call can still
+        reach the result (so no trap and no other result is reachable);
+        no reduction sequence runs forever; and the only reachable
+        configuration that cannot reduce further is the result. *)
+    Definition call_returns hs (s : store_record) (a : N) (args : list value)
+               (s' : store_record) (res : list value) : Prop :=
+      forall f,
+        let c := (hs, s, f, v_to_e_list args ++ [AI_invoke a]) in
+        let d := (hs, s', f, v_to_e_list res) in
+        reduce_trans c d /\
+        (forall c', reduce_trans c c' -> reduce_trans c' d) /\
+        (forall run : nat -> host_state * store_record * frame * list administrative_instruction,
+           run 0 = c -> ~ (forall n, reduce_tuple (run n) (run (S n)))) /\
+        (forall c', reduce_trans c c' ->
+           (forall c'', ~ reduce_tuple c' c'') -> c' = d).
+
+  The three new conjuncts are, verbatim, Determinism's
+  deterministic_outcome c d (Boundary.v keeps them spelled out so it
+  stays self-contained and reviewable without this directory).
+  Proof impact: at each place the decoder proves call_returns (start,
+  decode, done in Exports.v / Decode.v / Theorems.v), add
+    split; [exact: <old proof> | exact: (decoder_call_outcome Hf (<old proof> f))]
+  where Hf : s.(s_funcs) = s0.(s_funcs) is Realizes' existing hypothesis
+  (Theorems.v uses Instance.s0 as the witness, as decoder_call_outcome
+  requires).  Build wiring: the decoder's _CoqProject would add
+  `-Q ../determinism Determinism`; Determinism's DecoderInstance.v/Main.v
+  in turn read Decoder.Module/Instance, so either build ../determinism
+  after Instance.vo, or move the two decoder-specific theorems
+  (decoder_call_cfg_ok, decoder_call_outcome, ~20 lines) into the decoder
+  directory so that ../determinism depends on nothing but coq-wasm.

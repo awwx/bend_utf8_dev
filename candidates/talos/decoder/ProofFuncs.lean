@@ -2,18 +2,22 @@
 ProofFuncs.lean -- call lemmas for the pure helper functions of
 decoderModule ($cont, $second, $vs, $vsp, $cp = funcs 0..4).
 
-Each helper gets a *model* (a Lean function on UInt32 that follows the
-Wasm code operation by operation) and a call lemma: calling the function
-from any caller context pushes the model's value and changes nothing else.
-The models are related to Utf8Ref's isCont/secondOk/isVS/isVSP/cpOf in
-ProofModel.lean.
+Each helper gets a *model* (a Lean function on UInt32 computing what the
+Wasm code computes) and a call lemma: calling the function from any caller
+context pushes the model's value and changes nothing else.  Each proof is
+`wcall; wauto; wfinish [model]` (ProofMach.lean).  The models are related to
+Utf8Ref's isCont/secondOk/isVS/isVSP/cpOf in ProofModel.lean / ProofRefine.lean.
+
+EXPORTS
+  contB secondB          models of $cont, $second
+  by1 by2 by3 by4        bytes of a packed sequence, as the code extracts them
+  vsB vspB cpV           models of $vs, $vsp, $cp
+  call_cont call_second call_vs call_vsp call_cp   (each registered with `wcalls`)
 -/
 import ProofMach
 
 namespace Utf8Wasm
 open Wasm SmallStep
-
-set_option maxHeartbeats 0
 
 def contB (b : UInt32) : Bool := decide (b ≥ 128) && decide (b ≤ 191)
 
@@ -21,7 +25,7 @@ theorem call_cont {w : Store Unit} {b : UInt32} {params lv values code arity rem
     Reach ⟨.running ⟨⟨params, lv, .i32 b :: values⟩, .call 0 :: code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩
           ⟨.running ⟨⟨params, lv, .i32 (b2i (contB b)) :: values⟩, code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩ := by
   wcall; wauto
-  all_goals (simp [resumeCaller, Function.numParams, contB, *]; try wdone)
+  wfinish [contB]
 macro_rules | `(tactic| wcalls) => `(tactic| refine Reach.trans call_cont ?_)
 
 def secondB (b1 b2 : UInt32) : Bool :=
@@ -35,7 +39,7 @@ theorem call_second {w : Store Unit} {b1 b2 : UInt32} {params lv values code ari
     Reach ⟨.running ⟨⟨params, lv, .i32 b2 :: .i32 b1 :: values⟩, .call 1 :: code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩
           ⟨.running ⟨⟨params, lv, .i32 (b2i (secondB b1 b2)) :: values⟩, code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩ := by
   wcall; wauto
-  all_goals (simp [resumeCaller, Function.numParams, secondB, *]; try wdone)
+  wfinish [secondB]
 macro_rules | `(tactic| wcalls) => `(tactic| refine Reach.trans call_second ?_)
 
 /-- Bytes of a packed sequence, as the Wasm code extracts them. -/
@@ -58,7 +62,7 @@ theorem call_vs {w : Store Unit} {q m : UInt32} {params lv values code arity rem
     Reach ⟨.running ⟨⟨params, lv, .i32 m :: .i32 q :: values⟩, .call 2 :: code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩
           ⟨.running ⟨⟨params, lv, .i32 (b2i (vsB q m)) :: values⟩, code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩ := by
   wcall; wauto
-  all_goals (simp [resumeCaller, Function.numParams, vsB, by1, by2, by3, by4, *]; try wdone)
+  wfinish [vsB, by1, by2, by3, by4]
 macro_rules | `(tactic| wcalls) => `(tactic| refine Reach.trans call_vs ?_)
 
 def vspB (q m : UInt32) : Bool :=
@@ -72,7 +76,7 @@ theorem call_vsp {w : Store Unit} {q m : UInt32} {params lv values code arity re
     Reach ⟨.running ⟨⟨params, lv, .i32 m :: .i32 q :: values⟩, .call 3 :: code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩
           ⟨.running ⟨⟨params, lv, .i32 (b2i (vspB q m)) :: values⟩, code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩ := by
   wcall; wauto
-  all_goals (simp [resumeCaller, Function.numParams, vspB, by1, by2, by3, by4, *]; try wdone)
+  wfinish [vspB, by1, by2, by3]
 macro_rules | `(tactic| wcalls) => `(tactic| refine Reach.trans call_vsp ?_)
 
 def cpV (q m : UInt32) : UInt32 :=
@@ -85,7 +89,7 @@ theorem call_cp {w : Store Unit} {q m : UInt32} {params lv values code arity rem
     Reach ⟨.running ⟨⟨params, lv, .i32 m :: .i32 q :: values⟩, .call 4 :: code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩
           ⟨.running ⟨⟨params, lv, .i32 (cpV q m) :: values⟩, code, arity, rem, controls, calls⟩, ⟨rt0, w⟩⟩ := by
   wcall; wauto
-  all_goals (simp [resumeCaller, Function.numParams, cpV, by1, by2, by3, by4, *]; try wdone)
+  wfinish [cpV, by1, by2, by3, by4]
 macro_rules | `(tactic| wcalls) => `(tactic| refine Reach.trans call_cp ?_)
 
 end Utf8Wasm

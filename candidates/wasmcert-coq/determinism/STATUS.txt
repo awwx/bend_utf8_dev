@@ -1,0 +1,100 @@
+STATUS (determinism for WasmCert-Coq 2.2.1 reduce, on a fragment)
+Unit 1: 01:14:38-01:46 UTC 2026-11-12.  Unit 2: 01:46:24-02:05 UTC.
+Decoder integration: 02:15-02:30 UTC (decoder-specific files moved out to
+../decoder/DetInstance.v; this directory now depends only on coq-wasm).
+2026-11-12 improvement pass of the decoder (no file here changed): this library
+and ../symexec (symbolic execution, created in that pass) are the two REUSABLE,
+module-independent parts of the WasmCert-Coq development; a second verified
+module would reuse both and add its own DetInstance.v (its code is in the
+fragment, by computation).  ../decoder/check.sh rebuilds this directory from
+clean and rocqchk's every file of it.  Per-file CPU (sequential, contended):
+Fragment 0.6 s, ReduceDet 1.2, Trapped 1.9, Preservation 1.7, Focus 1.9,
+HeadStep 1.7, Det 6.2, Main 0.7.
+
+Run: ./check.sh   (clean build 14 s wall, contended; prints the main
+                   statements and Print Assumptions; verdict line.
+                   Last run: check_run.log)
+Current verdict: ALL PROVED -- reduce_det_fragment, the deterministic-outcome
+                 corollary and still_reaches_stuck_is_target, no holes, no new
+                 axioms; depends only on coq-wasm
+
+FRAGMENT (Fragment.v, all decidable booleans)
+  bi_ok b      : b is one of: const (num/vec/ref.null, i.e. any value);
+                 i32/i64 unop, binop, testop, relop; int->int cvtop;
+                 drop, select; local.get/set/tee; global.get/set;
+                 i32/i64 load/store (incl. packed); memory.size;
+                 nop, unreachable, block, loop, if (bodies recursively
+                 bi_ok), br, br_if, br_table, return, call.
+  ai_ok e      : AI_basic b with bi_ok b; AI_ref/AI_ref_extern (values);
+                 AI_invoke a; AI_label/AI_frame with ai_ok contents.
+                 NOT AI_trap, NOT AI_return_invoke.
+  funcs_ok s   : every closure in s.(s_funcs) is FC_func_native with a
+                 bi_ok body (no host functions anywhere in the store).
+  cfg_ok s es  : funcs_ok s && es_ok es.     (No typing hypothesis.)
+  trapped es   : first non-value of es is AI_trap, or a label/frame whose
+                 body is trapped.
+
+MAIN RESULTS, ALL PROVED UNCONDITIONALLY
+  Det.reduce_det_fragment_proved : reduce_det_fragment, i.e.
+    forall hs s f es hs1 s1 f1 es1 hs2 s2 f2 es2,
+      cfg_ok s es ->
+      reduce hs s f es hs1 s1 f1 es1 -> reduce hs s f es hs2 s2 f2 es2 ->
+      (hs1, s1, f1, es1) = (hs2, s2, f2, es2).
+  Main.fragment_deterministic_outcome :
+    forall hs s f es hs' s' f' vs, cfg_ok s es ->
+      reduce_trans (hs,s,f,es) (hs',s',f',v_to_e_list vs) ->
+      deterministic_outcome (hs,s,f,es) (hs',s',f',v_to_e_list vs)
+  where deterministic_outcome c D :=
+      (forall c', reduce_trans c c' -> reduce_trans c' D)            (* no trap, no other result *)
+   /\ (forall run : nat -> cfg, run 0 = c ->
+         (forall n, reduce_tuple (run n) (run n.+1)) -> False)        (* no infinite run *)
+   /\ (forall c', reduce_trans c c' -> (forall c'', ~ reduce_tuple c' c'') -> c' = D).
+  ReduceDet.still_reaches_stuck_is_target (no premises, any configurations):
+    (forall c', reduce_trans c c' -> reduce_trans c' D) ->
+    forall c', reduce_trans c c' -> (forall c'', ~ reduce_tuple c' c'') -> c' = D
+    (the first conjunct of deterministic_outcome implies the third).
+  The decoder's instance (decoder_call_outcome, for the call configurations
+  of ../decoder/Boundary.v's call_returns) is ../decoder/DetInstance.v.
+
+SUPPORTING LEMMAS (all PROVED, in the build)
+  ReduceDet.const_irreducible          values do not reduce
+  Trapped.trapped_step_preserved_proved   once trapped, always trapped (any store)
+  Preservation.fragment_step_preserved_proved
+                                       a fragment step keeps s_funcs and stays
+                                       in the fragment or becomes trapped
+  Focus.reduce_focus_first_gen         a step from vs ++ e :: rest (e first
+                                       non-value, not a trap) leaves rest alone
+  HeadStep.head_step_complete          every step of values ++ [e] (e in the
+                                       fragment, no host functions) is one of
+                                       the 43 explicit head_step rules
+  Det.lfill_nl_unique                  a context filled with values ++ [br/return]
+                                       determines depth, instruction, values
+  Det.br_stuck, Det.return_stuck       such contexts do not step (br to own
+                                       depth or deeper; return always)
+  Det.head_step_det                    two head_steps of the same input agree
+  ReduceDet.deterministic_outcome_if   the corollary from the three statements
+  (moved to ../decoder/DetInstance.v: s0_funcs_ok, decoder_bodies_ok,
+   decoder_call_cfg_ok -- the decoder is in the fragment, by vm_compute)
+
+ASSUMPTIONS (Print Assumptions; see check_run.log / assumptions.out)
+  reduce_det_fragment_proved, fragment_deterministic_outcome: only WasmCert-Coq/stdlib library axioms --
+  Classical_Prop.classic, functional_extensionality_dep,
+  ClassicalDedekindReals.sig_forall_dec / sig_not_dec, and the 5 opaque
+  simd_execute.SIMD_ops.app_v*_str parameters.  Nothing new.
+
+DECODER: every instruction of decoder_module is in the fragment
+  (i32.const, local.get/set, i32 add/sub/and/or/shl/shr_u,
+  eq/lt_u/le_u/ge_u, eqz, i32.load8_u, i32.store16, if, block, loop, br,
+  br_if); s0's closures are native with fragment bodies; nothing missing
+  (checked in ../decoder/DetInstance.v).
+
+NOT DONE (outside this unit's goal; user decisions)
+  - (Done by the integration: ../decoder/Boundary.v's call_returns now states
+    the unique outcome, with the first two conjuncts of deterministic_outcome;
+    see ../decoder/STATUS.txt.)
+  - Fragment extensions (call_indirect/tables, floats, SIMD, memory.grow,
+    bulk memory) are deterministic in this semantics but not covered;
+    each needs head_step constructors + det cases (est. 15-45 min each,
+    bulk memory more).
+
+SIZE: 1495 lines of Rocq in 9 files (Assumptions.v 10).  No wip/ files.

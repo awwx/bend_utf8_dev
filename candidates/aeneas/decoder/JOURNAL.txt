@@ -53,3 +53,103 @@ JOURNAL -- Aeneas decoder candidate (VM clock, 2026-11-11)
           Benchmark: 37 MB/s ASCII, 65 MB/s 3-byte text (wrapper string conversion is
           the likely bottleneck).  Done at ~20 min elapsed; stopped there rather than
           start the UTF-16 extension (listed in STATUS.txt as next step).
+
+NON-VACUITY PASS (EC2 clock, 2026-11-12)
+02:52:54  Start.  Read Boundary.lean, AUDIT.txt, STATUS/REPORT, src/lib.rs (core + shim),
+          decoder.mjs, Proofs.lean, check.sh, CHECK-SCRIPTS-AUDIT.txt.
+          Hypotheses of the guarantee per call: state R-related ("accepted");
+          decode_buffer 2*in.len <= out.len; decode_done 1 <= out.len; model slices have
+          length <= Usize.max (abstract width, so wasm32 covered).  What the wrapper passes:
+          in.len = min(CHUNK, rest) <= 65536; out.len = OUT_CAP = 131072 always; state =
+          start or previous result via the shim's state slot.  The shim has no buffers or
+          sizes of its own.  Nothing vacuous: 2*65536 = 131072 meets the condition exactly.
+02:56     Boundary.lean: Realizes body named RealizesWith D R (content unchanged; check.sh
+          checks by rfl that Realizes is the reviewed formula).  New statements-only
+          section: MaxChunkBytes, OutCapacity, layout offsets, WrapperLayoutFits,
+          CountsBounded (k <= 2*in.len, k <= 1: the audit's "implied, not stated"),
+          WrapperCallsCovered, VerifiedForWrapper.  Proofs.lean section 9, generic in D, R;
+          count bound by re-running the guarantee on a slice of exactly 2*in.len zeros.
+          Two small fixes (omega needs Slice.length unfolded; `simp` on replicate 65536
+          hits max recursion -> generic helper with symbolic n).
+02:59     check.sh: step 0b (constants from decoder.mjs vs Boundary.lean, verbatim call
+          lines in decoder.mjs and slice/state lines in mod shim), new hash, step 6 type +
+          rfl + axiom checks for verified_for_wrapper, verdict line mentions non-vacuity.
+          Mutations: (a) OutCapacity 131071 -> Proofs.lean:531 omega fails (the 2-per-byte
+          condition); (b) CHUNK 1<<17 in decoder.mjs only -> step 0b FAIL; (c) shim
+          from_raw_parts_mut(out_ptr, out_len / 2) (scratch copy) -> step 0b FAIL.
+03:02     Clean run (target/, lean/build removed): ALL CHECKS PASSED (53 s; check.log).
+          No change to src/lib.rs, decoder.wasm, generated Lean, spec or pure layer.
+
+IMPROVEMENT PASS (EC2 clock, 2026-11-12; contended machine, CPU times)
+03:35     Start.  Read HANDOVER 1/2/5/6/9, STATUS, JOURNAL, AUDIT (suggestions), pure-lean
+          IMPROVEMENT.txt, src/lib.rs, Decoder/Funs.lean, Proofs.lean, check.sh.
+03:37     Baseline in scratch: Types 1.2 s CPU, Funs 1.6, Boundary 1.1 (mostly the Aeneas
+          import, ~1.1 s floor per file), Proofs 11.0 s CPU / 4.7 s wall.  trace.profiler:
+          second_ok_eq 3.1 s (split_ifs + simp_all over ~10 goals), loop_spec 2.2,
+          unpack_spec 1.8 (step* + 4x scalar_tac on div/mod), decode_buffer_eq 1.4,
+          cp4/cp3 0.9/0.7, step_fresh_eq 0.9, decode_done_eq 0.8, step_eq 0.7.
+          Aeneas nightly: the spec attribute is @[step] (progress is a deprecated alias),
+          tactics step / step* / scalar_tac / simp_scalar / agrind; loops are proved
+          with loop.spec_decr_nat (its docstring: "meant to derive lemmas").  No
+          examples/tutorial in ~/aeneas-nightly beyond Aeneas/Tactic/Step/Tests.
+03:38-03:47  Rewrote Proofs.lean in scratch around @[step] specs.  Findings / friction:
+          - second_ok_eq's split_ifs splits BOTH sides' if-chains (combinatorial, 3.1 s).
+            `simp [def, refdef, UScalar.eq_equiv, ite_ok]` (ite_ok: if c then ok x else ok y
+            = ok (if ..)) turns both sides into the same Bool if-chain: 0.07-0.1 s.
+          - step* stops at `let (out1, k1) <- if o.n >= 1 then ...` (an `if` in bind
+            position) and at the `let (_, index_mut_back) := x` that Aeneas emits when the
+            first write is shared by two branches: the old 3 copy-paste cases + rcases/subst.
+            Fixed in the RUST (see 03:41): the writes moved into `write_out`, a `match o.n`
+            whose arms each write; Aeneas then emits plain Slice.update and the loop body is
+            straight-line, so step* runs through it and discharges write_out's
+            preconditions itself.
+          - PendRel `n = s.length ∧ [b0,b1,b2] = s ++ replicate ..` made simp_all/scalar_tac
+            hit max recursion once s was substituted (n -> s.length -> take n .. -> ...):
+            restated as `n ≤ 3 ∧ s = [b0,b1,b2].take n` (no rewrite cycle; also no longer
+            requires unused bytes to be 0, which nothing needed).
+          - step*'s `[> let x ← f .. <]` hypotheses: `first | (simp [.., *]; done) | ..` works,
+            simp_all with them in context hit max recursion (cause: the PendRel cycle above).
+          - The match-on-u8 literal patterns appear as `o.n = 0#8#uscalar`; `rw [h]; rfl`
+            gives the value (simp/scalar_tac did not).
+03:41     Rust: write_out(out, k, o) -> usize with `match o.n { 0 => k, 1 => {..}, _ => {..} }`
+          (first try with early returns still produced index_mut_back; match did not).
+          Panic handler: core::arch::wasm32::unreachable() under cfg(target_arch="wasm32"),
+          loop {} otherwise (the host build exists only for Charon's translation).
+03:47     Whole new Proofs.lean compiles in scratch; axioms propext/Classical.choice/
+          Quot.sound.  Proofs 11.0 -> 9.5 s CPU (3.6 s wall).
+03:48     Scratch: wasm rebuilt (5436 -> 5487 bytes; rust_begin_unwind is now `unreachable`);
+          wasm32 translation identical to host; difftest full PASS (33 s).
+03:49     Applied to the real directory (src/lib.rs, lean/Decoder/*, lean/Proofs.lean,
+          decoder.wasm); check.sh from clean: ALL CHECKS PASSED (50 s).
+03:50     Evidence for keeping the one-boolean helpers (scratch only): inlining vs2/vsp2 as
+          `&&`/`||` into step's `if` -> the one-pending branch 9 -> ~50 lines, continuation
+          duplicated 5x, Bools re-tested; `match b { 0x00..=0x7F => .., 0xC2..=0xF4 => .. }`
+          in step_fresh -> duplicated continuations and a dead `0 <= b` branch.
+03:51-03:55  unpack: first tried a direct `PendRel` spec with scalar_tac on the packed
+          formula: 3.4 s (worse).  Then scalar_tac hit max recursion on the cast goals
+          (large step* context); `simpa using p.n.hBounds` for the byte bounds, one omega per
+          field, UScalar.cast_val_eq for the casts: 1.0 s, and decode_buffer_spec becomes
+          a bare step*.  Lesson: scalar_tac costs ~0.2-0.3 s per call in a big context even
+          for trivial bounds.
+03:56     check.sh from clean: ALL CHECKS PASSED (53 s wall, 69.6 s CPU; check.log).
+03:57     IMPROVEMENT.txt, STATUS.txt, REPORT.txt updated.  Not stuck at any point; the
+          backing-up was: PendRel (rewrite cycle) once, unpack twice, write_out shape once.
+
+2026-11-12 04:10-04:35  Pure-layer consolidation.  decodeBuffer_snoc moved to
+          pure-lean/Utf8StepFacts.lean (same statement).  ref_step_bad deleted: it
+          was Utf8Pure.step_bad_pending (Utf8Proofs) with a redundant hypothesis;
+          step_spec now uses step_bad_pending.  loop_spec's per-step "at most 2
+          code points" now comes from Utf8StepFacts.step_text_length instead of
+          OutRel's outText.  Proofs.lean imports Utf8StepFacts; check.sh
+          PURE_FILES and lean/build_pure.sh list Utf8StepFacts; lean/pure copy
+          added with --refresh-copies.  check.sh ALL CHECKS PASSED.
+
+2026-11-12 05:15-05:45  Kernel replay added to check.sh (step 6b; --skip-replay skips
+          it and the final line then says so).  Replays all 149,103 constants of
+          Proofs' import closure except Init/Lean/Std (candidate, pure layer, Aeneas,
+          and the Mathlib etc. modules Aeneas imports) in 81 s / 6.7 GB; checks the two
+          pinned theorems' exact types and recomputes their axioms on the replayed
+          environment.  Restricting to candidate + Aeneas (Mathlib etc. trusted) took
+          19 s; not worth the gap.  Mutation (smuggled False via elab/addDecl/
+          debug.skipKernelTC, scratch copy): old check.sh PASS, new FAIL.  check.sh
+          from clean: ALL CHECKS PASSED, 134 s wall (check.log).

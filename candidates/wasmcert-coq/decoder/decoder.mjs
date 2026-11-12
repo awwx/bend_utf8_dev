@@ -9,7 +9,9 @@
 //  - decode_done calls `done` and reads its output the same way.
 import { readFileSync } from 'node:fs';
 
-const IN = 0, IN_MAX = 65536, OUT = 65536;
+// The layout constants below must equal Boundary.v's IN_addr, IN_max and
+// OUT_addr; check.sh compares this line with the values Rocq computes.
+const IN = 0, IN_MAX = 65536, OUT = 65536;  // LAYOUT IN_addr IN_max OUT_addr
 
 export async function load() {
   const bytes = readFileSync(new URL('./decoder.wasm', import.meta.url));

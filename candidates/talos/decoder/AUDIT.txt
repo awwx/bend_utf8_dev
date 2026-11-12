@@ -1,0 +1,405 @@
+AUDIT -- candidates/talos/decoder (independent review, 2026-11-12)
+Work copy: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/talos-audit/
+  clean/       tracked + untracked-not-ignored files of talos/decoder, pure-lean, spec-lean,
+               difftest (no build/); talos/talos and talos/tools symlinked (third-party, read only)
+  mut/<name>/  one full copy per mutation (mutate.sh, muts.txt), check.log each
+  AuditAxioms.lean, Replay.lean, wrapper-spot.mjs, replay.log
+Nothing under candidates/ was modified except adding this file (git status for
+candidates/talos is the same as at the start). Nothing installed.
+Time used: about 26 min wall (01:29-01:55 UTC), most of it waiting on Lean builds.
+
+VERDICT
+  The claim holds, with caveats that concern presentation and the check script, not the
+  proof. Utf8Wasm.shippedModuleCorrect has exactly the type Utf8Boundary.ShippedModuleCorrect,
+  depends on [propext, Classical.choice, Quot.sound] only, and a full kernel replay of every
+  non-core constant (Talos + candidate, 11,632 constants) is accepted. Every one of 12
+  semantic mutations of decoder.wat makes the proof fail; the 2^32 edge is handled correctly
+  and is harmless for the shipped wrapper. check.sh passes from a clean copy (2 min 07 s).
+
+  What a user may rely on (within Talos's semantics, for the module Talos decodes from the
+  printed text of the shipped bytes): starting from any memory (any contents, any page
+  count <= 65536) and otherwise the module's initial store,
+  - decode_start_state returns a value related to D.start and changes nothing;
+  - decode_buffer(v, inp, len, out) with v related to s, inp + len <= out and
+    out + 8*len <= memory size: reaches a normal return (Talos Step is deterministic, so no
+    trap, no stuck state, no divergence), returns (v', end) with v' related to s',
+    end = (out + 4|t|) mod 2^32, |t| <= 2*len, [out, out+4|t|) holds t as u32le, every other
+    byte and the page count unchanged, and nothing else in the store changed;
+    (s', t) = D.decode_buffer s (the len input bytes);
+  - decode_done likewise with out + 4 <= memory size, |t| <= 1;
+  for one D with D.Correct (utf8_decodes, utf8_decode_buffer_safe, utf8_decode_buffer_prompt,
+  unmodified spec). Since every call ends in storeWith m mem' and the hypotheses quantify over
+  all memories, this covers call N+1 on the memory left by call N, including the wrapper's
+  writes to the input area in between.
+
+FINDINGS BY SEVERITY
+  None critical. None that makes the theorem say less than the user would expect for the
+  shipped wrapper.
+  Medium
+  M1. ProofMain.lean and ProofRefine.lean (the top-level theorem and the refinement) are
+      untracked in git ("??"); the modified check.sh / check.expected.txt / ProofLoop /
+      ProofBuffer are uncommitted. A commit of tracked files only would ship a check.sh that
+      fails (it builds ProofMain). The user should `git add` both files when committing.
+  M2. ShippedModuleCorrect is an implication `∀ m, decodeForVerification printedWat = .ok m →
+      ...`. Read alone, Boundary.lean is vacuously true if Talos's decoder rejects the text.
+      Non-vacuity is established elsewhere: Utf8Wasm.decoderModule_decodes (pinned in
+      check.expected.txt, so check.sh does enforce it); I also checked
+      `example : ∃ m, decodeForVerification printedWat = .ok m := ⟨_, decoderModule_decodes⟩`.
+      Suggest stating it as `∃ m, decode = .ok m ∧ ∃ D, D.Correct ∧ Realizes m D` (the
+      proof already has the witness), so the reviewed file is self-contained.
+  M3. check.sh has no timeout, and four proof files set maxHeartbeats 0. Mutation m07 (state
+      count stored at bit 25) made ProofStep.lean run for 17 min before I killed it: a broken
+      proof can hang the check instead of failing it. Not a soundness issue.
+  Low
+  L1. check.sh's forbidden-word grep does not cover metaprogramming (macro/elab/initialize/
+      addDecl, attribute tricks); only the axiom list and Lean's kernel back it. I replayed
+      all 11,632 non-core constants with Lean.Kernel.Environment.replay (Replay.lean,
+      2 min 15 s, 7.1 GB RSS): accepted. Adding such a replay (or lean4checker) to check.sh
+      would close this; it is the one check here that does not trust the elaborator.
+  L2. check.sh does not verify the Talos checkout (commit d7c84ac, clean worktree, oleans
+      up to date). I checked by hand: `git status` clean, at the SETUP.md commit,
+      `lake build --no-build` "All targets up-to-date". Since Talos defines the semantics,
+      pin the commit and run `git diff --quiet` in check.sh.
+  L3. check.sh silently overwrites stale decoder/Utf8*.lean copies from pure-lean/ (sound,
+      the build then uses the checked copy, but it edits tracked files).
+  L4. Harmless refactors need proof edits: swapping the operands of an i32.and in $cont
+      (h01) breaks ProofFuncs (models restate the code's operation order); after updating
+      the model (a02) it then breaks contB_eq in ProofModel (needs Bool.and_comm). Expected
+      for this style, but it is the maintenance cost.
+  L5. Boundary does not promise anything for: an output area smaller than 8*len even if the
+      text fits; output before input or overlapping; state values not related by R (garbage
+      states: the module does not trap, e.g. 0x05000000 gives "��A"; the wrapper
+      also accepts 'x'/undefined as state 0 via ToInt32). DoneOk needs 4 bytes of room even
+      when nothing is written. All irrelevant to the shipped wrapper.
+
+1. REPRODUCTION
+  - Clean copy (no build/ anywhere in the candidate tree), Talos symlinked:
+    check.sh PASS, 2 min 06.8 s wall. Lean per file: DecoderModule 15 s, ProofFuncs 48 s,
+    ProofStep 17 s, everything else <= 2 s each; difftest 34 s. Final line as STATUS.txt.
+  - Depends only on: the built Talos checkout (ignored, third-party, verified pristine, see
+    L2), wasm-tools 1.251.0, elan Lean 4.35.0, Node 26. No dependency on leftovers:
+    check.sh does rm -rf build itself, and the Talos LEAN_PATH resolved through the symlink.
+  - Rebuilt decoder.wasm byte-identical (sha256 3ff6d962...); printed text identical
+    (640925bf...). The comment-only mutation h02 produced identical bytes and PASSed.
+
+2. BOUNDARY.LEAN AS A HOSTILE REVIEWER
+  - D is existential but pinned by D.Correct (the unmodified spec, hash-pinned). R is
+    existential, but StartOk forces R D.start (start value) and BufferOk forces R s' v' for
+    the returned value, so every state the wrapper can hold is related to a reachable D
+    state, and Correct fixes D's per-call text along every feed from D.start (safe + prompt
+    determine each call's output; utf8_decodes fixes decode_done). A degenerate R (empty)
+    fails StartOk; a degenerate D fails Correct. If R relates one value to several states,
+    BufferOk must hold for all of them (stronger, not weaker). No vacuity apart from M2.
+  - "Runs": Calls = Talos RunsExportWith = startExportConfig? succeeds (export exists,
+    argument count/types match) and ∃ finite Steps trace to .done values. Not partial
+    correctness. Talos proves Step deterministic (step_deterministic, steps_comparable,
+    safe_of_steps_to_done; axioms standard, checked), so a done trace excludes trap, stuck
+    (internal error) and divergence. The determinism theorem is not used by the proof but is
+    what gives "terminates without trapping" its meaning; it is proved in Talos, not assumed.
+  - Postconditions: returned values exactly [v', ofNat(out + 4|t|)]; bytesAt mem' out 4|t| =
+    textBytes t (u32le); sameOutside = same page count and same bytes outside the written
+    range; final = storeWith m mem' (whole store, so no other component changes). This is
+    "nothing else changed", and it is stated, not implied. |t| <= 2 len and |t| <= 1 are
+    stated.
+  - Hypotheses vs the wrapper: wrapper uses inp = 0, len <= 2^20, out = 2^20, module memory
+    160 pages (10 MiB, never grown): 0 + len <= 2^20 and 2^20 + 8*2^20 = 9 MiB <= 10 MiB;
+    decode_done out + 4 <= 10 MiB. No alignment is required (Talos has none; out is 4-aligned
+    anyway). Satisfied on every call.
+  - 2^32 edge: BufferLayout allows out + 8 len = 2^32 only with 65536 pages. Written bytes
+    lie below out + 4|t| <= 2^32, so no store address wraps; the end pointer wraps to 0 when
+    out + 4|t| = 2^32, and the statement says exactly that (UInt32.ofNat). True as written
+    and proved (writeCps_*, endAddr_eq). Not a hole: a caller computing (end - out) mod 2^32
+    still gets 4|t|; only a caller that reads end as an absolute address with end < out would
+    misread it, and the shipped wrapper's end is at most 9 MiB, nowhere near the edge.
+  - Chain bytes -> Module:
+      decoder.wasm --(wasm-tools print, TRUSTED)--> text
+      text == decoder.printed.wat               CHECKED (cmp in check.sh)
+      decoder.wasm == strip(parse(decoder.wat)) CHECKED (not needed for soundness; the wat
+                                                source and `parse` are not trusted)
+      printed.wat --include_str--> Boundary.printedWat; == Utf8Wasm.printedWat (rfl, CHECKED)
+      Talos decodeForVerification on that string = .ok decoderModule: kernel-evaluated
+        (cbv, CHECKED); that this parser implements the WAT text format: TRUSTED
+      decoderModule --Talos Step semantics--> theorem: semantics vs Wasm spec / V8 TRUSTED
+    Validation is outside the theorem (wasm-tools validate runs in check.sh; V8 validates at
+    instantiate).
+
+3. TALOS SEMANTICS: COVERED / NOT
+  - Covered: small-step execution of every instruction used (i32 arith/compare/shift,
+    load8_u, store, if/block/loop/br_if, call, multi-value return, early return), memory
+    bounds checks (traps on out-of-range access; the proof shows none occur).
+  - Not modelled: instantiation (store = Module.initialStore with arbitrary memory; this
+    module has no imports, globals, tables, data/elem segments or start function --
+    checked: imports 0, globals 0, 9 funcs -- so little can differ), validation, the JS-API
+    marshalling (ToInt32 of the state, multi-value -> JS array). Determinism: present and
+    proved in Talos (above).
+  - The statement is about one call from an ARBITRARY memory, not only the initial store,
+    so it covers call N+1 after call N and after host writes/grow (see VERDICT).
+
+4. MUTATION TESTS (each in its own copy; decoder.wasm and decoder.printed.wat regenerated
+   from the mutated wat so the pinned-bytes checks pass and only the proof can fail)
+   name                                   result
+   m01 E0 2nd-byte lower A0 -> 9F          FAIL ProofFuncs:36 (call_second)
+   m02 F4 2nd-byte upper 8F -> 9F          FAIL ProofFuncs:36
+   m03 ED 2nd-byte upper 9F -> BF          FAIL ProofFuncs:36
+   m04 F0 2nd-byte lower 90 -> 80          FAIL ProofFuncs:36
+   m05 3-byte cp shift 12 -> 11            FAIL ProofFuncs:86 (call_cp)
+   m06 decode_done drops U+FFFD            FAIL ProofDone:54
+   m07 state count at bit 25 (packing)     did not finish: ProofStep ran 17 min, killed (M3)
+   m08 extra store8 at out+4 (past output) FAIL ProofStep:51
+   m09 no reprocess after invalid prefix   FAIL ProofStep:65
+   m10 isCont upper BF -> C0 (off by one)  FAIL ProofFuncs:22 (call_cont)
+   m11 loop stops one byte early           FAIL ProofLoop:71
+   m12 pending-byte shift n<<3 -> n<<4     FAIL ProofStep:65
+   a01 m01 + model secondB updated to match FAIL ProofModel:63 (secondB_eq vs spec):
+       the failure is not just "model differs from code"; the spec link catches it too
+   h01 swap i32.and operands in $cont      FAIL ProofFuncs:22 (model syntax; see L4)
+   a02 h01 + model contB updated           FAIL ProofModel:59 (needs Bool.and_comm)
+   h02 comment only                        bytes identical; PASS
+  Statement / check side:
+   s01 drop `R s' v' ∧` from Boundary      FAIL hash pin (Boundary.lean)
+   s03 drop prompt from spec Correct       FAIL hash pin (spec-lean)
+   s05 alter pure-lean/Utf8Laws.lean       FAIL cmp with spec
+   s04 alter decoder/Utf8Laws.lean         (by reading) silently refreshed from pure-lean (L3)
+   s06 theorem shippedModuleCorrect : True FAIL "does not have type ShippedModuleCorrect"
+   s07 proof replaced by `sorryAx _ false` FAIL "declaration uses sorry" (and axioms check)
+   s08 edit printed.wat only               FAIL printed text != print of wasm
+   s09 swap in mutated wasm, wat kept      FAIL rebuild != shipped
+   s10 set_option debug.skipKernelTC       FAIL forbidden construct
+   s11 `sorry`                             FAIL forbidden construct
+  The pin is the only defence against a weakened Boundary.lean whose hash is re-pinned;
+  that is by design (the user reviews Boundary.lean and its hash together).
+
+5. AXIOMS AND ESCAPE HATCHES
+  - #print axioms (my file, clean build): shippedModuleCorrect, decoderModule_decodes,
+    step_deterministic, steps_comparable, RunsExportWith.deterministic: all
+    [propext, Classical.choice, Quot.sound].
+  - Candidate files: no sorry/admit/axiom/native_decide/bv_decide/implemented_by/extern/
+    unsafe/opaque/skipKernelTC; set_option only maxHeartbeats 0 / maxRecDepth; macros only
+    tactic macros (ProofMach/ProofFuncs/ProofStep) and the decoderWat% elaborator, whose
+    output is re-derived in the kernel.
+  - Talos import closure (15 modules, imports only Init/Lean, no Mathlib): no axiom, sorry,
+    native_decide, implemented_by, extern, unsafe, opaque; one `private partial def
+    quoteSexpr` (meta code in ProofEval, not on the logical path; partial defs are opaque
+    and cannot prove anything false); set_option maxHeartbeats only. cbv uses @[cbv_eval]
+    lemmas, i.e. ordinary kernel-checked rewriting; no ofReduceBool.
+    Anything an import added as an axiom would show in #print axioms; the replay (L1) also
+    rules out declarations added without kernel checking.
+
+6. UNVERIFIED PARTS: decoder.mjs (56 lines), reviewed line by line
+  - Layout IN=[0,1 MiB), OUT=[1 MiB, 9 MiB) inside the declared 10 MiB; never grows, so the
+    buffer is never detached; mem() and the Uint32Array view are fetched after each call.
+  - Chunking at 1 MiB: correctness follows from the laws themselves (they quantify over all
+    splits, so feeding chunks of each buffer is again a Correct decoder); unverified glue.
+    Empty input makes exactly one len-0 call (the `|| off === 0` / break).
+  - State is a JS number; i32 round trip preserves bits; old states stay usable (no state in
+    the instance; memory is not state). Spot-tested reuse of an old state three ways and
+    decode_done twice on the same state: correct.
+  - String construction: String.fromCodePoint.apply over 8192-element slices; relies on all
+    outputs being scalars (follows from D.Correct); throws on out-of-range values, which
+    cannot occur.
+  - Spot tests (wrapper-spot.mjs), all equal to TextDecoder: 4-byte char straddling the 1 MiB
+    chunk boundary at offsets -1/-2/-3, invalid prefix + reprocessed byte across the boundary,
+    3 MiB worst-case 2-cps-per-byte pattern, empty buffers with pending state, subarray with
+    byteOffset, Node Buffer, 64 MiB ASCII (0.76 s, 84 MiB/s). Very large inputs are limited
+    only by JS string length (V8 ~2^29 code units; RangeError beyond, not covered).
+  - Not covered by any theorem: the wrapper, ToInt32/multi-value marshalling, instantiation,
+    the engine.
+  - difftest (node candidates/difftest/run.mjs decoder.mjs): 564,671 inputs, 6.93 M splits,
+    20.6 M calls, 34.3 s: P1, P2, P3 PASS, RESULT: PASS.
+
+  Trusted between the theorem and Node: wasm-tools print (bytes -> text); Talos's WAT parser
+  meaning and its small-step semantics vs the Wasm spec as V8 implements it; that the JS
+  instance's store is initialStore with some memory; JS-API marshalling; decoder.mjs; V8;
+  the Lean kernel.
+
+7. PROOF QUALITY (suggestions only)
+  - Structure is good: symbolic-execution tactic (ProofMach), one call lemma per function
+    against a hand-written model, models related to Utf8Ref (ProofModel, ProofRefine), loop
+    induction, assembly (ProofMain). Headers list exports. Names are descriptive.
+  - Fragile: the models restate the code's operation order (L4), so every edit to the wat
+    means editing a model and its _eq lemma; deprecated names (if_neg) warn in ProofModel.
+  - Slow files: ProofFuncs 48 s, ProofStep 17 s are `wauto` (repeat any_goals first ...
+    split) plus `simp [*]` over goals that carry callee bodies in control frames, with
+    maxHeartbeats 0. A skilled user would: profile (set_option profiler true) to find the
+    dominating simp; replace `simp [..., *]` with `simp only` sets; state the body of each
+    function once as a def + `rfl` lemma (as done for decode_done) so goals do not carry
+    the module; split vsB/vspB/cpV call lemmas per m (one path each) instead of `split`
+    inside one goal; restore a finite maxHeartbeats so failures fail fast (M3).
+    DecoderModule's 15 s is the kernel cbv decode of the text; it reruns only when the
+    module changes, and could be cached by keying on the printed text's sha256.
+  - check.sh: add a timeout per Lean file, a kernel replay (L1), Talos commit/clean check
+    (L2), cmp-before-copy for the pure-layer copies (L3).
+
+WHAT THE USER SHOULD LOOK AT / DECIDE
+  - git add ProofMain.lean and ProofRefine.lean (M1).
+  - Whether Boundary.lean should assert that the printed text decodes (M2) -- a statement
+    change, so the user's call; the proof already has the witness.
+  - Accept or not the trusted base listed in section 6, especially Talos's WAT parser and
+    semantics (third-party, self-described work in progress, not proved against the spec).
+
+RE-AUDIT AFTER IMPROVEMENT PASS (2026-11-12, 04:45-05:09 UTC, independent, mutation round)
+Work copy: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/talos-reaudit/
+  clean/ (tracked + untracked-not-ignored files of talos/decoder, pure-lean, spec-lean,
+  difftest; no build/; talos/talos and talos/tools symlinked via /root/bend/utf8),
+  run-clean/ (the full check), mut/<name>/ (one copy per mutation, check.log with
+  per-line timestamps), mutate.sh, stests.sh, atests.sh, exprs/, mut-results.txt.
+Nothing under candidates/ modified except appending this section; git status of
+candidates/talos identical before/after. Talos README.md was edited for test s10a and
+restored with cp -p (sha256, size, mtime identical; `git status` clean; HEAD d7c84ac).
+Nothing installed. Time used: about 24 min wall. Mutation runs used --skip-replay
+except s05; at most 3 jobs in parallel (timings are contended).
+
+VERDICT
+  The original verdict stands: the claim holds, for the current proofs and scripts. The
+  rewritten tactic did not make the proofs accept wrong code: all 12 audit mutations and
+  17 new ones fail, none slower than 18 s in the failing file (none near 2 min). Kernel
+  replay accepts everything and rejects a smuggled False theorem.
+
+1. CLEAN RUN: check.sh (with replay) from clean copy: PASS, 4 min 06 s wall (contended
+   by 2 mutation jobs), 7.1 GB max RSS, replay 11,655 constants in 202 s. Lean per file:
+   DecoderModule 18 s, every other file <= 3 s. Shipped wasm sha256 3ff6d962... (=
+   repo). difftest (my own run, node difftest/run.mjs decoder.mjs): 564,671 inputs,
+   6.93 M splits, 20.6 M calls, 62.6 s, P1/P2/P3 PASS, RESULT: PASS.
+
+2. STATEMENT (Boundary.lean vs HEAD)
+  - Only change to existing text: ShippedModuleCorrect went from `∀ m, decode = .ok m →
+    ∃ D, ...` to `∃ m, decode = .ok m ∧ ∃ D, ...`: strictly stronger (adds that decoding
+    succeeds; fixes audit M2). StartOk/BufferOk/DoneOk/Realizes/Calls/BufferLayout
+    unchanged byte for byte. Nothing weakened. The old statement is kept as
+    ShippedModuleCorrect_v1 and pinned as implied (shippedModuleCorrect_implies_v1).
+  - New: wrapper constants (0, 2^20, 2^20, 160 pages), WrapperCallsCovered m,
+    ShippedWrapperCovered = ∃ m, decode = .ok m ∧ WrapperCallsCovered m.
+  - Same m: both theorems pin m by `decodeForVerification printedWat = .ok m`; since that
+    is a function, the two m are equal (checked: a 3-line example in AuditAxioms.lean).
+  - What the two pinned theorems establish together (checked): for the decoded module m
+    and some D with D.Correct and some R, (a) Talos's initial store of m has 160 pages and
+    is storeWith m of its own memory, so StartOk applies to the fresh instance; (b) on ANY
+    160-page memory, decode_buffer's precondition BufferLayout holds for inp = 0,
+    out = 2^20 and every len <= 2^20, decode_done's inMem(out + 4) holds, pages <= 65536;
+    (c) every guarantee ends in storeWith m mem' with sameOutside, hence 160 pages, so
+    call N+1 again meets (b) -- including after host writes that keep the page count.
+    The R hypothesis for call N+1 follows from call N's postcondition (R s' v') or
+    StartOk (R D.start v). So: every call of a sequence that uses those constants, starts
+    from the instance's initial store and passes back only returned states meets ALL
+    hypotheses of StartOk/BufferOk/DoneOk.
+  - Stays by reading (not a theorem): that decoder.mjs actually passes IN/OUT and
+    chunk.length <= CHUNK in its calls (check.sh compares only the three `// LAYOUT`
+    definitions textually); that it passes only returned states; that JS writes to the
+    input area keep the page count and nothing grows memory from JS (check.sh only greps
+    the module for memory.grow); the induction over a call sequence itself (short, by
+    reading); instantiation = Talos initialStore, ToInt32/multi-value marshalling, V8.
+    Conjunct (c) is immediate from sameOutside's definition (pages equal); harmless.
+
+3. MODULE MUTATIONS (decoder.wasm + decoder.printed.wat regenerated; only the proof can
+   fail). time = seconds spent in the failing Lean file (total check run 40-70 s).
+   name                                   result
+   m01 E0 2nd-byte lower A0->9F            FAIL ProofFuncs:40 call_second      4.3 s
+   m02 F4 upper 8F->9F                     FAIL ProofFuncs:40                   6.8 s
+   m03 ED upper 9F->BF                     FAIL ProofFuncs:40                   6.7 s
+   m04 F0 lower 90->80                     FAIL ProofFuncs:40                   4.9 s
+   m05 3-byte cp shift 12->11              FAIL ProofFuncs:90 call_cp           7.5 s
+   m06 decode_done drops U+FFFD            FAIL ProofDone:95 (doneBody rfl)     0.9 s
+   m07 state count at bit 25 (was 17 min)  FAIL ProofStep:72 call_step0        15.5 s
+   m08 extra store8 at out+4               FAIL ProofStep:72 (no wstep rule)    3.7 s
+   m09 no reprocess after invalid          FAIL ProofStep:86 call_step          3.6 s
+   m10 isCont upper BF->C0                 FAIL ProofFuncs:26 call_cont         4.1 s
+   m11 loop stops one byte early           FAIL ProofBuffer:29 (body rfl)       1.2 s
+   m12 pending shift n<<3 -> n<<4          FAIL ProofStep:86                    4.8 s
+   new, rarely taken paths:
+   n01 $vs m=4 checks b3 twice (not b4)    FAIL ProofFuncs:63 call_vs           4.1 s
+   n02 $second F4 lower 80->81             FAIL ProofFuncs:40                   3.4 s
+   n03 $step reprocess path FFFD->FFFE     FAIL ProofStep:72                    3.5 s
+   n04 $vsp m=1 upper F4->F5 (delays the   FAIL ProofFuncs:77 call_vsp          4.4 s
+       FFFD for F5 to the next byte;
+       total text same, prompt law broken)
+   n05 $cp 4-byte mask 07->0F              FAIL ProofFuncs:88 heartbeat timeout 17.8 s
+   m08b store32 0 at out+4 (has a rule)    FAIL ProofStep:72 (bound obligation) 2.7 s
+   new, local value only (wlocals):
+   n06 $vs local.set $b2 instead of $b3    FAIL ProofFuncs:63                   5.8 s
+   n07 $vsp $b3 from shift 8 not 16        FAIL ProofFuncs:77                   4.5 s
+   n08 $step $m = n+2                      FAIL ProofStep:72                    6.0 s
+   new, ProofLoop / ProofDone (explicit rule lists):
+   n09 loop: swap the two local.set after  FAIL ProofBuffer:29 (body rfl)       1.3 s
+       the call (state <-> out)
+   n10 loop: in += 2                       FAIL ProofBuffer:29 (body rfl)       1.0 s
+   n11 decode_done returns out+8           FAIL ProofDone:95 (body rfl)         1.4 s
+   n12 decode_start_state returns 1<<24    FAIL ProofDone:53 start_ok (Rel)     1.3 s
+   Because loopBody/doneBody are restated copies checked by `rfl`, n09/n10/n11/m06/m11
+   first fail on that copy. Re-run with the copy updated to match the mutated code, so
+   the proof itself is the judge:
+   a09 n09 + loopBody updated              FAIL ProofLoop:83 loop_iter          1.3 s
+   a10 n10 + loopBody updated              FAIL ProofLoop:83                    1.3 s
+   a11 m11 + loopBody updated              FAIL ProofLoop:49 loop_exit          1.0 s
+   a11d n11 + doneBody updated             FAIL ProofDone:88                    1.1 s
+   a06 m06 + doneBody updated              FAIL ProofDone:82                    1.1 s
+   Nothing hung; nothing above 18 s; m07 confirmed fixed (15.5 s under load vs "about
+   10 s" reported). n05 fails by the default heartbeat limit rather than an unsolved goal
+   (fail-fast works; the message is less telling).
+
+4. HARMLESS EDITS (bytes regenerated)
+   h01 swap i32.and operands in $cont      PASS, no proof edit (claim confirmed)
+   h03 reorder local.set $b1/$b2 in $vs    PASS, no proof edit
+   h04 $step i32.eqz n -> i32.eq n 0       PASS, no proof edit
+   h06 swap i32.or operands in $vsp m=1    PASS, no proof edit
+   h05 loop i32.eqz len -> i32.eq len 0    FAIL ProofBuffer:29: needs a proof edit
+       (loopBody copy, and loop_iter/loop_exit rule lists), as IMPROVEMENT.txt says.
+
+5. STATEMENT / CHECK-SIDE MUTATIONS (all fail check.sh)
+   s01 drop `t.length <= 2*len` (Boundary)  FAIL Boundary hash pin            1 s
+   s03 shippedWrapperCovered : True         FAIL top-level type check (Type mismatch)
+   s04 `sorry` in call_cp                   FAIL forbidden construct          1 s
+   s05 False theorem added by an `elab` calling addDecl with debug.skipKernelTC set
+       programmatically (name built from strings, evades grep); shippedModuleCorrect :=
+       (fun _ _ => smuggled.elim) RefDecoder_correct buffer_ok, so its axioms are exactly
+       the standard three. Full check: build, statement pins, Boundary type and axioms all
+       pass; FAIL kernel replay "while replaying declaration 'Utf8Wasm.smuggled'" (163 s).
+   s05b same with --skip-replay             PASS (printed "kernel replay SKIPPED")
+   s06 OUT changed only in decoder.mjs      FAIL layout constant wrapperOutputAddr
+   s07a wrapperOutputAddr only in Boundary  FAIL Boundary hash pin
+   s07b same, hash re-pinned                FAIL layout constant wrapperOutputAddr
+   s08a module memory 160 -> 140 pages      FAIL memory size (module 140, Boundary 160)
+   s08b 140 pages in module AND Boundary,   FAIL ProofWrapper:23 (`decide`: 9 MiB area
+        hash re-pinned                         does not fit) -- the theorem is not vacuous
+   s09 stale decoder/Utf8Proofs.lean copy   FAIL stale copy (no silent refresh now)
+   s10a Talos README.md edited              FAIL Talos checkout has local modifications
+   s10b untracked file in Talos checkout    FAIL same
+   s11 one byte of decoder.wasm altered     FAIL shipped wasm != rebuild
+
+6. AXIOMS / TACTIC CODE
+  - #print axioms (own file on the clean build): shippedModuleCorrect and
+    shippedWrapperCovered [propext, Classical.choice, Quot.sound]; wrapperCallsCovered
+    [propext, Quot.sound]; call_step, call_vs standard three.
+  - ProofMach's new code: two `elab` tactics. wstep only reads the goal and runs
+    `refine Reach.cons (Step.<rule> rfl) ?_` for real Talos Step constructors. wlocals
+    builds a whnf-reduced copy of the frame and uses MVarId.replaceTargetDefEq, which
+    the elaborator does NOT check; the kernel does (at addDecl, and again in the
+    replay), so a bug there yields a kernel type error, not a false theorem. No addDecl,
+    ofReduceBool, unsafe, implemented_by, set_option other than DecoderModule's
+    maxRecDepth; no maxHeartbeats override left. wfinish = simp_all + Reach.refl
+    (closing contradictory paths is sound).
+  - Replay covers the final theorems: Replay.lean checks both theorem names are among
+    the replayed constants and that their replayed types are exactly the Boundary
+    constants; all candidate constants are replayed (s05 shows it catches a declaration
+    the elaborator accepted unchecked).
+
+FINDINGS BY SEVERITY
+  None critical or high.
+  Medium
+  R1. (Audit M1, still open) ProofLayout, ProofMain, ProofRefine, ProofWrapper,
+      Utf8StepFacts (both copies) are still untracked; a tracked-only commit ships a
+      check.sh that fails. git add them.
+  Low
+  R2. `--skip-replay` PASSes a smuggled False theorem (s05b). Expected (the PASS line says
+      SKIPPED), but the replay is the only defence against metaprogramming; a result
+      counts only from a full run.
+  R3. The non-vacuity theorem ties the wrapper only through three textual constant
+      definitions; that decoder.mjs uses them in every call, never grows memory and passes
+      back only returned states stays by reading (stated in check.sh's NOT CHECKED text).
+  R4. Edits to decode_buffer/decode_done need proof edits (restated bodies + explicit rule
+      lists; h05). Documented. Loop/done mutations are first caught by the `rfl` copy
+      check; with the copy updated the proof still fails (a06-a11d), so this is cost,
+      not a hole.
+  Info: IMPROVEMENT.txt's "Not changed: Boundary.lean" refers to that pass only; the
+  Boundary change (∀ -> ∃, wrapper section) is from the earlier pass and is a
+  strengthening. Audit M2, M3, L1, L2, L3 are fixed and were re-tested (s05, s09, s10,
+  m07, timeouts); L4 fixed for straight-line code (h01/h03/h04/h06).

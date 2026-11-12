@@ -1,0 +1,535 @@
+AUDIT -- candidates/wasmcert-coq/decoder (+ ../determinism, ../../pure-rocq)
+Independent hostile review, 2026-11-12, 02:30-02:55 UTC (about 25 min of wall time, most of it
+builds running in parallel).
+Work copy: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/wasmcert-audit/
+  clean/       tracked + untracked-not-ignored files of candidates/{pure-rocq,spec-rocq,difftest,
+               wasmcert-coq/decoder,wasmcert-coq/determinism} (git ls-files -co --exclude-standard)
+  probe/       my own Rocq probe files (Vac.v, FileBytes.v, Ax.v)
+  scripts/     mutate.sh, batch*.sh, spot.mjs
+  mut/         per-mutation logs and diffs; mut_results*.txt
+Nothing in the repo was modified except adding this file (git status checked before and after:
+same as the session-start snapshot). Nothing installed. wasm-tools 1.251.0 from
+candidates/talos/tools was used read-only.
+
+VERDICT
+  DOES NOT HOLD AS STATED, because of one off-by-4 constant in Boundary.v. The proof itself is
+  real (kernel-checked by rocqchk, only library axioms, every semantic mutation breaks it).
+  But the store hypothesis in Realizes is never met by the module's own memory, so every
+  per-call guarantee is vacuously true for every store the shipped module can actually have:
+
+    mem_bytes_needed = OUT_addr + out_area IN_max = 65536 + (4*65536 + 4) = 327684 bytes,
+    the module's memory is 5 pages = 327680 bytes, with maximum 5 (lim_max = Some 5).
+
+  Proved in probe/Vac.v ("Closed under the global context"):
+    s0_not_covered : forall m, nth_error (s_mems s0) 0 = Some m ->
+                     ~ (mem_bytes_needed <= mem_length m)
+  (s0 is the store that instantiation yields; mem_make_length gives 327680.) Node agrees:
+  memory.buffer.byteLength = 327680, and memory.grow(1) throws "Maximum memory size exceeded".
+  In WasmCert, mem_grow also respects lim_max, and the module contains no memory.grow. So no
+  reachable store satisfies the hypothesis. The theorem only talks about hypothetical stores
+  whose memory data is longer than its declared type allows.
+  What still holds: instantiation from the empty store is proved (including module_typing),
+  the exports exist, and the Decoder satisfies the spec laws. The proof shows correct behaviour
+  on memories of >= 327684 bytes.
+  Practical risk is low. By my reading of the code, a call writes at most 2*len+2 output bytes
+  (one UTF-16 unit per input byte, plus at most one extra unit for bytes carried over from an
+  earlier call), so it never touches [327680, 327684). The difftest and my spot tests pass.
+  But this is not proved.
+  The gap is not purely cosmetic. A module that also wrote 2 bytes at OUT+4*len after its loop
+  would still satisfy Boundary.v: the write is inside out_area, and mem_holds only constrains
+  the text prefix. Yet that module traps on every full 64 KiB chunk, which is exactly the
+  chunk size decoder.mjs uses.
+  Fix (not applied): make the layout fit the memory. Options: out_area len = 2*len+2 (the real
+  bound), or mem_bytes_needed <= 5 pages with IN_max lowered, or a 6-page memory. The
+  re-review of Boundary.v and its hash pin would need to be redone.
+  Everything else checked holds, with caveats listed below.
+
+1. REPRODUCTION (clean copy, dependency order)
+  - pure-rocq/check.sh: ALL CHECKS PASSED, 22 s (not the "about 9 min" stated in
+    decoder/check.sh's header comment).
+  - determinism/check.sh: VERDICT ALL PROVED, 19 s. Its `make clean` is the rocq makefile
+    clean plus Assumptions.*, and leaves sources alone.
+  - decoder/check.sh: PASS line printed, 1 min 51 s (difftest included). Rebuilt decoder.wasm
+    is byte-identical to the shipped file.
+  - No dependence on leftovers: the copy had no .vo files at all.
+  - Untracked: DetInstance.v, Step*.v, V1Implied.v and all of ../determinism are untracked
+    (git status "??"). A clone of the repo would not build. The user commits; just flagging it.
+  - Stale dependencies. The determinism .vo files are deleted and rebuilt (good). The
+    candidate's own .vo files are deleted and rebuilt (good). The pure layer is NOT rebuilt:
+    check.sh only checks that each .vo exists and is newer than its .v (mtime), and cmp's
+    Utf8Laws.v with the spec. A pure-layer .vo built from different sources, with an older
+    .v mtime, would slip through (e.g. a weaker RefDecoder_correct; Decoder_correct comes from
+    Utf8Laws.vo, which is mtime-checked only). This needs deliberate mtime games; `git checkout`
+    makes the .v newer, which is caught. Print Assumptions is transitive, so an Admitted in the
+    pure layer would still show up. Low severity. Suggest rebuilding the pure layer (22 s) or
+    hashing its .v files.
+
+2. BOUNDARY.V, READ HOSTILELY
+  - Store size: VACUOUS for real stores. See the verdict. This is the main finding.
+  - Existential D: tied to Decoder_correct, the spec's three laws unmodified (the hash of
+    spec-rocq/Utf8Laws.v is pinned; the pure-rocq copy is cmp'd). The witness is RefDecoder.
+  - Existential R: no degenerate R works. start must give an R-related value, every decode must
+    produce R st' v' for D's own next state, and the output must equal D's text for that st.
+    An R relating everything would force the module's output to be independent of the state.
+    An empty R contradicts start. R need not be functional; that is harmless.
+  - s0/inst/addresses: instantiate empty_store decoder_module [] (s0, frame [] inst0, []) is
+    proved via interp_instantiate (vm_compute) plus the library's soundness lemma
+    interp_instantiate_imp_instantiate. The relational instantiate includes module_typing
+    (validation), import typing and alloc_module, so the existential is genuinely inhabited.
+    The export addresses come from inst0's export list.
+  - Store quantifier: s_funcs = s0's, memory at a_mem of any contents and type, >= 327684
+    bytes; globals, tables etc. arbitrary. The module has no globals, tables or data.
+    * A store after a call: the result store is store_with_mem s a_mem m' with mem_frame (same
+      type and length), so the next call's premises hold again. Sequences are covered (modulo
+      the size bug).
+    * Host overwrote the input area: covered, since memory contents are arbitrary.
+    * NOT covered: a store holding other modules' functions (s_funcs must EQUAL the
+      single-module list). Node's store is the engine's, so this is a modelling decision
+      (REPORT item 3 says so).
+  - store_with_mem: seq.set_nth with default m'. a_mem = 0 exists, so it replaces in place; the
+    padding case never arises.
+  - mem_frame / mem_holds: the output bytes [OUT, OUT+|utf16le t|) are pinned exactly. The rest
+    of the output area [.., OUT+4len+4) is unspecified (may be garbage). Everything outside it
+    is unchanged, along with memory length and type and the rest of the store.
+  - Lengths: decode returns the number of output BYTES (lg 3 - OUT), the wrapper passes it as
+    a Uint8Array length, and done does the same. Consistent. i32_of_nat cannot wrap: len <=
+    65536 and output <= 262148 by the frame.
+  - call_returns (checked and holds as worded): for all caller frames f, reduce_trans c d; every
+    c' reachable from c still reaches d; no run : nat -> cfg with run 0 = c and a reduce_tuple
+    step at every n. That is the correct "no infinite run". The host state is the same hs in d
+    (not allowed to change). "No trap" is implied: a reachable trapped configuration cannot
+    reach values (Trapped.v, see 3). "Forall f" is fine because a native invoke ignores the
+    caller's frame. One thing not stated: the call configuration's frame f is unrelated to
+    inst0. That is irrelevant for AI_invoke.
+  - utf16_units / utf16le: correct UTF-16 for scalars (0xD800 + (n-0x10000)/0x400, 0xDC00 +
+    mod). Lone surrogates would map to one unit; values above 0x10FFFF to garbage. The spec
+    guarantees outputs are scalars or U+FFFD (decodes_first_scalar via begins_with_scalar, or
+    replacement_char). The decoder's texts are constrained through safe/decodes, so this is
+    not an issue.
+  - Limits: IN_max = 65536 per call (enforced only by the wrapper's chunking). The out area
+    4*len+4 is an over-approximation by about 2x (real bound 2*len+2); that slack is what
+    breaks the 5-page fit.
+  - NOT promised: anything for inputs > 65536 per call (wrapper's job); anything about
+    i32 values not produced by the module; contents of the output area beyond the text; other
+    modules in the store; the real (5-page) store, as above.
+
+3. DETERMINISM LIBRARY
+  - reduce_det_fragment_proved: checked and holds. Its only premise is cfg_ok; no typing
+    hypothesis; library axioms only (Print Assumptions; rocqchk passes). The statement is
+    pinned by Print in check.expected.txt.
+  - The fragment is honest. Host functions, AI_trap, return_invoke, floats, SIMD, tables,
+    memory.grow and bulk memory are excluded. funcs_ok depends only on s_funcs, and Realizes
+    fixes s_funcs = s0's, so it holds for EVERY store Realizes quantifies over
+    (DetInstance.decoder_call_cfg_ok; s0_funcs_ok by vm_compute).
+  - No instruction passes by accident: whatever bi_ok accepts, determinism is proved for it.
+    The decoder uses i32 const/binop/relop/testop, local get/set, load8_u, store16, block,
+    loop, if, br, br_if, so nothing outside the fragment.
+  - Corollary: no_infinite_run follows from determinism plus "the unique path reaches an
+    irreducible D" (induction on the rt1n derivation). Checked by reading, and it is the stated
+    type. Trap handling: fragment_step_preserved gives es_ok es' \/ trapped es';
+    trapped_step_preserved (any store) keeps trapped; trapped_not_const means a trapped
+    configuration never becomes values. So "can still reach d" really excludes traps. Checked.
+
+4. BYTES VS TERM
+  - Machine-checked in Rocq (vm_compute, which extends the TCB by the VM):
+    run_parse_module (binary_of_module decoder_module) = Some decoder_module (Binary.v).
+  - Shell-checked: EmitHex prints a hex string (library hex printer), a node one-liner turns it
+    into decoder.wasm, and check.sh cmp's it with the shipped file. Trusted in that path: the
+    hex printer, the regex and Buffer.from.
+  - I CLOSED that gap independently (probe/FileBytes.v): the shipped file's 643 bytes as a
+    Rocq list, with file_bytes = decoder_bytes and run_parse_module file_bytes = Some
+    decoder_module both by vm_compute. Closed under the global context.
+  - Independent parser: wasm-tools validate succeeds. wasm-tools print shows 3 types, memory
+    5 5, exports start/decode/done/memory, no imports/data/start/globals. I compared the
+    instruction listing against Module.v by hand: all constants (A0, 90, 9F, 8F, C2/0x32,
+    D7C0, 3FF, DC00, 1F/0F/07 masks, shifts 6/12/18, n<<3, 1<<24) match.
+    decoder.roundtrip.wat (not generated by the build) re-assembles to a different 687-byte
+    file: it has names and explicit empty `else`. Structurally it matches the shipped program
+    otherwise.
+  - Trusted: that V8 decodes the bytes as WasmCert's parser does. wasm-tools agrees on these
+    bytes.
+
+5. MUTATIONS (scratch copy; wasm regenerated from the mutated term, then the full check.sh with
+   timeout 900 s; no timeouts)
+   Semantic (module term) -- all make the PROOF fail:
+     m01 E0 lower bound A0->9F           FAIL StepPending.v:231 (range vs lo_next/hi_next)
+     m02 ED upper bound 9F->A0           FAIL StepPending.v:231
+     m03 F0 lower bound 90->80           FAIL StepPending.v:231
+     m04 F4 upper bound 8F->90           FAIL StepPending.v:231
+     m05 lead-byte bound 0x32->0x33      FAIL StepEmpty.v:264
+     m06 2-byte mask 1F->3F              FAIL StepComplete.v:150
+     m07 surrogate D7C0->D800            FAIL StepComplete.v:105
+     m08 done returns 0 bytes (drops FFFD) FAIL Exports.v:150
+     m09 state packing n<<3 -> n<<2      FAIL StepPending.v:249
+     m10 done also stores at OUT+4 (outside its area) FAIL Exports.v:150
+     m11 no reprocess after invalid prefix FAIL StepPending.v:249
+   Harmless:
+     h01 store16 align hint 0->1         FAIL Exports.v:148 (proof is syntax-bound to memarg)
+     h02 one extra unused local          FAIL Decode.v:340
+     p01 shipped .wasm + custom section  FAIL pinned-bytes check (as intended)
+     So harmless code changes need proof edits; I found none that passes.
+   Statement/check side:
+     s01 drop no-infinite-run from Boundary.v   caught (Boundary hash)
+     s02 alter pure-rocq/Utf8Laws.v             caught (cmp)
+     s03 alter spec-rocq/Utf8Laws.v             caught (spec hash)
+     s04 top theorem : True                     caught (build: V1Implied; elaboration check would too)
+     s05 Admitted in StepSpec.v                 caught (hole grep)
+     s06 top-level Hypothesis cheat : False     caught (build error: declaration-outside-section
+                                                is an error here; grep does NOT list Hypothesis/
+                                                Variable, Print Assumptions diff is the backstop)
+     s07 fragment admits AI_trap                caught (determinism build breaks)
+     s08 deterministic_outcome first conjunct := True  caught (determinism build breaks)
+     s09 shadow decoder_module_correct := True in Theorems.v   caught (V1Implied build broke).
+         Weakness: CheckTop resolves `decoder_module_correct` unqualified, after importing
+         Theorems, so a shadow is not excluded by the type check itself. Use
+         Decoder.Boundary.decoder_module_correct.
+     w01 wrapper chunk 65537                    caught (difftest)
+     w02 wrapper without ignoreBOM              caught (difftest)
+   None of these mutations can detect the size bug in the verdict. Only reading found it.
+
+6. AXIOMS AND ESCAPE HATCHES
+  - Print Assumptions (my run) gives the same 9 axioms for decoder_module_correct_proved,
+    reduce_det_fragment_proved, fragment_deterministic_outcome and instantiate_decoder. Notably
+    the STATEMENT decoder_module_correct (a definition) already depends on all 9. They all
+    enter through the library's definitions of reduce/instantiate (Flocq reals for floats,
+    SIMD string Parameters, classic/funext used by library definitions). The proof adds none.
+    The decoder uses no float/SIMD instruction.
+  - Consistency: classic + funext + the two ClassicalDedekindReals axioms are Stdlib's standard
+    classical-reals axioms, consistent together. The SIMD Parameters are functions into string
+    (inhabited), so they cannot be contradictory.
+  - rocqchk (installed): a full recursive check of Decoder.Theorems, Decoder.V1Implied and
+    Determinism.Main, including Stdlib, mathcomp, coq-wasm and compcert, finished in 67 s:
+    "Modules were successfully checked", exit 0. No type-in-type, unsafe fixpoints or assumed
+    positivity. Its context summary lists every axiom/Parameter of the loaded libraries (Int63
+    primitives, Reals impl, compcert Archi.win64, ...); Print Assumptions shows only the 9 are
+    used.
+  - Grep of all build files: no Admitted/admit/Axiom/Parameter/Unset * Checking/Extraction/
+    native_compute. Hypothesis/Variable only inside sections (discharged; the top type is
+    checked). vm_compute in Binary, Instance, DetInstance, Exports, Repr, StepEmpty (VM in the
+    TCB). Local Strategy opaque [seq_cp U32_of_N] (StepComplete) and Local Transparent
+    Archi.big_endian (Mem, StepEmpty): harmless.
+  - Context `{ho: host}: the final theorem is universally quantified over host_function_class,
+    BlockUpdateMemory and host. Being universal makes it stronger; the library provides
+    instances (Memory_vec), so this is not vacuous.
+
+7. UNVERIFIED PARTS: decoder.mjs (36 lines)
+  - One instance; memory is 5 pages and never grows, so the views stay valid. text() makes a
+    fresh view anyway.
+  - decode_buffer: chunks of <= 65536 (= IN_max), copies to IN = 0, calls decode(state, len),
+    reads nbytes at OUT. Input [0, 65536) and output [65536, ...) are disjoint. Chunking relies
+    on the spec's split law (proved for D); the loop itself is unverified. Empty input makes
+    exactly one len-0 call.
+  - State: the i32 travels as a JS number (signed); ToInt32 on re-entry preserves the bits. The
+    API is functional: old states are reusable (spot-tested).
+  - TextDecoder('utf-16le', {ignoreBOM: true}): keeps U+FEFF (tested; w02 shows difftest
+    catches its removal). Non-fatal, so a lone surrogate would silently become U+FFFD (the
+    proof says none occur). Never streaming, but surrogate pairs are emitted within one call,
+    and byte counts are always even.
+  - Requires a Uint8Array: a plain Array throws TypeError (subarray).
+  - difftest (run inside check.sh on the clean copy): P1/P2/P3 PASS, RESULT: PASS.
+  - My spot tests (scripts/spot.mjs), all OK: BOM kept and split, ED A0 80, F4 90, E0 9F,
+    F0 8F, C0 80, F5, per-byte emoji split, U+10FFFF, U+FFFF, empty buffers, pending at done,
+    old-state reuse, a 4-byte char straddling the 64 KiB chunk boundary, 64 KiB of C3 41,
+    64 KiB of 80, pending chains, 256 KiB of emoji, 10 MB pseudo-random, all against Node's
+    TextDecoder('utf-8').
+  - Trusted between the theorem and Node: the Boundary-to-real-store gap (verdict); WasmCert as
+    a model of V8; that the parser matches V8's decoding of the bytes; the JS/Wasm ABI;
+    TextDecoder; the chunking loop; the single-module store assumption.
+
+8. PROOF QUALITY (suggestions only)
+  - Proofs are syntax-directed wp scripts. Any code change, even a semantically null one (h01,
+    h02), breaks them. That makes them robust against wrong code, but maintenance is expensive.
+  - Stale text: REPORT.txt "WHAT IS TRUSTED" item 1 still says step_spec is unproved.
+    REPORT/STATUS quote "memory m >= 327684 bytes" without noticing it exceeds 5 pages.
+    check.sh says the pure layer takes "about 9 min" (22 s measured).
+  - The pure lemmas in StepPending/StepComplete (pending_lead, pending_vp, pending_vs,
+    step_reject/extend/complete, seq_cp_bound) belong in pure-rocq, as STATUS notes.
+  - The Local Strategy opaque workaround for the 32-boolean code point record (Qed > 60 s
+    otherwise) is fragile. Prefer a sealed accessor lemma or a Z-valued view in the pure
+    layer.
+  - Per-file times: not re-measured individually. The whole decoder build plus checks is
+    111 s in total.
+  - check.sh: qualify the name in the type check (s09); add Hypothesis/Variable outside
+    sections to the grep (it is caught today only because the warning is an error); rebuild or
+    hash the pure layer.
+
+DECISIONS THE USER SHOULD KNOW ABOUT (design level)
+  - Memory layout: input up to 64 KiB at address 0, output after it. The specification
+    reserves 4 output bytes per input byte plus 4, which does not fit the module's fixed
+    5-page memory. As written, the guarantee therefore applies to no real instance (must be
+    fixed).
+  - Each call gets at most 64 KiB of input; larger buffers are split by the unverified wrapper.
+  - The module is assumed to be alone in the Wasm store (no other modules' functions).
+  - Decoder states are opaque 32-bit values. Only values the module returned are promised to
+    work; old states stay valid.
+  - Output is UTF-16LE in memory. Bytes in the reserved area beyond the returned length are
+    unspecified; nothing outside it changes.
+  - Every call has exactly one outcome: it returns, with no trap and no infinite run, and does
+    not touch the host.
+
+==========================================================================================
+RE-AUDIT AFTER FIX -- 2026-11-12, 03:19-03:35 UTC (about 16 min)
+Work copy: .../scratchpad/wasmcert-audit/clean2/ (fresh tracked + untracked copy, no .vo files);
+probes in probe/r2/ (Uniq.v, Vac2.v); mutations in mut2/, results in mut_results4.txt;
+sentinel test in scripts/sentinel.mjs. No tracked file modified; nothing installed.
+
+VERDICT: HOLDS, with the low-severity caveats below. The critical finding is fixed. Module.v,
+decoder.wasm and decoder.mjs are byte-identical to the versions audited above, so only the
+statement and the proofs changed.
+
+1. Clean reproduction: decoder/check.sh alone, from a copy with no .vo files: PASS, 3 min 29 s.
+   It deletes and rebuilds the pure layer (running pure-rocq/check.sh, ALL CHECKS PASSED) and
+   the determinism library. It passes rocqchk ("Modules were successfully checked") and the
+   difftest. Regenerated wasm sha256 is 0bafcc44...e2d3, identical to the shipped file.
+
+2. Non-vacuity.
+   - Vac.v redone against the new bound (probe/r2/Vac2.v, closed under the global context):
+     the instantiated store's memory meets mem_bytes_needed = 196610 <= 327680. The largest
+     call's input hypothesis is satisfiable in the real store: mem_holds of 65536 bytes at
+     IN_addr holds (65536 zero bytes in the fresh memory). Arbitrary contents are the host's
+     write, which Realizes allows since memory contents are arbitrary.
+   - decoder_module_applies, read critically:
+     * It quantifies over EVERY instantiation result. Its memory clause is exactly Realizes'
+       condition: nth_error s_mems a_mem = Some m and mem_bytes_needed <= mem_length m, with m
+       exactly 5 pages, fixed.
+     * layout_fits: input [0, 65536) ends at OUT = 65536; mem_bytes_needed <= 5 pages.
+     * Proved by unfolding alloc_module (not by picking a witness).
+     * The first conjunct's `forall hs` is unused but harmless.
+   - Caveat (low): the claim does not itself say that every instantiation result has
+     Realizes' s_funcs and memory address. Realizes picks its own s0/inst existentially. I
+     proved it holds anyway (probe/r2/Uniq.v, library axioms only): every result of
+     instantiate empty_store decoder_module [] equals (s0, inst0). So the real store meets
+     every store premise of Realizes: same s_funcs, memory 0 of 327680 bytes. Suggest adding
+     this uniqueness to decoder_module_applies so a reader need not rely on it.
+   - Sequences of wrapper calls are covered. Each result store is store_with_mem with the
+     same memory type and length and s_funcs unchanged; host writes to the input area are
+     arbitrary contents; states are passed back unchanged. No remaining Realizes hypothesis
+     is unmeetable by the real module and wrapper (chunks <= 65536 = IN_max; states only
+     from the module).
+
+3. Bound 2*len+2: right and tight.
+   - OutBound.v proves it on Inv states. Because Boundary.v's frame uses the new out_area,
+     "nothing outside [OUT, OUT+2len+2) changes" is proved against the smaller area.
+   - Sentinel test on the shipped .wasm in Node: 32,014,975 decode/done calls. Covered:
+     * all 17652 states reachable by feeding up to 3 bytes from start;
+     * from each state: len 0, every byte (len 1), and 1536 byte pairs (len 2);
+     * done on every state;
+     * 65536-byte chunks of 7 adversarial patterns (4-byte chars, C3 41, 80, E2 82 chains,
+       F4 8F BF, F0 41, ASCII) from the start state and about 5% of the pending states, so
+       chunks start mid-sequence;
+     * 3000 random calls at lengths 0..5, 100, 65535 and 65536.
+   - Results:
+     * returned length <= 2*len+2 always; maximum excess exactly 2 (e.g. state "C2 pending"
+       + byte 00: U+FFFD + U+0000 = 4 bytes for len 1), so the bound is tight;
+     * no byte written beyond the returned length (sentinel window up to OUT+4len+64, i.e.
+       the old area plus margin);
+     * input area untouched;
+     * done writes <= 2 bytes.
+   - No counterexample found.
+
+4. Wrapper: unchanged. It reads exactly nbytes at OUT (Uint8Array(buffer, OUT, nbytes)); the
+   chunk size is 65536 = IN_max.
+
+5. Mutations (wasm regenerated from the term where the term changed):
+     r1 old out_area 4*len+4 restored, BOUNDARY_SHA re-pinned  FAIL NonVacuity.v:23 (layout_fits)
+     r2 PAGES 5 -> 2                                          FAIL NonVacuity.v:40
+     r3 PAGES 5 -> 4 (still >= 196610, but claim says 5 pages) FAIL NonVacuity.v:40
+     r4 IN_MAX 65536 -> 98304 (overlaps output; wasm unchanged) FAIL NonVacuity.v:23
+     t1 shadow decoder_module_correct := True in Theorems.v   FAIL (PrevImplied build). The
+        check now elaborates @Decoder.Theorems.decoder_module_correct_proved against
+        @Decoder.Boundary.decoder_module_correct, so a shadow cannot satisfy it by
+        construction.
+     t2 section `Hypothesis cheat : forall hs, step_spec hs`  FAIL (PrevImplied build)
+     t2b same, with PrevImplied patched to compile            FAIL "statement check":
+        CheckTop.v line 9, the extra premise does not unify with top_correct_type.
+
+6. Boundary.v diff against the version audited above: only (a) out_area 4*len+4 -> 2*len+2
+   (smaller frame = stronger promise; smaller memory requirement), (b) the new final section
+   (layout_fits, instance_memory_fits, decoder_module_applies), and (c) comments. Nothing
+   else changed and nothing was weakened.
+   PrevImplied.v is honest. It proves current -> prev -> v1, and its header says prev and v1
+   were vacuous, so the implications only show that no component was weakened.
+
+7. Check-script weaknesses from the first audit:
+   - Timestamp validation: closed. Pure-layer .vo files are deleted and rebuilt.
+   - Unqualified name: closed (t1, t2b).
+   - Hypothesis/Variable leaks: closed. Section leaks are caught by the explicit-@ type check
+     (t2b). Top-level ones are a build error, and would also show in Print Assumptions.
+   - Still true: the hole grep does not list Hypothesis/Variable. Harmless given the above.
+   - Still true: the untracked proof files (NonVacuity.v, OutBound.v, PrevImplied.v, Step*.v,
+     DetInstance.v, ../determinism/) mean a clone cannot build.
+
+8. Stale documentation: Module.v line 12 still says the output area is [OUT, OUT + 4*len + 4).
+   REPORT.txt line 48 still says ">= 327684 bytes" and line 103 still says "4*len+4"
+   (REPORT's preface flags these as describing the defective statement). OutBound.v's lemmas
+   belong in the pure layer (its header says so).
+
+==========================================================================================
+RE-AUDIT AFTER IMPROVEMENT PASS -- 2026-11-12, 04:46-05:20 UTC (about 34 min)
+Work dir: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/wasmcert-reaudit/
+  clean/, full/  fresh copies (git ls-files -co --exclude-standard of pure-rocq, spec-rocq,
+                 difftest, wasmcert-coq/{decoder,symexec,determinism}; no .vo files)
+  pristine/      the same, source for every mutant (mut/NAME.{diff,log}); scripts/;
+  probe/Gap.v    my corollary probe; table.txt, mut_results_*.txt
+No tracked file modified (git status before/after differs only by the concurrent Aeneas
+re-audit's AUDIT.txt). Nothing installed. Machine shared with two other re-audits (load up
+to 13 on 8 vCPU), so wall times are contended.
+
+VERDICT: HOLDS, with low-severity caveats (below). The improvement pass weakened nothing.
+
+1. Reproduction from clean
+   - decoder/check.sh (it deletes and rebuilds pure layer, symexec, determinism, decoder):
+     PASS, 148 s wall / 138 s user. With FULL_ROCQCHK=1: PASS, 225 s wall / 205 s user.
+   - Regenerated decoder.wasm sha256 0bafcc44...e2d3, same as shipped and as audited.
+   - Stale dependency .vo (mut/s12_stale): I built pure-rocq with an Admitted lemma, symexec
+     and determinism with an `Axiom ... : False` each, then restored the sources with
+     mtime 2000-01-01, leaving the poisoned .vo files newer. check.sh recompiled all three
+     (ROCQ compile lines), PASS; the rebuilt .vo contain no poisoned name. Checked and holds:
+     the script really rebuilds.
+   - Every Require in the build files names a module listed in its _CoqProject, so no stray
+     unlisted .vo can be used.
+
+2. Statement
+   - Boundary.v vs the re-audited one (wasmcert-audit/clean2, sha 69e0fe6a...): the only
+     changes are the new Definition instantiation_unique (any two results of
+     instantiate empty_store decoder_module [] are equal, quantified over the whole
+     store * frame * init-list triple), its conjunction into decoder_module_applies, and two
+     header comments. Realizes, call_returns, mem_frame, out_area (2*len+2), the layout and
+     decoder_module_correct are byte-identical. Nothing weakened. New pin 2e8b73ec...42ed
+     matches the file.
+   - Module.v: the diff is the header comment lines 12-13 only (4*len+4 -> 2*len+2). The
+     regenerated bytes are identical, and Binary.v proves run_parse_module decoder_bytes =
+     Some decoder_module. The parser is a function, so equal bytes imply an equal term.
+     decoder.mjs is byte-identical (sha 14d7af65...).
+   - What the two theorems give together, with nothing left to reading. I proved this as
+     corollaries in probe/Gap.v (compiled against the built tree, using only Boundary.v's
+     definitions and the two claims as hypotheses; it uses the 9 library axioms, which come
+     from the definition of instantiate):
+       claims_cover_real_store: correct -> applies -> forall z, instantiate empty_store
+         decoder_module [] z -> exists D, Decoder_correct D /\ forall hs, exists s inst,
+         z = (s, Build_frame [] inst, []) /\ (all of Realizes' guarantees with s0 := s,
+         inst := inst, AND s's own memory at the exported address has >= mem_bytes_needed
+         bytes).
+       result_store_closed (Closed under the global context): a call's result store
+         store_with_mem s a m' with mem_frame m m' keeps s_funcs, has m' at a, and has the
+         same memory length.
+     So the guarantees apply to the one store that instantiation produces, and (by trivial
+     induction with result_store_closed) to every store reached by any sequence of calls
+     whose inputs are <= IN_max bytes, with any host change to memory contents in between.
+     The induction itself is not stated in the repo. It is a two-line argument, but it is
+     still by reading.
+   - Still by reading (the wrapper and the model): chunks <= 65536 bytes are copied to IN=0
+     before each call; nbytes are read at OUT; states are passed back unchanged (JS Number
+     -> ToInt32 keeps the bits); host writes change contents only, never length or type; one
+     instance, and the "memory" export is the only memory; the chunking loop is right
+     (relies on the spec's split law); TextDecoder('utf-16le', ignoreBOM); WasmCert as a
+     model of V8, including JS-API instantiation = instantiate from the empty store; the
+     single-module store (s_funcs equality).
+
+3. Opacity and axioms
+   - The pure-layer change is `Global Opaque seq_cp.` appended at the end of Utf8Proofs.v,
+     plus a new lemma lead_cases used in the Ltac table_arith (Utf8Bridge.v). git diff shows
+     no definition or statement changed. Utf8Laws.v = spec (cmp + pinned hash). Opaque is a
+     conversion-strategy hint and cannot make the kernel accept more. rocqchk, which
+     re-checks the .vo files independently, passes.
+   - Remaining hints: Local Transparent Archi.big_endian (StepEmpty.v, symexec/Mem.v). No
+     other Opaque/Strategy anywhere in decoder/symexec/determinism.
+   - Print Assumptions of top_correct_check and top_applies_check (check.expected.txt, which
+     my run matched): exactly the nine library axioms (sig_not_dec, sig_forall_dec,
+     functional_extensionality_dep, classic, 5 SIMD_ops.app_v*_str). Checked and holds.
+   - Pure layer axiom-free: its check.sh's 27 "Closed under the global context" pass, and
+     rocqchk -o -norec over the 5 Utf8 modules lists no Utf8.* axiom in the context (only
+     Stdlib-internal module parameters). Checked and holds.
+
+4. Mutations of the module term (wasm regenerated from the mutated term, Boundary pin
+   re-pinned, full check.sh with timeout 900; time = check.sh wall time to FAIL, of which
+   about 20-30 s is the pure-layer rebuild before the decoder build starts):
+     m01 E0 lo A0->9F       77 s  StepPending.v:123     m07 D7C0->D800          73 s StepComplete.v:109
+     m02 ED hi 9F->A0       79 s  StepPending.v:123     m08 done returns 0      63 s Exports.v:161
+     m03 F0 lo 90->80       78 s  StepPending.v:123     m09 pack n<<3 -> n<<2   69 s StepPending.v:141
+     m04 F4 hi 8F->90       93 s  StepPending.v:123     m10 done stores OUT+4   58 s Exports.v:161
+     m05 lead bound 32->33  88 s  StepEmpty.v:218       m11 no reprocess        64 s StepPending.v:141
+     m06 2-byte mask 1F->3F 95 s  StepComplete.v:136
+   Aimed at the merged "completes a sequence" lemma (its pieces cp_code_ok2..4 / emit_cp_ok):
+     c2 2-byte shift 6->5         65 s StepComplete.v:140
+     c3 3-byte shift 12->11       68 s StepComplete.v:177
+     c3 3-byte mask 0F->1F        68 s StepComplete.v:167
+     c3 low6_of_st 8 -> 9         68 s StepComplete.v:168
+     c4 4-byte shift 18->17       75 s StepComplete.v:233
+     c4 4-byte mask 07->0F        75 s StepComplete.v:217
+     c4 low6_of_st 16 -> 15       73 s StepComplete.v:219
+     c4 surrogate shr 10->11      73 s StepComplete.v:109
+     c4 surrogate mask 3FF->1FF   70 s StepComplete.v:111
+     c4 low surrogate DC00->D800  68 s StepComplete.v:111
+     c  low6 mask 3F->7F (3+4 B)  49 s StepComplete.v:170
+   Output bound / framing:
+     f1 extra store16 at OUT+2len+2 after the loop (inside the old 4len+4 area)  43 s Decode.v:327
+     f2 emit_fffd stores 32 bits (right place, wrong width)                      46 s StepEmpty.v:151
+     f3 done stores 8 bits (right place, wrong width)                            52 s Exports.v:159
+     f4 BMP code unit stored 8 bits                                              59 s StepComplete.v:73
+   All 26 make the proof FAIL. No timeouts. In every case the regenerated wasm differed from
+   the shipped one. Caveat, as in the first audit: the proofs are syntax-directed, so the
+   failures are at shape-specific rewrite/apply steps. These mutations show that no change
+   survives; they do not show which semantic argument rejects it.
+
+5. Statement / check-side mutations
+     s01 old out_area 4len+4, pin updated     FAIL 43 s NonVacuity.v:27 (layout_fits)
+     s02 PAGES 5 -> 4 (wasm regenerated)       FAIL 44 s NonVacuity.v:53
+     s03 IN_MAX 65536 -> 98304                 FAIL 45 s NonVacuity.v:27
+     s04a instantiation_unique weakened to fst z1 = fst z2, old pin   FAIL 0 s (Boundary hash)
+     s04b same, pin updated                    PASSES (expected: the hash pin of the reviewed
+                                               Boundary.v is the only guard against a weaker
+                                               statement; by design)
+     s04c conjunct dropped, pin updated        FAIL 46 s NonVacuity.v:67 (proof shape only)
+     s05a fragment admits memory.grow          FAIL 30 s determinism Preservation.v:132
+     s05b deterministic_outcome conjunct 1 -> True   FAIL 42 s Exports.v:67
+     s06 decoder_module_correct_proved : True  FAIL 52 s statement check (CheckTop line 9)
+     s07 shadow decoder_module_correct := True FAIL 53 s statement check
+     s08 section Hypothesis step_spec          FAIL 52 s statement check (extra premise)
+     s09 Admitted in StepSpec.v                FAIL 20 s hole grep
+     s10 Axiom in symexec/I32.v                FAIL 20 s hole grep
+     s11 `Axioms cheat cheat2 : False.` in pure-rocq/Utf8StepFacts.v, used by
+         ref_decode_buffer_snoc                FAIL 69 s, but only at the decoder's
+                                               Print Assumptions diff: pure-rocq/check.sh
+                                               PASSED ("ALL CHECKS PASSED ... no axioms")
+     s12 stale poisoned dependency .vo         rebuilt; PASS (see 1)
+     s13 one byte of decoder.wasm flipped      FAIL 54 s (regenerated bytes differ)
+     w1 decoder.mjs OUT 65536 -> 65538         FAIL 90 s difftest
+     w2 decoder.mjs IN_MAX 65536 -> 65538      FAIL 112 s difftest
+     w4 decoder.mjs IN 0 -> 2                  FAIL 90 s difftest
+     w3 decoder.mjs IN_MAX 65536 -> 32768      PASSES (harmless: within the proved range)
+   Wrapper constants: there is NO mechanical check tying decoder.mjs's IN, IN_MAX, OUT to
+   Module.v / Boundary.v (check.sh mentions decoder.mjs only to run the difftest). The
+   Talos and Aeneas candidates have one. Only the difftest catches the harmful changes I
+   tried.
+
+6. rocqchk scope
+   - Default: -norec on all 34 project modules (decoder 15, symexec 6, determinism 8, pure
+     5): 11.6 s. FULL_ROCQCHK=1 (Decoder.Theorems, Decoder.NonVacuity, Determinism.Main,
+     recursively): 60.3 s. It checked 14 Decoder modules (not Binary, which the theorems
+     do not depend on) plus all 20 others of the project, and about 460 installed libraries
+     (Corelib, Stdlib, mathcomp, HB, elpi, ExtLib, Flocq, parseque, compcert, Wasm).
+   - So the default leaves unchecked exactly the installed library .vo files, nothing of the
+     project. It actually covers one more project module (Binary) than the full mode. The
+     installed libraries were kernel-checked by rocq c at install time. Re-checking them
+     protects only against tampered or miscompiled installed .vo files, and it costs about
+     49 s more. A reasonable default, and the verdict line says which mode ran.
+
+7. Differential harness (run myself, clean copy): P1/P2/P3 PASS, RESULT: PASS, 564671
+   inputs, 6.93 M (input, split) runs, 20.6 M decode_buffer calls, 28.8 s.
+
+FINDINGS
+  - Low: the wrapper's layout constants are not mechanically tied to the Rocq layout (see 5).
+    Only the difftest guards them. Suggest the Talos/Aeneas style: LAYOUT-marked lines in
+    decoder.mjs compared with Module.v's IN, IN_MAX, OUT and PAGES.
+  - Low: pure-rocq/check.sh's hole grep `\b(Admitted|admit|Axiom|Parameter|Abort)\b` misses
+    `Axioms`, `Parameters`, `Conjecture`, `Hypothesis`/`Variable` at top level. It checks
+    axiom-freeness only for its 27 listed lemmas. s11 shows a used axiom passes the pure
+    check and is caught only by the decoder's transitive Print Assumptions diff. That
+    backstop is complete for the top theorems, so the final claim is not affected. Suggest
+    using the decoder's grep list there.
+  - Info: the composition "real store + sequences of calls" is a short corollary of the two
+    claims (probe/Gap.v proves both parts). Stating it in the repo would remove the last
+    reading step on the Rocq side.
+  - Info: IMPROVEMENT.txt says 35 project files are rocqchk'd; there are 34 modules.
+Time used: about 34 min.

@@ -11,9 +11,12 @@
 //    (every output code point is a Unicode scalar: pure-lean decoded_scalar).
 import { readFileSync } from 'node:fs';
 
-const CHUNK = 1 << 20;          // input area [0, CHUNK)
-const IN = 0;
-const OUT = CHUNK;              // output area [CHUNK, CHUNK + 8*CHUNK)
+// Memory layout.  check.sh reads the three "LAYOUT" lines and fails unless they
+// equal the constants of the same names in Boundary.lean (the numbers the
+// non-vacuity theorem is about); keep them plain decimal literals.
+const CHUNK = 1048576;          // LAYOUT wrapperMaxChunk   (2^20; input area [IN, IN + CHUNK))
+const IN = 0;                   // LAYOUT wrapperInputAddr
+const OUT = 1048576;            // LAYOUT wrapperOutputAddr (output area [OUT, OUT + 8*CHUNK))
 
 function cpsToString(u32, start, end) {
   let s = '';

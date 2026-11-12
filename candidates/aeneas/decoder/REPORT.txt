@@ -28,8 +28,37 @@ REPORT -- Aeneas candidate: streaming UTF-8 decoder (Rust -> Charon/Aeneas -> Le
   have length <= Usize.max.  The state relation R is existential and not reviewed; that
   is sound because R must hold initially, be preserved, and the text is pinned to D.
 
+  NON-VACUITY (added 2026-11-12).  Second pinned theorem
+  DecoderProofs.verified_for_wrapper : Boundary.VerifiedForWrapper, where
+    VerifiedForWrapper := ∃ D, D.Correct ∧ ∃ R, RealizesWith D R ∧ CountsBounded D R
+                          ∧ WrapperCallsCovered D R ∧ WrapperLayoutFits
+  (Realizes D is now written ∃ R, RealizesWith D R; content unchanged, checked by rfl
+  against the reviewed formula in check.sh step 6).  Hypotheses of the guarantee, per
+  call: (i) the state value is R-related to a D state ("accepted"); (ii) decode_buffer:
+  2*in.len <= out.len; (iii) decode_done: 1 <= out.len; (iv) implicitly, model slices have
+  length <= Usize.max (no other range condition; Usize width is abstract, so wasm32 is
+  covered).  What the wrapper passes: in.len <= CHUNK = 65536, out.len = OUT_CAP = 131072
+  for every call, state = start state or the value the previous call returned (through
+  the shim's state slot).  WrapperCallsCovered proves (i)-(iv) for exactly those calls:
+  start state accepted; slices of 65536 bytes / 131072 code points exist; a covered
+  decode_buffer call meets (ii), returns, and returns an accepted state (so by
+  induction every state the wrapper passes is accepted); decode_done meets (iii).
+  CountsBounded: the count is <= 2*in.len (decode_buffer) and <= 1 (decode_done) for
+  every call meeting the conditions (proved by re-running the guarantee on a slice of
+  exactly 2*in.len, resp. 1, entries: the text does not depend on out).
+  WrapperLayoutFits: input [0,65536), output [65536, 65536+4*131072), state slot after
+  it, 4-byte aligned, region < 2^32.  Proofs: section 9 of Proofs.lean, generic in D, R.
+  Mechanical tie to the code: check.sh step 0b evaluates `const CHUNK` / `const OUT_CAP`
+  from decoder.mjs and compares them with `def MaxChunkBytes` / `def OutCapacity` in
+  Boundary.lean, and requires the wrapper's call/length/layout lines and the shim's
+  from_raw_parts / state-store lines verbatim (the shim has no buffer sizes of its own;
+  sizes come only from the wrapper).  Not covered: that from_raw_parts really yields
+  slices of those lengths over the region, that the region exists in linear memory and is
+  unused by the module, that JS hands the state back unchanged (all trusted, as before).
+
 2. TRUSTED / UNVERIFIED BETWEEN THE THEOREM AND NODE RUNNING THE BYTES
-  a. Lean kernel; the review of Utf8Laws.lean + Boundary.lean (69 lines).
+  a. Lean kernel; the review of Utf8Laws.lean + Boundary.lean (192 lines; 69 before the
+     non-vacuity section).
   b. Charon (rustc MIR -> LLBC): unverified.  Could mistranslate a construct (e.g.
      casts, `%` semantics, struct update, loop exits).  Runs rustc in dev profile.
   c. Aeneas (LLBC -> Lean): unverified (paper proofs of the approach only).  Could
@@ -53,7 +82,8 @@ REPORT -- Aeneas candidate: streaming UTF-8 decoder (Rust -> Charon/Aeneas -> Le
      and `&mut [u32]` with slice::from_raw_parts(_mut) from (ptr,len), call the core,
      and for decode_buffer store the new u32 state through `state_out`.  Could get
      wrong: aliasing/validity of the pointers (it trusts the caller), the state store.
-     The panic handler is `loop {}` (unreachable for in-contract calls, by the theorem).
+     The panic handler traps (core::arch::wasm32::unreachable(); `loop {}` before
+     2026-11-12) -- unreachable for in-contract calls, by the theorem.
   h. The wrapper (decoder.mjs, 40 non-blank lines).  Logic: grow memory once by a fixed
      region (64 KiB input chunk, 128K-entry u32 output, 4-byte state slot); split every
      input into 64 KiB chunks (justified by the spec's split independence, but the
@@ -63,14 +93,20 @@ REPORT -- Aeneas candidate: streaming UTF-8 decoder (Rust -> Charon/Aeneas -> Le
      offsets, the 0-length call, string conversion, reading stale memory.
 
 3. SIZES
-  Rust safe core: 115 non-blank, non-comment lines (shim 26).  Generated Lean:
-  Funs.lean 443 lines, Types.lean ~40.  Boundary.lean 69 lines.  Proofs.lean 464 lines
-  (406 non-blank/non-comment) => about 3.5 proof lines per line of Rust.  This does NOT
+  Rust safe core: 122 non-blank, non-comment lines (shim 29).  Generated Lean:
+  Funs.lean 448 lines, Types.lean ~40.  Boundary.lean 192 lines (69 before
+  non-vacuity).  Proofs.lean 450 lines (370 before non-vacuity, incl. a 25-line header;
+  334 non-blank/non-comment in all) => about 2.7 proof lines per line of Rust.
+  (First pass: 115 lines of Rust, Proofs.lean 547 lines / 464 before non-vacuity;
+  see IMPROVEMENT.txt.)  This does NOT
   count the shared pure layer (RefDecoder and its correctness, ~1100 lines), reused
   unmodified.
-  Wasm: 5436 bytes, no imports, no allocator.
+  Wasm: 5487 bytes (5436 before the 2026-11-12 improvement pass), no imports, no allocator.
 
-4. BUILD / RUN TIMES (this VM, other agents running)
+4. BUILD / RUN TIMES
+  Current (EC2, contended, 2026-11-12): check.sh from clean 53 s wall / 70 s CPU;
+  candidate Lean: Types 1.3 s, Funs 1.9, Boundary 1.6, Proofs 9.8 s CPU (~4 s wall);
+  difftest full ~33 s.  The numbers below are the first session's (old VM).
   cargo build wasm: ~2 s cold.  charon+aeneas: ~5 s per target.
   Pure layer: ~4.5 min CPU (Utf8Table), once.  Boundary+Proofs: ~30 s (mostly loading
   Mathlib-based Aeneas oleans; Proofs.lean itself ~8 s).
@@ -83,9 +119,10 @@ REPORT -- Aeneas candidate: streaming UTF-8 decoder (Rust -> Charon/Aeneas -> Le
   String.fromCodePoint); not profiled further.
 
 5. SCALING
-  The proof effort tracked the Rust structure closely: one small lemma per Rust
-  function, one refinement lemma for the step, one loop invariant.  step*/scalar_tac
-  discharged all arithmetic and bounds obligations.  What scales well: functions with
+  The proof effort tracked the Rust structure closely: one @[step] spec lemma per Rust
+  function (27), each caller proved by `unfold; step*` chaining the callees' specs, one
+  loop invariant (loop.spec_decr_nat).  step*/scalar_tac discharged the arithmetic and
+  bounds obligations; what remains by hand is list bookkeeping on the reference side.  What scales well: functions with
   scalar/struct/slice arguments, single loops, `&mut` slices.  What would not, or is
   untested: nested loops with early exits, iterators/closures, traits beyond derives,
   heap allocation (no_std with no allocator here).  The big leverage was the pure
@@ -93,9 +130,13 @@ REPORT -- Aeneas candidate: streaming UTF-8 decoder (Rust -> Charon/Aeneas -> Le
   larger component would need such a reference model written first.
 
 6. PUSHES TOWARD AN INEFFICIENT OR AWKWARD IMPLEMENTATION
-  - Short-circuit `&&`/`||` compound conditions are translated with the continuation
-    duplicated per branch; I restructured into one-boolean-per-function helpers (fine
-    after inlining by LLVM, but a style constraint).
+  - Short-circuit `&&`/`||` compound conditions (and range `match`es) that GUARD a branch
+    are translated with the continuation duplicated per branch; as a function's tail
+    value they are fine.  Hence one-boolean-per-function helpers (they also mirror
+    Utf8Ref's isVS/isVSP; re-tested in the improvement pass: still the better shape).
+  - Writes shared by two branches (`out[k] = c0; if .. { out[k+1] = c1 }`) come out as
+    index_mut + a back function that step* does not get through; a `match` whose arms
+    each write gives plain Slice.update (write_out).
   - Code points computed with `%`/`*`/`+` rather than `&`/`<<`/`|` to match the pure
     layer's Nat lemmas (LLVM produces the same masks/shifts).
   - Indexed while loop with bounds-checked indexing; the checks are proved unreachable

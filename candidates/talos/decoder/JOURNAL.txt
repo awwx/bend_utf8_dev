@@ -81,3 +81,130 @@ Time per milestone: implementation + harness 2 min (+2 min full harness);
 15:01:36 Second full check.sh: CHECK PASSED in 8 min 08 s (includes ProofModel.lean).  Stopped at about 42 minutes:
           the rest of statement 1 needs more than the remaining time, so I chose to
           leave the compiled state clean.
+
+Second session (2026-11-12, times UTC; EC2 8 vCPU, contended by two Rocq agents)
+01:13:42  Start.  Read AGENTS.md, HANDOVER.md, STATUS/REPORT/JOURNAL, Boundary.lean,
+          decoder.wat, proof files, pure-layer exports.
+01:15     Boundary 2^32 edge analysed before proving: the statement is true as
+          written.  Store addresses never reach 2^32 (out + 4|t| <= 2^32); only
+          the end pointer after the last code point can wrap, and Boundary's
+          UInt32.ofNat (out + 4|t|) wraps the same way.  The old loop proof only
+          needed `< 2^32` because it took toNat of the end pointer after the last
+          byte.  Decided: prove as written, no proposed-statement file needed.
+01:16-17  ProofRefine.lean, part 1 (packN, enc_toNat, qOf_enc, nOf_enc, lead*_eq,
+          packed_seq).  Errors on the first compile: `1 <<< 24` elaborated as Nat
+          (needed type ascriptions on both operands); one omega needed a
+          nonlinear bound supplied by hand (x * 256^n <= 255 * 2^24); packed_seq
+          first tried `decide +revert` (fails: Decidable over UInt32), then
+          `simp (config := {decide := true}) only [...]` closed every case
+          outright (the planned `exact ⟨rfl, rfl, rfl⟩` was then "no goals").
+          Inner-first rewriting order of simp mattered: lead1_eq rewrote
+          `decide (a ≤ 127)` before lead1234_eq could match, so lead1234_eq's
+          left side was restated with isLead1.
+01:18-19  stepM_eq / stepM_enc / step_length.  Three rounds of small fixes: a
+          wrong case split (l = [b, c] is the length-3 pending case, not
+          [b, c, d]); `simp` normalising `a :: l ++ [x]` to `a :: (l ++ [x])` so
+          hypotheses no longer matched (switched to `simp only` with ↓reduceIte);
+          omega lacking l.length <= 2 in its context.  No getting stuck.
+01:19-20  ProofLoop: dropped out + 8n < 2^32; last byte handled by a separate
+          branch (loop_iter then loop_exit, no address arithmetic).  Two fixes
+          (runM on [] needed unfolding; the remaining bound is out + 8 < 2^32).
+01:21-22  ProofMain.lean (layout lemmas with the 2^32 edge allowed via a case
+          split cs = [] / cs ≠ [], runM_enc, buffer_ok, done_ok, assembly).  Two
+          compile rounds: UInt8 `x &&& 255 = x` (simp had pushed the mask into
+          UInt8), a missing length_cons in the goal, a simp_all that destroyed
+          the hypothesis it needed.  shippedModuleCorrect: axioms standard.
+01:22-27  check.sh: added ProofRefine/ProofMain to the build, type check of the
+          top-level theorem against Boundary's statement, exact axiom-list
+          comparison, unqualified PASS line.  A bash heredoc inside a heredoc
+          broke one edit attempt (no file was changed; redone from a script
+          file).  First run failed as intended on check.expected.txt (hlt
+          removed from loop_correct/buffer_runs); regenerated it, diffed (only
+          the removed hypothesis and the new entries), reran from a clean build:
+          PASS, 2 min 06 s.
+          Difficulty overall: low.  The first session's estimate (1.5-2.5 h)
+          was far too high; working through toNat with small lemmas avoided the
+          Bool-goal trouble it hit.
+
+2026-11-12 02:12-02:19  Audit fix M2 (AUDIT.txt): Boundary.ShippedModuleCorrect
+          restated as `∃ m, decode printedWat = .ok m ∧ ∃ D, D.Correct ∧
+          Realizes m D` (was the implication over decoded modules).  Proof
+          became a term using decoderModule_decodes.  Added
+          ShippedModuleCorrect_v1 (old text) and shippedModuleCorrect_implies_v1
+          in ProofMain.lean, pinned in check.sh / check.expected.txt; new
+          Boundary hash.  First run failed only on the new expected lines (as
+          intended); clean rerun PASS in 3 min 41 s.  Old Boundary.lean fails
+          the hash pin.  No difficulties.
+
+2026-11-12 02:52-03:05  Third session: non-vacuity theorem.  Read Boundary's
+          call conditions (pages <= 65536; inp + len <= out; out + 8*len <=
+          memory; out + 4 <= memory for decode_done; R s v) and decoder.mjs
+          (IN 0, CHUNK 2^20, OUT 2^20, 160 pages, never grown).  All met;
+          Realizes already chains (StartOk/BufferOk conclude R; sameOutside
+          keeps the page count).  Added Boundary section (constants,
+          WrapperMem, WrapperCallsCovered, ShippedWrapperCovered) and
+          ProofWrapper.lean; compiled first try (initial page count by rfl on
+          the decoded module, the rest omega/decide).  decoder.mjs constants
+          as decimal literals on "// LAYOUT" lines; check.sh compares them and
+          the module's memory line with Boundary.  A helper inside a command
+          substitution printed its FAIL into the captured value; fixed to print
+          to stderr.  Mutations as in STATUS.txt NON-VACUITY: all fail as
+          intended.  Clean check.sh run: PASS, 3 min 49 s.  Difficulty: low.
+
+2026-11-12 03:34-04:03  Improvement pass (proof engineering, no statement
+          changes).  Worked in a scratch copy, then installed the files.
+          03:34 baseline per file (CPU): ProofFuncs 47 s, ProofStep 17 s,
+          DecoderModule 22 s, rest <= 2 s each.
+          03:37 profiler (set_option profiler true) first put almost all of
+          ProofFuncs under "attribute application" (49.7 s): misleading -- the
+          `macro_rules` command after each theorem waits for the theorem's
+          asynchronously elaborated proof.  Needed `set_option Elab.async
+          false` plus trace.profiler to see per-theorem / per-tactic times.
+          03:40 cause 1: `wauto` = `repeat (any_goals (first ...))` retries
+          every rule on every stuck goal after each step (quadratic).
+          `repeat'` instead: ProofFuncs 47 -> 18 s (ProofStep not measured alone).
+          Cause 2: every failed `refine Reach.cons (Step.X rfl) ?_` costs
+          20-30 ms and wstep tried up to 17 rules per step; replaced the
+          `first` list with an `elab` that reads the head instruction and
+          applies only its rule: ProofFuncs 6.7 s, ProofStep 4 s, both with
+          the default heartbeat limit.  Small slip: ambiguous `Config.mk`
+          (Lean.Meta.Config.mk) in the quoted names; fully qualified them.
+          03:44 mutation m07 (state count at bit 25): my first mutation script
+          matched nothing (the site is `local.get 5 / i32.const 24 / i32.shl`
+          in $step, with deeper indentation) and "passed"; noticed the failed
+          assert and redid it.  Now fails in 10 s.  Why it hung: with the
+          wrong packing one path's final goal is false; `wdone` (exact
+          Reach.refl _) then runs a full defeq check between two different
+          configurations, unfolding UInt32/BitVec arithmetic without bound
+          (checked: without `wdone` the same file fails in 4 s).
+          Tried to make `wdone` reducible-only so wrong code fails at once:
+          backed out -- correct paths need unfolding of numerals (module
+          literal `{ toBitVec := 255#32 }` vs `255`).  The heartbeat limit is
+          the fail-fast mechanism now.
+          03:47 DecoderModule: `decide +kernel` (no Decidable instance) and
+          `rfl` (elaborator whnf, heartbeat timeout) both fail; kept Talos's
+          `cbv` (12.7 s, profiled), which needs no heartbeat override.
+          maxRecDepth is needed there (checked), not in ProofBuffer (removed).
+          03:52 path closer `wfinish [defs]` with &&/|| AC normalization:
+          audit mutation h01 (swap i32.and operands in $cont) now passes with
+          no proof edit (before: ProofFuncs and ProofModel failed).
+          03:57 cause 3 (trace of call_vs): a successful `local.get` cost
+          ~150 ms because after Step.call / Step.localSet the frame's params
+          and locals are unevaluated terms containing the whole callee record
+          (`List.set (List.map ValueType.zero fn.locals) ..`); each get
+          re-evaluated the chain.  `wlocals` rewrites them to literal lists
+          (definitional, replaceTargetDefEq): ProofFuncs 2.7 s, ProofStep 2.2 s.
+          Restructuring: ProofLayout.lean (memory-layout lemmas, merged from
+          ProofLoop and ProofMain; writeCps_below was a duplicate of
+          writeCps_outside), ProofPureExtras.lean (lemmas for the pure layer;
+          step_text_length now proved directly), dead code removed, headers.
+          Difficulty: moderate; the only real confusion was the async profiler.
+
+2026-11-12 04:10-04:35  Pure-layer consolidation.  ProofPureExtras.lean's lemmas
+          (isVSP4, step_length, step_text_length, decodeBuffer_bounds) moved to
+          pure-lean/Utf8StepFacts.lean (namespace Utf8Pure, same statements);
+          ProofPureExtras.lean deleted, ProofRefine imports Utf8StepFacts.
+          check.sh: Utf8StepFacts added to the copy / forbidden-grep / build
+          lists, ProofPureExtras removed from OURS and the build list; copy
+          refreshed with --refresh-copies.  check.expected.txt unchanged (still
+          matches).  check.sh PASS (kernel replay 11655 constants, was 11644).

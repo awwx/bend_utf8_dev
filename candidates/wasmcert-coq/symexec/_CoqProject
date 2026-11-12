@@ -1,0 +1,8 @@
+-arg -w -arg -notation-overridden,-notation-for-abbreviation,-deprecated-reference-since-mathcomp-2.3.0,-abstract-large-number,-deprecated-syntactic-definition
+-Q . SymExec
+Steps.v
+Control.v
+Wp.v
+Mem.v
+WpMem.v
+I32.v

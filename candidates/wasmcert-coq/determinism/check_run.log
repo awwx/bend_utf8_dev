@@ -1,0 +1,177 @@
+rocq makefile -f _CoqProject -o Makefile.coq
+make -f Makefile.coq -j 2 all
+make[1]: Entering directory '/root/utf8/candidates/wasmcert-coq/determinism'
+ROCQ DEP VFILES
+ROCQ compile Fragment.v
+ROCQ compile ReduceDet.v
+ROCQ compile Trapped.v
+ROCQ compile Preservation.v
+ROCQ compile Focus.v
+ROCQ compile HeadStep.v
+ROCQ compile Det.v
+ROCQ compile Main.v
+make[1]: Leaving directory '/root/utf8/candidates/wasmcert-coq/determinism'
+build: 13 s
+no Admitted/admit/Axiom/Parameter in the build files
+reduce_det_fragment_proved
+     : reduce_det_fragment
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+reduce_det_fragment =
+fun (hfc : datatypes.host_function_class) (memory : memory.BlockUpdateMemory)
+  (ho : host.host) =>
+forall (hs : host.host_state) (s : datatypes.store_record)
+  (f : datatypes.frame) (es : list datatypes.administrative_instruction)
+  (hs1 : host.host_state) (s1 : datatypes.store_record)
+  (f1 : datatypes.frame) (es1 : list datatypes.administrative_instruction)
+  (hs2 : host.host_state) (s2 : datatypes.store_record)
+  (f2 : datatypes.frame) (es2 : list datatypes.administrative_instruction),
+is_true (cfg_ok s es) ->
+opsem.reduce hs s f es hs1 s1 f1 es1 ->
+opsem.reduce hs s f es hs2 s2 f2 es2 ->
+(hs1, s1, f1, es1) = (hs2, s2, f2, es2)
+     : forall {hfc : datatypes.host_function_class}
+         {memory : memory.BlockUpdateMemory},
+       host.host -> Prop
+
+Arguments reduce_det_fragment {hfc memory ho}
+fragment_deterministic_outcome
+     : forall (hs : host.host_state) (s : datatypes.store_record)
+         (f : datatypes.frame)
+         (es : list datatypes.administrative_instruction)
+         (hs' : host.host_state) (s' : datatypes.store_record)
+         (f' : datatypes.frame) (vs : list datatypes.value),
+       is_true (cfg_ok s es) ->
+       opsem.reduce_trans (hs, s, f, es)
+         (hs', s', f', operations.v_to_e_list vs) ->
+       deterministic_outcome (hs, s, f, es)
+         (hs', s', f', operations.v_to_e_list vs)
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+deterministic_outcome =
+fun (hfc : datatypes.host_function_class) (memory : memory.BlockUpdateMemory)
+  (ho : host.host)
+  (c
+   D : host.host_state * datatypes.store_record * datatypes.frame *
+       list datatypes.administrative_instruction) =>
+(forall
+   c' : host.host_state * datatypes.store_record * datatypes.frame *
+        list datatypes.administrative_instruction,
+ opsem.reduce_trans c c' -> opsem.reduce_trans c' D) /\
+(forall
+   run : nat ->
+         host.host_state * datatypes.store_record * datatypes.frame *
+         list datatypes.administrative_instruction,
+ run 0 = c ->
+ (forall n : nat, opsem.reduce_tuple (run n) (run (S n))) -> False) /\
+(forall
+   c' : host.host_state * datatypes.store_record * datatypes.frame *
+        list datatypes.administrative_instruction,
+ opsem.reduce_trans c c' ->
+ (forall
+    c'' : host.host_state * datatypes.store_record * datatypes.frame *
+          list datatypes.administrative_instruction,
+  ~ opsem.reduce_tuple c' c'') ->
+ c' = D)
+     : forall {hfc : datatypes.host_function_class}
+         {memory : memory.BlockUpdateMemory} {ho : host.host},
+       host.host_state * datatypes.store_record * datatypes.frame *
+       list datatypes.administrative_instruction ->
+       host.host_state * datatypes.store_record * datatypes.frame *
+       list datatypes.administrative_instruction -> Prop
+
+Arguments deterministic_outcome {hfc memory ho} c D
+still_reaches_stuck_is_target
+     : forall
+         c
+          D : host.host_state * datatypes.store_record * datatypes.frame *
+              list datatypes.administrative_instruction,
+       (forall
+          c' : host.host_state * datatypes.store_record * datatypes.frame *
+               list datatypes.administrative_instruction,
+        opsem.reduce_trans c c' -> opsem.reduce_trans c' D) ->
+       forall
+         c' : host.host_state * datatypes.store_record * datatypes.frame *
+              list datatypes.administrative_instruction,
+       opsem.reduce_trans c c' ->
+       (forall
+          c'' : host.host_state * datatypes.store_record * datatypes.frame *
+                list datatypes.administrative_instruction,
+        ~ opsem.reduce_tuple c' c'') ->
+       c' = D
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+proved in the build: reduce_det_fragment
+proved in the build: fragment_step_preserved
+proved in the build: trapped_step_preserved
+unconditional end results present: fragment_deterministic_outcome, still_reaches_stuck_is_target
+VERDICT: ALL PROVED -- reduce_det_fragment, the deterministic-outcome corollary and still_reaches_stuck_is_target, no holes, no new axioms; depends only on coq-wasm

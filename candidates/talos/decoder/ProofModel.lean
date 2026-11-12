@@ -1,7 +1,12 @@
 /-
-ProofModel.lean -- (partial) refinement of the Wasm-level model `stepM` to Utf8Ref's `step`
-(STATUS.txt, missing statement 1).  Only the empty-pending case is done so far, plus
-byte-level lemmas (packing/extraction, contB/secondB) for the other cases.
+ProofModel.lean -- facts relating the Wasm-level models (ProofFuncs, ProofStep)
+to Utf8Ref, used by ProofRefine.lean.
+
+EXPORTS
+  by1_toUInt32           the low byte of a widened byte is the byte
+  stepM_nil              stepM 0 x = (enc (step [] x).1, (step [] x).2)  (empty pending state)
+  contB_eq secondB_eq    contB / secondB on widened bytes = Utf8Ref's isCont / secondOk
+  bytes_of_toNat         by1..by4 of a number given as four base-256 digits
 -/
 import ProofStep
 import ProofDone
@@ -40,21 +45,10 @@ theorem stepM_nil (x : UInt8) : stepM 0 x.toUInt32 = (enc (step [] x).1, (step [
       have h3 : ¬ (((194 ≤ x ∧ x ≤ 223) ∨ (224 ≤ x ∧ x ≤ 239)) ∨ (240 ≤ x ∧ x ≤ 244)) := by
         simp [UInt8.le_iff_toNat_le] at *; omega
       simp [h1, h1']
-      rw [if_neg h2', if_neg h3]
+      simp only [h2', h3, ↓reduceIte]
       rfl
 
 /-! ## Byte-level lemmas for the remaining cases (packing, extraction, ranges) -/
-
-theorem u8lt (x : UInt8) : x.toUInt32.toNat < 256 := by simp; exact x.toNat_lt
-
-theorem or_shl_toNat (x y : UInt32) (k : Nat) (hk : k < 32) (hx : x.toNat < 2 ^ k)
-    (hy : y.toNat * 2 ^ k < 2 ^ 32) :
-    (x ||| y <<< (UInt32.ofNat k)).toNat = x.toNat + y.toNat * 2 ^ k := by
-  have hk' : (UInt32.ofNat k).toNat = k := by simp; omega
-  simp only [UInt32.toNat_or, UInt32.toNat_shiftLeft, hk', Nat.mod_eq_of_lt hk]
-  rw [Nat.mod_eq_of_lt (by rw [Nat.shiftLeft_eq]; omega)]
-  rw [Nat.or_comm, ← Nat.shiftLeft_add_eq_or_of_lt hx, Nat.shiftLeft_eq]
-  omega
 
 theorem contB_eq (x : UInt8) : contB x.toUInt32 = isCont x := by
   simp only [contB, isCont, UInt32.le_iff_toNat_le, UInt8.le_iff_toNat_le, ge_iff_le]

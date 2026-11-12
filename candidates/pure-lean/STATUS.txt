@@ -3,6 +3,16 @@ STATUS of candidates/pure-lean (shared pure layer for the Talos and Aeneas candi
 PROVED (no sorry; kernel-checked; axioms only propext / Classical.choice /
 Quot.sound; builds under leanprover/lean4:v4.35.0 and v4.36.0-rc2; see check.sh)
 
+KERNEL REPLAY (check.sh step 4, 2026-11-12; on by default, --skip-replay to skip):
+on each toolchain, every constant of the six files' import closure except Init/Lean/Std
+is replayed in a fresh kernel environment (v4.35.0: 510 constants, v4.36.0-rc2: 493);
+then each of the 16 theorems has exactly its law's type and its axioms, recomputed from
+the replayed constants, are within propext / Classical.choice / Quot.sound.  Not
+replayed: Lean core, Utf8Eval.lean (an evaluation test, not imported).  Cost: +12 s
+(check.sh 25 s with replay, 12 s without; 4.1 GB peak RSS).  A smuggled False theorem
+(elab + addDecl under debug.skipKernelTC) used by RefDecoder_correct: old check.sh
+PASSED, new one FAILs on both toolchains at the replay.
+
   Spec-internal laws, each `Utf8Pure.<law>_proved : <law>` with the spec's
   exact proposition:
     bit8_value_sum  bit8_value_word  u32_byte4_bits
@@ -30,6 +40,14 @@ Quot.sound; builds under leanprover/lean4:v4.35.0 and v4.36.0-rc2; see check.sh)
     - output: decoded_scalar, decodeBuffer_out_scalar, decodeDone_out_scalar
       (every output code point is a Unicode scalar; U+FFFD included), so the
       output is UTF-16-encodable without surrogate problems.
+
+  Step facts (Utf8StepFacts.lean, 2026-11-12; moved from the Talos and Aeneas
+  candidates so both share them; counterpart of ../pure-rocq/Utf8StepFacts.v):
+    isVSP4, decodeBuffer_snoc, step_length (state stays <= 3 bytes),
+    step_text_length (<= 2 code points per step), pendingCount,
+    stepFresh_count_bound, step_count_bound, decodeBuffer_count_bound
+    (|text| + pendingCount state' <= |bytes| + pendingCount state),
+    decodeBuffer_text_length (|text| <= 2 * |bytes|), decodeBuffer_bounds.
 
   RefDecoder design (Utf8Ref.lean, unchanged since first definition):
     State := List UInt8, the pending bytes: [] or a valid-sequence prefix that

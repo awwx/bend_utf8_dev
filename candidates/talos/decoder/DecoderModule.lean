@@ -4,14 +4,20 @@ import Interpreter.Wasm.Examples.UIntLemmas
 import Lean.Elab.Term
 
 /-!
-# Elaborator turning the printed WAT into a Module literal (not trusted)
+# DecoderModule.lean -- the module literal and its kernel-checked decode
 
-`spike.printed.wat` is the output of `wasm-tools print spike.wasm`.
-`spikeModule` is the AST literal obtained by running Talos's WAT decoder at
-elaboration time (`decoderWat%`, a copy of CodeLib's `watModule%`, copied so this
-spike does not need to build CodeLib/iris-lean).  The elaborator is NOT
-trusted: `spikeModule_decodes` re-runs the decoder on the same text inside the
-kernel (via `cbv`) and proves it yields exactly `spikeModule`.
+EXPORTS
+  printedWat             the text `wasm-tools print decoder.wasm` produced (checked by check.sh)
+  decoderModule          the Module literal (built at elaboration time, NOT trusted)
+  decoderModule_decodes  Talos's decodeForVerification printedWat = .ok decoderModule
+
+`decoderWat%` runs Talos's WAT decoder at elaboration time and turns the result
+into a literal with the derived `ToExpr` instances (a copy of CodeLib's
+`watModule%`, copied so that CodeLib/iris-lean need not be built).  The
+elaborator is not trusted: `decoderModule_decodes` re-runs the decoder on the
+same text by `cbv` (Talos's `kernel_decoder` setup) and proves it yields exactly
+`decoderModule`.  That proof is most of this file's 15 s; it uses the default
+heartbeat limit (profiled: the `cbv` call is 12.7 s).
 -/
 
 namespace Wasm
@@ -69,8 +75,8 @@ def printedWat : String := include_str "decoder.printed.wat"
 /-- The module literal, produced by the (untrusted) elaborator. -/
 def decoderModule : Module := decoderWat% "decoder.printed.wat"
 
+-- `cbv` recurses through the whole decoder run (default maxRecDepth 512 is too small).
 set_option maxRecDepth 100000 in
-set_option maxHeartbeats 0 in
 /-- Kernel-checked: Talos's verification decoder maps the printed text to
 exactly `decoderModule`. -/
 theorem decoderModule_decodes :

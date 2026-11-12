@@ -368,8 +368,27 @@ def pack (p : Pend) : Result Std.U32 := do
 def decode_start_state : Result Std.U32 := do
   ok 0#u32
 
+/-- [decoder::write_out]:
+    Source: 'src/lib.rs', lines 125:0-138:1 -/
+def write_out
+  (out : Slice Std.U32) (k : Std.Usize) (o : Out) :
+  Result (Std.Usize × (Slice Std.U32))
+  := do
+  match o.n with
+  | 0#uscalar => ok (k, out)
+  | 1#uscalar =>
+    let out1 ← Slice.update out k o.c0
+    let k1 ← k + 1#usize
+    ok (k1, out1)
+  | _ =>
+    let out1 ← Slice.update out k o.c0
+    let i ← k + 1#usize
+    let out2 ← Slice.update out1 i o.c1
+    let k1 ← k + 2#usize
+    ok (k1, out2)
+
 /-- [decoder::decode_buffer]: loop body 0:
-    Source: 'src/lib.rs', lines 131:4-143:5
+    Source: 'src/lib.rs', lines 147:4-152:5
     Visibility: public -/
 @[rust_loop_body]
 def decode_buffer_loop.body
@@ -383,27 +402,13 @@ def decode_buffer_loop.body
   then
     let i2 ← Slice.index_usize input i
     let o ← step p i2
-    let (out1, k1) ←
-      if o.n >= 1#u8
-      then
-        do
-        let (_, index_mut_back) ← Slice.index_mut_usize out k
-        let k2 ← k + 1#usize
-        if o.n >= 2#u8
-        then
-          let out2 := index_mut_back o.c0
-          let s ← Slice.update out2 k2 o.c1
-          let k3 ← k2 + 1#usize
-          ok (s, k3)
-        else let s := index_mut_back o.c0
-             ok (s, k2)
-      else ok (out, k)
+    let (k1, out1) ← write_out out k o
     let i3 ← i + 1#usize
     ok (cont (out1, o.p, i3, k1))
   else ok (done (out, p, k))
 
 /-- [decoder::decode_buffer]: loop 0:
-    Source: 'src/lib.rs', lines 131:4-143:5
+    Source: 'src/lib.rs', lines 147:4-152:5
     Visibility: public -/
 @[rust_loop]
 def decode_buffer_loop
@@ -416,7 +421,7 @@ def decode_buffer_loop
     (out, p, i, k)
 
 /-- [decoder::decode_buffer]:
-    Source: 'src/lib.rs', lines 127:0-145:1
+    Source: 'src/lib.rs', lines 143:0-154:1
     Visibility: public -/
 def decode_buffer
   (state : Std.U32) (input : Slice Std.U8) (out : Slice Std.U32) :
@@ -428,7 +433,7 @@ def decode_buffer
   ok ((i, k), out1)
 
 /-- [decoder::decode_done]:
-    Source: 'src/lib.rs', lines 149:0-156:1
+    Source: 'src/lib.rs', lines 158:0-165:1
     Visibility: public -/
 def decode_done
   (state : Std.U32) (out : Slice Std.U32) :

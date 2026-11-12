@@ -1,5 +1,154 @@
+Constant Decoder.Theorems.decoder_module_correct_proved
+Constant Decoder.NonVacuity.decoder_module_applies_proved
+Constant Decoder.Boundary.decoder_module_correct
+Constant Decoder.Boundary.decoder_module_applies
+@decoder_module_correct_proved
+     : forall (hfc : datatypes.host_function_class)
+         (memory : memory.BlockUpdateMemory) (ho : host.host),
+       decoder_module_correct
+@decoder_module_applies_proved
+     : forall (hfc : datatypes.host_function_class)
+         (memory : memory.BlockUpdateMemory) (ho : host.host),
+       decoder_module_applies
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+pend =
+fun st : Utf8Ref.State => match st with
+                          | nil => 0
+                          | (_ :: _)%list => 2
+                          end
+     : Utf8Ref.State -> nat
+
+Arguments pend st
+step_out_bound
+     : forall (st : Utf8Ref.State) (b : Byte.byte),
+       length (utf16le (snd (Utf8Ref.step st b))) +
+       pend (fst (Utf8Ref.step st b)) <= 2 + pend st
+decode_out_bound
+     : forall (st : Utf8Ref.State) (bs : list Byte.byte),
+       let
+       '(st', t) := Utf8Ref.ref_decode_buffer st bs in
+        length (utf16le t) + pend st' <= 2 * length bs + pend st
+decode_out_area
+     : forall (st : Utf8Ref.State) (bs : list Byte.byte),
+       BinNat.N.le
+         (BinNat.N.of_nat
+            (length (utf16le (snd (Utf8Ref.ref_decode_buffer st bs)))))
+         (out_area (length bs))
+ref_done_out_bound
+     : forall st : Utf8Ref.State,
+       BinNat.N.le (BinNat.N.of_nat (length (utf16le (Utf8Ref.ref_done st))))
+         (out_area 0)
+Closed under the global context
+step_spec_proved
+     : forall hs : host.host_state, step_spec hs
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
 decoder_module_correct_if_step
      : (forall hs : host.host_state, step_spec hs) -> decoder_module_correct
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+step_spec_of_cases
+     : forall hs : host.host_state,
+       (forall (st : Utf8Ref.State) (b : Byte.byte), step_case hs st b) ->
+       step_spec hs
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+step_case_empty
+     : forall (hs : host.host_state) (b : Byte.byte), step_case hs nil b
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+step_case_reject
+     : forall (hs : host.host_state) (b1 : Byte.byte) 
+         (r : list Byte.byte) (b : Byte.byte),
+       Utf8Proofs.Inv (b1 :: r)%list ->
+       Utf8Ref.vp ((b1 :: r) ++ b :: nil) = false ->
+       step_case hs (b1 :: r)%list b
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+step_case_extend
+     : forall (hs : host.host_state) (b1 : Byte.byte) 
+         (r : list Byte.byte) (b : Byte.byte),
+       Utf8Proofs.Inv (b1 :: r)%list ->
+       Utf8Ref.vp ((b1 :: r) ++ b :: nil) = true ->
+       Utf8Ref.vs ((b1 :: r) ++ b :: nil) = false ->
+       step_case hs (b1 :: r)%list b
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+step_case_complete2
+     : forall (hs : host.host_state) (b1 b : Byte.byte),
+       Utf8Proofs.Inv (b1 :: nil)%list ->
+       Utf8Ref.vs (b1 :: b :: nil) = true -> step_case hs (b1 :: nil)%list b
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+step_case_complete3
+     : forall (hs : host.host_state) (b1 b2 b : Byte.byte),
+       Utf8Proofs.Inv (b1 :: b2 :: nil)%list ->
+       Utf8Ref.vs (b1 :: b2 :: b :: nil) = true ->
+       step_case hs (b1 :: b2 :: nil)%list b
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+step_case_complete4
+     : forall (hs : host.host_state) (b1 b2 b3 b : Byte.byte),
+       Utf8Proofs.Inv (b1 :: b2 :: b3 :: nil)%list ->
+       Utf8Ref.vs (b1 :: b2 :: b3 :: b :: nil) = true ->
+       step_case hs (b1 :: b2 :: b3 :: nil)%list b
 where
 ?hfc : [ |- datatypes.host_function_class]
 ?memory : [ |- memory.BlockUpdateMemory]
@@ -23,8 +172,9 @@ memory.mem_lookup (BinNat.N.of_nat i) (datatypes.meminst_data m1) = Some wb ->
 byte_as_mem b wb ->
 BinInt.Z.le BinNums.Z0 o ->
 BinNat.N.le
-  (BinNat.N.add (BinInt.Z.to_N o)
-     (BinNat.N.pos (BinNums.xO (BinNums.xO BinNums.xH))))
+  (BinNat.N.add
+     (BinNat.N.add (BinInt.Z.to_N o) (BinNat.N.pos (BinNums.xO BinNums.xH)))
+     (BinNat.N.of_nat (pend st)))
   (operations.mem_length m1) ->
 BinInt.Z.lt
   (BinInt.Z.add o (BinInt.Z.pos (BinNums.xO (BinNums.xO BinNums.xH))))
@@ -49,6 +199,22 @@ Wp.wp hs s1 (frame_of st L i o junk) nil Module.step_code
        host.host_state -> Prop
 
 Arguments step_spec {hfc memory ho} hs
+writes =
+fun (memory : memory.BlockUpdateMemory) (m1 m2 : datatypes.meminst)
+  (o : BinNums.N) (ns : list BinNums.N) =>
+datatypes.meminst_type m2 = datatypes.meminst_type m1 /\
+operations.mem_length m2 = operations.mem_length m1 /\
+mem_holds m2 o ns /\
+(forall q : BinNums.N,
+ BinNat.N.lt q o \/
+ BinNat.N.le (BinNat.N.add o (BinNat.N.of_nat (length ns))) q ->
+ memory.mem_lookup q (datatypes.meminst_data m2) =
+ memory.mem_lookup q (datatypes.meminst_data m1))
+     : forall {memory : memory.BlockUpdateMemory},
+       datatypes.meminst ->
+       datatypes.meminst -> BinNums.N -> list BinNums.N -> Prop
+
+Arguments writes {memory} m1 m2 o%_N_scope ns%_list_scope%_seq_scope
 Axioms:
 ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
 ClassicalDedekindReals.sig_forall_dec :
@@ -143,3 +309,349 @@ simd_execute.SIMD_ops.app_vshiftop_str :
   datatypes.vshiftop -> String.string -> String.string -> String.string
 simd_execute.SIMD_ops.app_vbinop_str :
   datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+reduce_det_fragment_proved
+     : reduce_det_fragment
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+reduce_det_fragment =
+fun (hfc : datatypes.host_function_class) (memory : memory.BlockUpdateMemory)
+  (ho : host.host) =>
+forall (hs : host.host_state) (s : datatypes.store_record)
+  (f : datatypes.frame) (es : list datatypes.administrative_instruction)
+  (hs1 : host.host_state) (s1 : datatypes.store_record)
+  (f1 : datatypes.frame) (es1 : list datatypes.administrative_instruction)
+  (hs2 : host.host_state) (s2 : datatypes.store_record)
+  (f2 : datatypes.frame) (es2 : list datatypes.administrative_instruction),
+is_true (cfg_ok s es) ->
+opsem.reduce hs s f es hs1 s1 f1 es1 ->
+opsem.reduce hs s f es hs2 s2 f2 es2 ->
+(hs1, s1, f1, es1) = (hs2, s2, f2, es2)
+     : forall {hfc : datatypes.host_function_class}
+         {memory : memory.BlockUpdateMemory},
+       host.host -> Prop
+
+Arguments reduce_det_fragment {hfc memory ho}
+fragment_deterministic_outcome
+     : forall (hs : host.host_state) (s : datatypes.store_record)
+         (f : datatypes.frame)
+         (es : list datatypes.administrative_instruction)
+         (hs' : host.host_state) (s' : datatypes.store_record)
+         (f' : datatypes.frame) (vs : list datatypes.value),
+       is_true (cfg_ok s es) ->
+       opsem.reduce_trans (hs, s, f, es)
+         (hs', s', f', operations.v_to_e_list vs) ->
+       deterministic_outcome (hs, s, f, es)
+         (hs', s', f', operations.v_to_e_list vs)
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+deterministic_outcome =
+fun (hfc : datatypes.host_function_class) (memory : memory.BlockUpdateMemory)
+  (ho : host.host)
+  (c
+   D : host.host_state * datatypes.store_record * datatypes.frame *
+       list datatypes.administrative_instruction) =>
+(forall
+   c' : host.host_state * datatypes.store_record * datatypes.frame *
+        list datatypes.administrative_instruction,
+ opsem.reduce_trans c c' -> opsem.reduce_trans c' D) /\
+(forall
+   run : nat ->
+         host.host_state * datatypes.store_record * datatypes.frame *
+         list datatypes.administrative_instruction,
+ run 0 = c ->
+ (forall n : nat, opsem.reduce_tuple (run n) (run (S n))) -> False) /\
+(forall
+   c' : host.host_state * datatypes.store_record * datatypes.frame *
+        list datatypes.administrative_instruction,
+ opsem.reduce_trans c c' ->
+ (forall
+    c'' : host.host_state * datatypes.store_record * datatypes.frame *
+          list datatypes.administrative_instruction,
+  ~ opsem.reduce_tuple c' c'') ->
+ c' = D)
+     : forall {hfc : datatypes.host_function_class}
+         {memory : memory.BlockUpdateMemory} {ho : host.host},
+       host.host_state * datatypes.store_record * datatypes.frame *
+       list datatypes.administrative_instruction ->
+       host.host_state * datatypes.store_record * datatypes.frame *
+       list datatypes.administrative_instruction -> Prop
+
+Arguments deterministic_outcome {hfc memory ho} c D
+still_reaches_stuck_is_target
+     : forall
+         c
+          D : host.host_state * datatypes.store_record * datatypes.frame *
+              list datatypes.administrative_instruction,
+       (forall
+          c' : host.host_state * datatypes.store_record * datatypes.frame *
+               list datatypes.administrative_instruction,
+        opsem.reduce_trans c c' -> opsem.reduce_trans c' D) ->
+       forall
+         c' : host.host_state * datatypes.store_record * datatypes.frame *
+              list datatypes.administrative_instruction,
+       opsem.reduce_trans c c' ->
+       (forall
+          c'' : host.host_state * datatypes.store_record * datatypes.frame *
+                list datatypes.administrative_instruction,
+        ~ opsem.reduce_tuple c' c'') ->
+       c' = D
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+cfg_ok =
+fun (hfc : datatypes.host_function_class) (memory : memory.BlockUpdateMemory)
+  (s : datatypes.store_record)
+  (es : list datatypes.administrative_instruction) =>
+(funcs_ok s && es_ok es)%bool
+     : forall {hfc : datatypes.host_function_class}
+         {memory : memory.BlockUpdateMemory},
+       datatypes.store_record ->
+       list datatypes.administrative_instruction -> bool
+
+Arguments cfg_ok {hfc memory} s es%_list_scope%_seq_scope
+funcs_ok =
+fun (hfc : datatypes.host_function_class) (memory : memory.BlockUpdateMemory)
+  (s : datatypes.store_record) =>
+List.forallb func_ok (datatypes.s_funcs s)
+     : forall {hfc : datatypes.host_function_class}
+         {memory : memory.BlockUpdateMemory},
+       datatypes.store_record -> bool
+
+Arguments funcs_ok {hfc memory} s
+func_ok =
+fun (hfc : datatypes.host_function_class) (cl : datatypes.funcinst) =>
+match cl with
+| datatypes.FC_func_native _ _ mf =>
+    List.forallb bi_ok (datatypes.modfunc_body mf)
+| datatypes.FC_func_host _ _ => false
+end
+     : forall {hfc : datatypes.host_function_class},
+       datatypes.funcinst -> bool
+
+Arguments func_ok {hfc} cl
+es_ok =
+fun es : list datatypes.administrative_instruction => List.forallb ai_ok es
+     : list datatypes.administrative_instruction -> bool
+
+Arguments es_ok es%_list_scope%_seq_scope
+ai_ok =
+fix ai_ok (e : datatypes.administrative_instruction) : bool :=
+  match e with
+  | datatypes.AI_basic b => bi_ok b
+  | datatypes.AI_trap | datatypes.AI_return_invoke _ => false
+  | datatypes.AI_label _ es LI =>
+      (List.forallb ai_ok es && List.forallb ai_ok LI)%bool
+  | datatypes.AI_frame _ _ es => List.forallb ai_ok es
+  | _ => true
+  end
+     : datatypes.administrative_instruction -> bool
+
+Arguments ai_ok e
+bi_ok =
+fix bi_ok (b : datatypes.basic_instruction) : bool :=
+  match b with
+  | datatypes.BI_cvtop t2 _ t1 _ => (int_type t1 && int_type t2)%bool
+  | datatypes.BI_unop t _ | datatypes.BI_binop t _ |
+    datatypes.BI_testop t _ | datatypes.BI_relop t _ |
+    datatypes.BI_load t _ _ | datatypes.BI_store t _ _ => 
+      int_type t
+  | datatypes.BI_block _ bs | datatypes.BI_loop _ bs => List.forallb bi_ok bs
+  | datatypes.BI_if _ bs1 bs2 =>
+      (List.forallb bi_ok bs1 && List.forallb bi_ok bs2)%bool
+  | datatypes.BI_const_num _ | datatypes.BI_const_vec _ |
+    datatypes.BI_ref_null _ | datatypes.BI_drop | 
+    datatypes.BI_select _ | datatypes.BI_local_get _ |
+    datatypes.BI_local_set _ | datatypes.BI_local_tee _ |
+    datatypes.BI_global_get _ | datatypes.BI_global_set _ |
+    datatypes.BI_memory_size | datatypes.BI_nop | 
+    datatypes.BI_unreachable | datatypes.BI_br _ | 
+    datatypes.BI_br_if _ | datatypes.BI_br_table _ _ | 
+    datatypes.BI_return | datatypes.BI_call _ => true
+  | _ => false
+  end
+     : datatypes.basic_instruction -> bool
+
+Arguments bi_ok b
+int_type =
+fun t : datatypes.number_type =>
+match t with
+| datatypes.T_i32 | datatypes.T_i64 => true
+| _ => false
+end
+     : datatypes.number_type -> bool
+
+Arguments int_type t
+decoder_call_outcome
+     : forall (hs : host.host_state) (s : datatypes.store_record)
+         (f : datatypes.frame) (a : datatypes.funcaddr)
+         (args : list datatypes.value) (s' : datatypes.store_record)
+         (res : list datatypes.value),
+       datatypes.s_funcs s = datatypes.s_funcs Instance.s0 ->
+       opsem.reduce_trans
+         (hs, s, f,
+          seq.cat (operations.v_to_e_list args)
+            (datatypes.AI_invoke a :: nil))
+         (hs, s', f, operations.v_to_e_list res) ->
+       deterministic_outcome
+         (hs, s, f,
+          seq.cat (operations.v_to_e_list args)
+            (datatypes.AI_invoke a :: nil))
+         (hs, s', f, operations.v_to_e_list res)
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+     = (0, 65536, 65536)
+     : nat * nat * nat

@@ -9,7 +9,8 @@
 
     Memory (5 pages, not growable by the module):
       input area   [IN, IN + len)            IN = 0, len <= IN_MAX = 65536
-      output area  [OUT, OUT + 4*len + 4)    OUT = 65536 (UTF-16LE code units)
+      output area  [OUT, OUT + 2*len + 2)    OUT = 65536 (UTF-16LE code units;
+                                             Boundary.v's out_area)
 
     Exports:
       start  () -> i32                    the start state (0)

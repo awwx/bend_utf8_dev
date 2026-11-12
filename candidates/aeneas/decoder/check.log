@@ -1,99 +1,63 @@
 
-=== 1. spec and pure layer are unmodified copies (0s)
-byte-identical
+=== 0. reviewed files match their pinned hashes (0s)
+/root/utf8/candidates/spec-lean/Utf8Laws.lean: OK
+lean/Boundary.lean: OK
 
-=== 2. build decoder.wasm (rustc, wasm32-unknown-unknown, release) (0s)
-    Finished `release` profile [optimized] target(s) in 0.06s
--rwxr-xr-x 1 root root 5436 Nov 11 15:17 decoder.wasm
+=== 0b. wrapper constants: decoder.mjs and the shim (src/lib.rs) agree with lean/Boundary.lean (0s)
+decoder.mjs: CHUNK=65536 OUT_CAP=131072;  Boundary.lean: MaxChunkBytes=65536 OutCapacity=131072
+constants agree; wrapper call lines and shim slice/state lines as described in Boundary.lean
+
+=== 1. spec and pure layer: build copies equal the audited spec / pure-lean sources (0s)
+lean/pure/*.lean identical to pure-lean/*.lean; Utf8Laws.lean identical to the pinned spec
+
+=== 2. rebuild decoder.wasm (rustc, wasm32-unknown-unknown, release); must equal the shipped file (0s)
+f6b24c1b2b81ee4762e04fd9d59ef8b1ffadf68d1f568a46f92cf2e5994e859c  decoder.wasm
 
 === 3. re-run Charon + Aeneas (host and wasm32 targets); compare with lean/Decoder (0s)
 generated Lean identical for host and wasm32 translations
 
-=== 4. forbidden constructs in hand-written Lean (6s)
-none (no sorry/admit/axiom/native_decide/implemented_by/extern/bv_decide)
+=== 4. forbidden constructs in hand-written Lean (3s)
+none (sorry/admit/axiom/native_decide/implemented_by/extern/unsafe/opaque/skipKernelTC/#exit/debug options/bv_decide)
 
-=== 5. build Lean (6s)
-== pure Utf8Laws
-== pure Utf8Bits
-Utf8Bits.lean:42:48: warning: This simp argument is unused:
-  Bool.toNat_true
+=== 5. build Lean (every error is fatal; candidate .olean files are always rebuilt) (3s)
+built lean/Decoder/Types.lean
+built lean/Decoder/Funs.lean
+built lean/Boundary.lean
+built lean/Proofs.lean
 
-Hint: Omit it from the simp argument list.
-  [apply] simp only [getLsbD_toNat, Bool.toNat_false, UInt8.toNat_ofNat']
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-== pure Utf8Ref
-== pure Utf8Table
-Utf8Table.lean:33:56: warning: This simp argument is unused:
-  and_mask_15
-
-Hint: Omit it from the simp argument list.
-  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_7, and_mask_63]
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-Utf8Table.lean:33:69: warning: This simp argument is unused:
-  and_mask_7
-
-Hint: Omit it from the simp argument list.
-  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_63]
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-Utf8Table.lean:42:43: warning: This simp argument is unused:
-  and_mask_31
-
-Hint: Omit it from the simp argument list.
-  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_15, and_mask_7, and_mask_63]
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-Utf8Table.lean:42:69: warning: This simp argument is unused:
-  and_mask_7
-
-Hint: Omit it from the simp argument list.
-  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_63]
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-Utf8Table.lean:53:43: warning: This simp argument is unused:
-  and_mask_31
-
-Hint: Omit it from the simp argument list.
-  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_15, and_mask_7, and_mask_63]
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-Utf8Table.lean:53:56: warning: This simp argument is unused:
-  and_mask_15
-
-Hint: Omit it from the simp argument list.
-  [apply] simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_7, and_mask_63]
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-== pure Utf8Proofs
-Utf8Proofs.lean:341:33: warning: This simp argument is unused:
-  List.singleton_append
-
-Hint: Omit it from the simp argument list.
-  [apply] simp only [h1, ↓reduceIte, List.cons_append]
-
-Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
-== Decoder/Types
-== Decoder/Funs
-== Boundary
-== Proofs
-
-=== 6. axioms (229s)
-== Axioms
+=== 6. statement and axioms of the top-level theorem (17s)
 'DecoderProofs.verified' depends on axioms: [propext, Classical.choice, Quot.sound]
+'DecoderProofs.verified_for_wrapper' depends on axioms: [propext, Classical.choice, Quot.sound]
 'DecoderProofs.realizes' depends on axioms: [propext, Classical.choice, Quot.sound]
 'Utf8Pure.RefDecoder_correct' depends on axioms: [propext, Classical.choice, Quot.sound]
+DecoderProofs.verified : Boundary.Verified; DecoderProofs.verified_for_wrapper : Boundary.VerifiedForWrapper; axioms exactly as expected
 
-=== 7. difftest harness (232s)
-inputs 564671, (input,split) runs 6930038, decode_buffer calls 20558487, 75.8 s
+=== 6b. kernel replay of everything Proofs imports except Lean core (candidate, pure layer, Aeneas library, and the Mathlib/Batteries/Aesop/... modules it imports) (18s)
+replaying 149103 constants of 4202 modules (all but Init/Lean/Std); module roots [Aeneas, AeneasMeta, Aesop, Batteries, Boundary, Decoder, ImportGraph, Lake, LeanSearchClient, Mathlib, Plausible, ProofWidgets, Proofs, Qq, Utf8Bits, Utf8Laws, Utf8Proofs, Utf8Ref, Utf8StepFacts, Utf8Table]
+replayed DecoderProofs.verified depends on axioms: [propext, Classical.choice, Quot.sound]
+replayed DecoderProofs.verified_for_wrapper depends on axioms: [propext, Classical.choice, Quot.sound]
+replay OK
+kernel replay: 81 s
+
+=== 7. difftest harness (on the shipped decoder.wasm, compared with the rebuild in step 2) (99s)
+inputs 564671, (input,split) runs 6930038, decode_buffer calls 20558487, 35.2 s
 P1 total output: PASS
 P2 per-call output (safe and prompt): PASS
 P3 state persistence / buffer hygiene: PASS
 RESULT: PASS
 
-=== ALL CHECKS PASSED (308s)
+NOT CHECKED by this script (trusted): Charon, Aeneas and its Std model, the Lean
+kernel and toolchain versions (not pinned; AENEAS_BIN / AENEAS_LEAN may redirect
+them); rustc/LLVM (the release .wasm is built from the same src/lib.rs that Charon
+translates in the dev profile; nothing proves the machine code matches the Lean
+model); the unsafe shim (mod shim) and the JS wrapper decoder.mjs (exercised only by
+the difftest harness; step 0b only checks that their call sizes and call lines are
+the ones Boundary.VerifiedForWrapper is about -- that the shim's raw pointers give
+slices of those lengths over memory the wrapper really reserved is not proved);
+the Wasm engine.  The kernel replay (step 6b) covers every constant imported by
+Proofs except Lean core (Init/Lean/Std, which the replaying kernel itself is built
+on); it does not cover lean/Axioms.lean (not imported by Proofs; a report only) or
+unsafe/partial constants (skipped by Lean's replay; a theorem cannot use them).
 
-real	5m8.258s
-user	6m25.268s
-sys	0m24.885s
+=== ALL CHECKS PASSED: Boundary.Verified, and non-vacuity for the wrapper's calls (Boundary.VerifiedForWrapper); kernel replay OK (149103 constants: all of Proofs' imports except Lean core Init/Lean/Std) (135s)
+wall 134.44 s, peak RSS 6733912 KB

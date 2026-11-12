@@ -1,0 +1,210 @@
+IMPROVEMENT PASS (WasmCert-Coq decoder; 2026-11-12, 03:34-04:10 UTC; EC2, Rocq 9.2.0)
+
+Goal: bring the finished, audited proof to what a skilled Rocq user would deliver:
+first the audit's small corrections (part A), then check time, fragility and structure
+(part B).  Timestamped difficulties: JOURNAL.txt, session 7.
+
+MEASUREMENT
+  Per file: `rocq c -time` one file at a time, in dependency order, in scratch copies
+  (before = the tree at 03:34, after = the final tree), with /usr/bin/time.  Two other
+  agents' Lean builds ran at the same time (load average 2-5 on 8 vCPU), so wall times
+  are contended; compare CPU (user).  Both copies carried a .lia.cache file; the final
+  check.sh ran from a tree with no build products and no lia cache.  Each file costs
+  about 0.5 s of start-up and library loading.  An uncontended re-measurement is to follow.
+
+BEFORE / AFTER, PER FILE (user CPU s; lines; lemmas = Lemma/Theorem/Corollary)
+  file                         before: CPU  lines lemmas   after: CPU  lines lemmas
+  pure-rocq/Utf8Laws.v (spec)          0.33   905   -            0.32   905   -
+  pure-rocq/Utf8Ref.v                  0.12   124   0            0.13   124   0
+  pure-rocq/Utf8Bridge.v               8.48   370  34            8.50*  389  35
+  pure-rocq/Utf8Proofs.v               0.90   511  62            0.90   524  62
+  pure-rocq/Utf8StepFacts.v (new)        -      -   -            0.30   188  16
+  determinism/ (8 files, unchanged)   13.47  1485   -           13.47  1485   -
+  symexec/Steps.v   (was decoder/)     0.75   335  29            0.70   335  29
+  symexec/Control.v (was decoder/)     0.55    77   6            0.52    77   6
+  symexec/Wp.v      (was decoder/)     0.66    98   6            0.60    98   6
+  symexec/Mem.v     (was decoder/)     0.58    81   2            0.56    81   2
+  symexec/WpMem.v   (was decoder/)     0.55    59   2            0.49    59   2
+  symexec/I32.v (new; lemmas moved)      -      -   -            0.70   236  29
+  decoder/Module.v (comment only)      0.52   165   0            0.49   166   0
+  decoder/Binary.v                     1.08    13   1            1.06    13   1
+  decoder/Instance.v                   0.51    55   2            0.51    55   2
+  decoder/DetInstance.v                0.50    57   4            0.48    57   4
+  decoder/Boundary.v (A.1)             0.54   230   0            0.52   245   0
+  decoder/OutBound.v                   0.62   117  12            0.49    80  10
+  decoder/NonVacuity.v                16.86    48   3            0.59    70   5
+  decoder/Repr.v                       0.53    39   3            0.57    52   7
+  decoder/Exports.v                    1.00   153  10            0.69   164  10
+  decoder/Decode.v                    15.57   361  20            0.98   332  13
+  decoder/Theorems.v                   0.55    46   2            0.57    47   2
+  decoder/StepEmpty.v                  1.23   360  24            1.12   315  14
+  decoder/StepPending.v                2.82   470  28            2.54   331  11
+  decoder/StepComplete.v              16.55   436  17            1.95   325   9
+  decoder/StepSpec.v                   0.52    46   3            0.55    46   3
+  decoder/PrevImplied.v                0.64   214  10          (archived, not built)
+  decoder/Assumptions.v, wip/StepWIP.v    -   140   9          (removed)
+  ---------------------------------------------------------------------------------
+  decoder + symexec (.v in build)     63.1  3460 184           16.7  3184 165
+  everything (sequential)             86.4                     40.3
+  check.sh from clean               216.6 s wall / 243.9 s CPU (before, same conditions)
+                                    109.5 s wall / 118.4 s CPU (after; final run, see end)
+  * Utf8Bridge.v: these rows had a warm .lia.cache (in both copies).  From scratch it is
+    11.1 s before and 9.9 s after (lead_cases, below; same load, measured twice each).
+  The earlier STATUS figure (3 min 29 s) matches the before run.  Of the remaining
+  check.sh time: difftest ~30 s, pure layer (its check.sh) ~20 s, determinism build
+  ~15 s, decoder + symexec build ~12 s (make -j2), rocqchk 12 s (was ~70 s), wasm emit
+  and statement check ~10 s.
+
+DIAGNOSIS (what was slow and why)
+  1. NonVacuity.v, 16.9 s (not on the list of slow files): instance_memory_fits_proved
+     ran `cbn` on goals that contain the whole module term (from the relational
+     instantiate's alloc_module), then `rewrite mem_make_length` and Qed (6.5 s) on the
+     same big terms.  Fix: first prove that every instantiation result IS the computed
+     (s0, Build_frame [] inst0, []) (instantiate_decoder_result, also the proof of the
+     new uniqueness claim), rewrite with it, and reason about s0 symbolically.  0.6 s.
+  2. Decode.v, 15.6 s: 14.5 s in the last 3 lines of decode_correct: an ssreflect `/=`
+     (simpl) on a two-element goal with Int32.repr (OUT + ...) - Int32.repr OUT made simpl
+     evaluate repr / modulus arithmetic on the 65536 literal (6.8 s), a `have ->` rewrite
+     in the resulting term (3.5 s), and a Qed re-checking it (3.8 s).  Fix: `change` the
+     record projection int_sub i32m to Int32.isub, rewrite i32_isub_repr and
+     Z.add_simpl_l.  1.0 s.
+  3. StepComplete.v, 16.6 s: 14 s in one helper, utf16le_cp_len, of the same kind:
+     `rewrite ... /=` and `case: ... => /=; lia` on utf16le of a symbolic code point;
+     simpl worked on (0xD800 + (c - 0x10000) / 0x400) mod 256 and similar N literal
+     arithmetic.  Not the bit record: with `Opaque U32_to_N` it takes the same time.  The
+     lemma duplicated OutBound.utf16le_one_len (which needs no premise); removed.  2.0 s.
+  4. rocqchk, ~70 s of check.sh: it re-checked all of coq-wasm, mathcomp and CompCert on
+     every run.  Now every library of this development (decoder, symexec, determinism,
+     pure layer: 35 files) is re-checked with -norec and the installed libraries are
+     loaded unchecked: 12 s.  FULL_ROCQCHK=1 restores the full check; the verdict line
+     says which was done.  (A skilled user trusts the installed, kernel-compiled
+     dependencies as he trusts the installed rocq; the re-check that matters is of the
+     files built here.)
+  5. Utf8Bridge.v, 11.1 s from scratch (8.5 s with a warm .lia.cache, which is what the
+     previous passes measured).  The previous pass guessed N subtraction in lia goals.
+     Measured in vs_form: table_arith (case split on the byte-range table, 5 x 5
+     branches, with lia discarding each impossible one) 0.72 s, the final lia_mod (the
+     lia with N subtraction) 0.17 s.  So the cost is branches times one lia each.  New
+     lemma lead_cases (the 9 lead-byte classes that actually occur, proved once from
+     seq_len_cases and lo2_hi2_cases) used by table_arith: 11.1 s -> 9.9 s.  The rest is
+     spread over six lemmas of 1-2 s (encoding_form, utf8_form_unique, vs_form,
+     form_vs, pending_completion, ...).
+
+THE 32-BOOLEAN CODE POINT RECORD (evidence about the spec's representation)
+  Every place it cost something, over all sessions:
+  - Kernel, decoder: the Qed of step_case_complete2 (and 3, 4) does not finish without
+    an opacity hint (killed after > 2 min in this pass; > 60 s in session 2), although
+    the tactic script runs in about a second.  The kernel unfolds seq_cp s =
+    U32_of_N (seq_value s) into a U32_bits record of 32 N.testbit's of a symbolic number
+    while checking a conversion.  Making either seq_cp or U32_of_N opaque suffices
+    (tested separately, 2.3 s each).
+  - Pure layer: encoding_form destructs a U32 into 32 booleans and splits on the shape
+    bits (~1.9 s, about 30 cases); U32_to_N_inj peels 32 bits; U32_to_N_bound
+    generalizes 32 b2n's; yesterday's pass replaced an enumeration over all scalars
+    (Utf8Check.v, 509 s) that existed because of the record.
+  - Not the record (measured): Decode.v and utf16le_cp_len (N / Z literal arithmetic
+    under simpl), NonVacuity.v (cbn of the module term).
+  - The decoder proof never needs the bits: every use goes through U32_to_N, i.e. the
+    numeric value.  A spec with U32 as a bounded N (or Z) would remove the whole class.
+  What was done: one sealed interface instead of a per-file workaround.  The pure layer
+  already had the numeric interface (seq_cp_value, seq_cp_value1..4; now also
+  seq_cp_bound in Utf8StepFacts.v); `Global Opaque seq_cp` at the end of
+  pure-rocq/Utf8Proofs.v (after every proof there) makes every downstream file use it.
+  The decoder's `Local Strategy opaque [seq_cp U32_of_N]` is gone; there is no
+  Strategy/Opaque left in the decoder.  (Opaque changes only the order in which the
+  kernel unfolds, not what it accepts; a non-Local Opaque was checked to survive
+  Require.)  U32_of_N itself is the spec's and stays transparent.
+
+PART A (audit corrections)
+  A.1 Boundary.v: new instantiation_unique (any two results of instantiating the module
+      in the empty store are equal), conjoined into decoder_module_applies, with the
+      plain-language comment "instantiating the module has exactly one possible result,
+      so the memory this claim talks about is the memory the guarantees are about".
+      Proved in NonVacuity.v (instantiate_decoder_result, instantiation_unique_proved).
+      Strengthening only; nothing else in Boundary.v changed except the two header
+      paragraphs that list the claims.  BOUNDARY_SHA re-pinned (2e8b73ec...42ed).
+  A.2 Module.v: the comment now says 2*len + 2 (Boundary.v's out_area); term untouched;
+      regenerated decoder.wasm byte-identical (sha256 0bafcc44...e2d3, checked by
+      check.sh).  REPORT.txt: new CURRENT STATE section; FINAL THEOREM and DESIGN text
+      updated to the current statement (196610 bytes, 2*len+2, done writes <= 2 bytes);
+      the rest marked as history.  STATUS.txt rewritten for the current state.
+      wip/StepWIP.v (obsolete first draft of emit_fffd_ok, superseded since session 2)
+      removed with git rm; Assumptions.v (tracked; superseded by check.sh's CheckTop)
+      removed with git rm; wip/ is gone.
+  A.3 PrevImplied.v: removed from the build, check.sh and check.expected.txt.  It
+      compared the claim with two superseded statements that were vacuous for the real
+      module, so it guarded nothing; the shadowing / extra-premise checks the re-audit
+      credited to it (t1, t2) are done by CheckTop's fully qualified, @-explicit type
+      checks (t2b showed that).  The file was untracked, so it is kept in archive/ with a
+      note rather than deleted.
+  A.4 Pure lemmas moved to pure-rocq/Utf8StepFacts.v (new): step_reject, step_extend,
+      step_complete, pending_lead, lo_next/hi_next, pending_vp, pending_vs, seq_cp_bound,
+      ref_decode_buffer_snoc, and the output bound, now counted in UTF-16 code units
+      (cp_units, text_units, pending_units, step_units_bound, decode_units_bound,
+      ref_done_units_bound).  OutBound.v keeps only the conversion to bytes
+      (utf16le_length: 2 bytes per unit) and the same exported statements (step_out_bound,
+      decode_out_bound, decode_out_area, ref_done_out_bound, pend; pinned output
+      unchanged).  pure-rocq/check.sh greps the new file and prints Print Assumptions for
+      10 of its lemmas: 27 "Closed under the global context" (was 17); ALL CHECKS PASSED.
+      Utf8Laws.v untouched.
+
+PART B (structure)
+  - Reusable vs decoder-specific is now a directory split:
+      ../symexec (SymExec)        Steps, Control, Wp, Mem, WpMem, I32 -- symbolic
+                                  execution and i32 arithmetic; no decoder names
+      ../determinism (Determinism) unchanged
+      ../../pure-rocq (Utf8)      spec-level facts about RefDecoder
+      . (Decoder)                 everything that mentions decoder_module
+    Each has its own _CoqProject (symexec and determinism map only themselves, checked by
+    check.sh) and STATUS.txt; symexec/STATUS.txt says what a second module would reuse.
+  - I32.v: the 29 i32/Z lemmas that were spread over Decode, StepEmpty, StepPending and
+    StepComplete (with headers that listed lemmas no longer there).  Repr.v got the
+    byte/state range facts (bN_bZ, bN_lt, small_byte, small_enc); a duplicate (bN_le)
+    went; the tactics small_tac and wp_if_bool, copied in two files because Ltac does not
+    survive a section, are defined once at the top of StepEmpty.v.
+  - One central case lemma: step_case_complete2/3/4 were near-copies (diff: the list
+    literal and the cp_code lemma).  Now step_case_complete b1 r b takes the cp_code
+    result as a hypothesis and the three named cases are one-line instances (names and
+    statements kept; they are printed in check.expected.txt).
+  - Every file has a header listing its exports and where its inputs come from.
+    Style rule (stated in STATUS): files that touch Wasm use ssreflect, like WasmCert-Coq;
+    pure files use stdlib tactics.  Two consequences recorded in the headers: `++` is
+    seq.cat under ssreflect and List.app in the pure layer (Decode.v keeps a one-line
+    utf16le_cat for that reason), and named arguments `(x := t)` only work for implicit
+    arguments, so the pure lemmas are called positionally.
+  - Fragility: wr_app's `rewrite O2; [lia|]` relied on the order of the generated side
+    goal; now `rewrite (O2 q ltac:(lia))`.  The case lemmas' `rewrite ...; try (apply
+    small_const; lia)` patterns are order-independent.  No other bracketed side-goal
+    selection after a conditional rewrite remains (grep).
+  - Instruction-order dependence: not removed (not at reasonable cost in this box).
+    STATUS.txt, "WHAT A CODE EDIT TO Module.v REQUIRES", says what an edit costs: the
+    code is factored into named pieces with one lemma each, so an edit inside a piece is
+    repaired in that lemma; the case lemmas only chain them.
+
+PINNED STATEMENTS CHANGED
+  - Boundary.v (hash re-pinned): decoder_module_applies gains the conjunct
+    instantiation_unique (strengthening).  decoder_module_correct unchanged.
+  - check.expected.txt: only the PrevImplied section removed (258 lines: the prev/v1
+    statements and implications); every other line identical, including both top-level
+    types and Print Assumptions (the nine WasmCert-Coq library axioms).
+  - Top-level theorems keep their fully qualified names and types:
+    Decoder.Theorems.decoder_module_correct_proved,
+    Decoder.NonVacuity.decoder_module_applies_proved.
+
+WHAT A FURTHER PASS COULD DO
+  - Utf8Bridge.v (9.9 s, now the slowest file): the remaining branches are discarded by
+    lia one at a time; a cheaper contradiction check, or stating vs_form / form_vs per
+    lead class, would cut more.
+  - Less dependence on instruction order: state the sub-block lemmas over a record of
+    locals instead of 11-element list literals, and a wp automation that discharges the
+    i32 side conditions from a hint database (most compile rounds in every session went
+    to side goals).
+  - Spec representation: U32 as a bounded N would make the seq_cp sealing unnecessary.
+  - check.sh: difftest (~30 s) is now the largest single step.
+
+FINAL CHECK
+  04:05-04:07 UTC: git clean -X of decoder, symexec, determinism and pure-rocq (no build
+  products, no lia cache), then ./check.sh: PASS, 109.5 s wall, 118.4 s CPU (110.1 user +
+  8.3 sys), with the other agents' builds running.  Log: check_run.log.  Regenerated
+  decoder.wasm sha256 0bafcc44...e2d3 (unchanged).  FULL_ROCQCHK=1's rocqchk command was
+  also run once by hand: see JOURNAL.

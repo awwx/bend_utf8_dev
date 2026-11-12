@@ -1,0 +1,10 @@
+-arg -w -arg -notation-overridden,-notation-for-abbreviation,-deprecated-reference-since-mathcomp-2.3.0,-abstract-large-number,-deprecated-syntactic-definition,-spurious-ssr-injection
+-Q . Determinism
+Fragment.v
+ReduceDet.v
+Trapped.v
+Preservation.v
+Focus.v
+HeadStep.v
+Det.v
+Main.v

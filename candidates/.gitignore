@@ -54,3 +54,9 @@ CoqMakefile.conf
 # Logs are tracked: several STATUS and REPORT files point at them as the
 # record of a check run. Uncomment to stop tracking them.
 # *.log
+
+## Scratch output of check scripts
+
+# Rewritten by determinism/check.sh on every run and only grepped there;
+# the recorded run is in determinism/check_run.log.
+/wasmcert-coq/determinism/assumptions.out

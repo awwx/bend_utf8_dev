@@ -3,7 +3,7 @@
 From Stdlib Require Import ZArith NArith Relations Lia.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool eqtype seq.
 From Wasm Require Import operations opsem properties.
-From Decoder Require Import Steps Control Wp Mem.
+From SymExec Require Import Steps Control Wp Mem.
 
 Set Implicit Arguments.
 Unset Strict Implicit.

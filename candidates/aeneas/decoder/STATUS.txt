@@ -16,13 +16,67 @@ PROVED (lean/Proofs.lean; no sorry, no new axioms, no native_decide/bv_decide;
     (decode_done); the rest of the output slice is unchanged.  No length bound such as
     len <= U32.max is needed.
 
-  Milestones: per-byte step refines Utf8Pure.step (step_eq) -- done; decode_buffer loop
-  (loop_spec) -- done; decode_done and start (decode_done_eq, start_eq) -- done;
-  top-level -- done.
+  DecoderProofs.verified_for_wrapper : Boundary.VerifiedForWrapper   (non-vacuity, 2026-11-12)
+    where VerifiedForWrapper := ∃ D, D.Correct ∧ ∃ R, RealizesWith D R ∧ CountsBounded D R
+      ∧ WrapperCallsCovered D R ∧ WrapperLayoutFits
+    (RealizesWith D R is the body of Realizes, unchanged; check.sh checks by rfl that
+    Realizes is still exactly the reviewed formula).  Says: the guarantee applies to every
+    call decoder.mjs makes through the shim -- the start state is accepted (related by R);
+    model slices of the wrapper's sizes exist; a decode_buffer call from an accepted state
+    with <= MaxChunkBytes = 65536 input bytes and an output slice of OutCapacity = 131072
+    code points meets the 2-per-byte condition, returns, and returns an accepted state;
+    decode_done with that slice meets its condition and returns.  Also states the count
+    bounds the audit found only implied (k <= 2*in.len; k <= 1 for decode_done) and that
+    the wrapper's memory layout (input, output, state slot) is consistent and < 4 GiB.
+    Nothing was vacuous: OutCapacity = 2 * MaxChunkBytes exactly meets the condition.
+    check.sh step 0b reads CHUNK/OUT_CAP from decoder.mjs and fails if they differ from
+    Boundary.lean, and checks the call lines of the wrapper and the slice/state lines of
+    the shim verbatim.  Still trusted: the shim's raw pointers really give slices of those
+    lengths over memory the wrapper actually reserved (the Lean is about the model only).
+
+  Milestones: per-byte step refines Utf8Pure.step (step_spec) -- done; decode_buffer loop
+  (loop_spec, decode_buffer_spec) -- done; decode_done and start (decode_done_spec,
+  start_rel) -- done;
+  top-level -- done; non-vacuity for the wrapper's calls (verified_for_wrapper) -- done.
+
+IMPROVEMENT PASS (2026-11-12, see IMPROVEMENT.txt)
+  Proofs.lean restructured around one @[step] spec lemma per Rust function, proved with
+  Aeneas's step*; 547 -> 450 lines, 11.2 -> 9.8 s CPU.  Rust: the output writes moved
+  into write_out (a `match o.n`), so the generated loop body is straight-line; the
+  shim's panic handler now traps (core::arch::wasm32::unreachable) instead of looping.
+  decoder.wasm rebuilt: 5436 -> 5487 bytes.  Same pinned theorems, same Boundary.lean.
+
+PURE-LAYER LEMMAS (2026-11-12)
+  decodeBuffer_snoc moved to the shared pure layer (pure-lean/Utf8StepFacts.lean, same
+  statement; copy in lean/pure/); ref_step_bad removed (it was Utf8Pure.step_bad_pending);
+  loop_spec takes "at most 2 code points per byte" from Utf8StepFacts.step_text_length.
 
 RUNNING IMPLEMENTATION
-  decoder.wasm (5.4 KB, no imports, no allocator); decoder.mjs passes the full difftest
+  decoder.wasm (5487 bytes, no imports, no allocator); decoder.mjs passes the full difftest
   harness (P1/P2/P3 PASS, including the 3..8 MB single-call buffers).
+
+KERNEL REPLAY (check.sh step 6b, 2026-11-12; on by default, --skip-replay to skip)
+  Replays in a fresh kernel environment (importing only Init/Lean/Std) every constant
+  of the import closure of Proofs: 149,103 constants from 4202 modules -- the candidate
+  (Decoder.Types/Funs, Boundary, Proofs), the pure layer copies (Utf8Laws, Utf8Bits,
+  Utf8Ref, Utf8Table, Utf8Proofs, Utf8StepFacts), the Aeneas library (Aeneas,
+  AeneasMeta) and every Mathlib/Batteries/Aesop/Qq/Plausible/ProofWidgets/ImportGraph/
+  LeanSearchClient/Lake module those import.  NOT replayed: Lean core Init/Lean/Std
+  (the replaying kernel's base), lean/Axioms.lean (not imported; a report only),
+  unsafe/partial constants (skipped by Lean's replay; unusable by theorems).  On the
+  replayed environment: DecoderProofs.verified has type exactly Boundary.Verified and
+  verified_for_wrapper exactly Boundary.VerifiedForWrapper, and their axioms,
+  recomputed by walking the replayed constants (#print axioms in 4.36 reads per-module
+  axiom lists stored in the .olean files), are exactly propext, Classical.choice,
+  Quot.sound.  (The Aeneas library declares bv_decide native axioms, e.g.
+  Aeneas.Std.U128.bv_mod_size._native.bv_decide.ax_1_6; they are not used.)
+  Cost: replay 81 s, 6.7 GB peak RSS; full check.sh 134 s (53 s with --skip-replay,
+  2.9 GB).  Timeout CHECK_REPLAY_TIMEOUT, default 900 s.
+  Mutation: a False theorem added by an elab calling addDecl with debug.skipKernelTC set
+  programmatically (name built from strings), used by DecoderProofs.verified: the old
+  check.sh printed ALL CHECKS PASSED; the new one FAILs in step 6b ("while replaying
+  declaration 'DecoderProofs.smuggled'"); with --skip-replay it PASSes and the final
+  line says "kernel replay SKIPPED".  A result counts only from a run with the replay.
 
 NOT PROVED / OUT OF SCOPE OF THE THEOREM
   - Anything below the Lean model: Charon, Aeneas, the Aeneas Std model, rustc/LLVM, the

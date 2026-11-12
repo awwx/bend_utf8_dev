@@ -509,3 +509,16 @@ Lemma step_pending st b : st <> [] ->
   if vp (st ++ [b]) then (if vs (st ++ [b]) then ([], [seq_cp (st ++ [b])]) else (st ++ [b], []))
   else let '(st', o) := step_empty b in (st', FFFD :: o).
 Proof. destruct st; [congruence|reflexivity]. Qed.
+
+(* Sealing [seq_cp] for downstream proofs.  A code point is a record of 32
+   booleans (Utf8Laws.U32); [seq_cp s] is [U32_of_N (seq_value s)], i.e. 32
+   [N.testbit]s of a symbolic number.  Downstream proofs should use its
+   numeric interface ([seq_cp_value], [seq_cp_value1..4], [seq_cp_ok],
+   [seq_cp_bound] in Utf8StepFacts.v) and never unfold it.  Without this
+   declaration the kernel, when checking the Wasm decoder's
+   "byte completes a sequence" cases, unfolded seq_cp into the 32-boolean
+   record and did not finish (> 60 s per Qed; ../wasmcert-coq/decoder
+   used a Local Strategy in StepComplete.v before).  [Opaque] only changes
+   the order in which the kernel and tactics unfold definitions, not what
+   is accepted; it is placed after every proof in this file. *)
+Global Opaque seq_cp.

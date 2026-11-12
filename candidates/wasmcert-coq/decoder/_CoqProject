@@ -1,16 +1,20 @@
 -arg -w -arg -notation-overridden,-notation-for-abbreviation,-deprecated-reference-since-mathcomp-2.3.0,-abstract-large-number,-deprecated-syntactic-definition
 -Q . Decoder
 -Q ../../pure-rocq Utf8
+-Q ../determinism Determinism
+-Q ../symexec SymExec
 Module.v
 Binary.v
-Steps.v
-Control.v
-Wp.v
-Mem.v
-WpMem.v
 Instance.v
+DetInstance.v
 Boundary.v
+OutBound.v
+NonVacuity.v
 Repr.v
 Exports.v
 Decode.v
+StepEmpty.v
+StepPending.v
+StepComplete.v
+StepSpec.v
 Theorems.v

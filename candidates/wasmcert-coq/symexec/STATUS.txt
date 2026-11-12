@@ -1,0 +1,42 @@
+STATUS (symexec: reusable symbolic execution for WasmCert-Coq 2.2.1; Rocq 9.2.0)
+Created 2026-11-12 by the improvement pass: these files were in ../decoder (Steps.v,
+Control.v, Wp.v, Mem.v, WpMem.v) or spread over the decoder's case files (the i32
+lemmas, now I32.v).  Nothing in them mentions the decoder; they depend only on the
+installed coq-wasm (and its mathcomp / CompCert).  Logical path: SymExec
+(-Q ../symexec SymExec).  No Admitted/admit/Axiom/Parameter; everything is proved from
+WasmCert-Coq's small-step relation [reduce].  Build: make (about 5 s); ../decoder/check.sh
+rebuilds it from clean, greps it for holes and re-checks it with rocqchk.
+
+WHAT A SECOND VERIFIED MODULE WOULD REUSE
+  This library (how code runs) and ../determinism (that a returning call has no other
+  outcome) are the module-independent parts.  A new module needs its own Module.v,
+  Instance.v (instantiation by computation), DetInstance.v (its bodies are in the
+  determinism fragment, by computation), a boundary file, and per-function proofs
+  written with wp / wp_step below.
+
+FILES (in dependency order)
+  Steps.v   steps (reduce_trans at a fixed host state) and lifting through contexts,
+            labels, frames; exec s f stk bes s' f' stk' (basic instructions complete
+            normally; stacks TOP FIRST); instruction rules exec_const, exec_local_get /
+            _set, exec_binop, exec_relop, exec_testop_i32, exec_load_packed,
+            exec_store_packed; branches exec_br, exec_br_if_true / _false, exec_br_br,
+            exec_then_br, exec_br_prefix; block_loop_rule (an invariant rule for
+            block (loop body) with empty block types); invoke_rule (native function
+            call with locals).
+  Control.v exec_block_gen / _none / _one, exec_if_branch / _true / _false: block and
+            if whose bodies complete normally.
+  Wp.v      wp hs s f stk bes Q (weakest precondition over exec), wp_nil, wp_cons,
+            wp_app, wp_mono, wp_if, wp_if1; tactic wp_step (one instruction of
+            straight-line code; repeat wp_step runs a block).
+  Mem.v     store16_spec (a 16-bit little-endian store: its two bytes, everything
+            else unchanged, same length), lo_byte, hi_byte, mem_update_gen_length.
+  WpMem.v   upd_mem0 (replace memory 0), store16_post, wp_store16, wp_store16_eq.
+  I32.v     i32 arithmetic on values in [0, 2^32): comparisons (ltu_val, leu_val,
+            geu_val, eq_val), add/sub/or/shl/shr_u/and as Z arithmetic, bit-field
+            packing (Z_lor_disjoint, lor_pack, lor_mid), modulus_val, small.
+
+LIMITS (what a further pass could add)
+  - Only the instruction forms the decoder uses have rules (i32 only, packed 8-bit
+    load, 16-bit store, block/loop/if with empty or one-result types, br / br_if).
+  - Proofs written with wp_step follow the code instruction by instruction, so they
+    are tied to the exact instruction sequence (see ../decoder/IMPROVEMENT.txt).

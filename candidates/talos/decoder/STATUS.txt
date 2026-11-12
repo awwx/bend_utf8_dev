@@ -1,84 +1,208 @@
-STATUS of candidates/talos/decoder (Talos candidate, 60-minute time box)
+STATUS of candidates/talos/decoder (Talos candidate)
+
+SUMMARY (2026-11-12, second session)
+  COMPLETE.  The top-level claim Utf8Boundary.ShippedModuleCorrect
+  (Boundary.lean, hash-pinned; strengthened 2026-11-12, see AUDIT FIX below) is proved as
+  Utf8Wasm.shippedModuleCorrect (ProofMain.lean), with exactly the Boundary type
+  (check.sh elaborates `example : Utf8Boundary.ShippedModuleCorrect :=
+  Utf8Wasm.shippedModuleCorrect`) and axioms exactly [propext, Classical.choice,
+  Quot.sound] (compared by check.sh).  No sorry, no new axioms, no native_decide,
+  no bv_decide.  check.sh ends with an unqualified "PASS:" line.
+  Non-vacuity (third session, 2026-11-12): the second pinned claim
+  Utf8Boundary.ShippedWrapperCovered (every call the shipped wrapper makes meets
+  every condition of the guarantees, on the module's real 160-page memory) is
+  proved as Utf8Wasm.shippedWrapperCovered (ProofWrapper.lean); check.sh ties
+  Boundary's layout constants to decoder.mjs and the module text.  See
+  NON-VACUITY below.
+  First session: 42 min (all Wasm-semantics work).  Second session: about 13 min
+  of proof work for everything below marked (new).
 
 RUNNING IMPLEMENTATION
   decoder.wat -> decoder.wasm (880 bytes, Wasm 1.0 + multi-value results, linear
   memory only).  decoder.mjs passes the full difftest harness
-  (node ../../difftest/run.mjs decoder.mjs: P1/P2/P3 PASS, about 2 minutes).
+  (node ../../difftest/run.mjs decoder.mjs: P1/P2/P3 PASS).  Not changed.
 
 BOUNDARY STATEMENT
   Boundary.lean: textBytes (u32le layout), bytesAt, sameOutside, storeWith
   (initial store = Talos initialStore with arbitrary memory, pages <= 65536),
   Calls, StartOk / BufferOk / DoneOk, Realizes, ShippedModuleCorrect.
-  Not changed during the work.  One known issue: BufferLayout allows the output
-  area to end exactly at 2^32 (only possible with 65536 pages); the loop proof
-  below assumes out + 8*len < 2^32.  Either prove the wrap-around case (the
-  claim stays true because UInt32.ofNat wraps the same way) or tighten
-  BufferLayout to `< 2^32` and record it.
+  Not changed in either proof session; ShippedModuleCorrect strengthened
+  afterwards (AUDIT FIX below).
 
-PROVED (no sorry, axioms propext / Classical.choice / Quot.sound; see Axioms.lean)
+  The 2^32 edge (resolved, statement proved as written): BufferLayout allows the
+  output area [out, out + 8*len) to end exactly at 2^32 (only with 65536 pages).
+  The statement is TRUE there and is proved as written.  Reason: every byte
+  written lies below out + 4*|t| <= 2^32, so no store address wraps; only the
+  pointer after the last code point can wrap (to 0), and Boundary states the
+  returned end as UInt32.ofNat (out + 4*|t|), which wraps identically
+  (endAddr_eq).  The first session's loop proof needed out + 8*len < 2^32 only
+  because it computed the end pointer's toNat after the last byte; loop_correct
+  now handles the last byte separately, and that hypothesis was removed from
+  loop_correct and buffer_runs (a strengthening; check.expected.txt updated).
+  decode_done at out = 2^32 - 4 is covered the same way.
+
+PROVED
+  First session (unchanged):
   - decoderModule_decodes: Talos's decodeForVerification on the printed text of
     the shipped bytes = the literal `decoderModule` (kernel `cbv`).
-  - start_ok: decode_start_state returns 0 (= enc []), store unchanged.  This is
-    already exactly Boundary's StartOk shape with R := Rel.
+  - start_ok: decode_start_state returns 0 (= enc []), store unchanged.
   - done_runs: decode_done(v, out): v = 0 -> returns out, store unchanged;
     v != 0 -> writes 0xFFFD (write32) at out, returns 4 + out.
-  - buffer_runs: decode_buffer(v, inp, len, out), under the layout contract
-    (plus out + 8*len < 2^32), terminates without trapping and returns
-    (runM ...).1 / .2.1 with final store storeWith (runM ...).2.2, where runM is
-    a Wasm-level model: a left fold over bytesAt mem inp len of stepM.
-  - Call lemmas (any caller context) for every function: call_cont,
-    call_second, call_vs, call_vsp, call_cp (pure helpers, against Bool/UInt32
-    models contB, secondB, vsB, vspB, cpV), call_step0 / call_step ($step with
-    its memory writes, against stepM / writeCps / endAddr), loop_correct.
-  - stepM_nil (ProofModel.lean): the per-byte refinement for the empty-pending
-    case:  stepM 0 x.toUInt32 = (enc (step [] x).1, (step [] x).2).
-    Also in ProofModel.lean: or_shl_toNat (packing as a Nat sum), bytes_of_toNat
-    (by1..by4 extract the bytes of a packed word), contB_eq (= isCont),
-    secondB_eq (= secondOk): the byte-level lemmas the other cases need.
+  - Call lemmas for every function (call_cont, call_second, call_vs, call_vsp,
+    call_cp, call_step0, call_step); loop_correct; buffer_runs (decode_buffer
+    against runM, the fold of the per-byte Wasm model stepM).
+  - stepM_nil (empty-pending refinement); or_shl_toNat, bytes_of_toNat, contB_eq,
+    secondB_eq (ProofModel.lean).
+  Changed (strengthened):
+  - loop_correct, buffer_runs: hypothesis out + 8*len < 2^32 dropped (new).
+  New, ProofRefine.lean (per-byte refinement, pure Lean):
+  - enc_toNat, qOf_enc, nOf_enc: packed state / packed sequence as numbers
+    (packN = little-endian base-256 value).
+  - packed_seq: vsB/vspB/cpV on a packed 1..4-byte list = isVS/isVSP/cpOf.
+  - stepM_enc: stepM (enc p) x = (enc (step p x).1, (step p x).2) for |p| <= 3.
+  - step_length: (step p x).1.length <= 3 for |p| <= 3 (now in the pure
+    layer, Utf8StepFacts.lean).
+  New, ProofMain.lean (layout, whole buffer, assembly):
+  - writeCps_bytes / writeCps_outside (allowing out + 4*|cs| = 2^32),
+    endAddr_eq, writeCps_append, endAddr_append, write32_bytes, bytesAt_add.
+  - decodeBuffer_bounds: |state| <= 3, |text| <= 2*|bytes| (now in the pure
+    layer, Utf8StepFacts.lean).
+  - runM_enc: runM (enc p) out mem bs = (enc s', endAddr out t, writeCps mem out t)
+    with (s', t) = decodeBuffer p bs.
+  - start_ok', buffer_ok, done_ok: Boundary's StartOk/BufferOk/DoneOk for
+    decoderModule, RefDecoder, R := Rel.
+  - shippedModuleCorrect : Utf8Boundary.ShippedModuleCorrect.
   - Imported unmodified: Utf8Pure.RefDecoder_correct.
 
-NOT PROVED (exact missing statements)
-  1. Model refinement (pure, no Wasm):
-       for p : List UInt8 with 1 <= p.length <= 3 and b : UInt8 (p = [] is done),
-         stepM (enc p) b.toUInt32 = (enc (step p b).1, (step p b).2)
-       and (step p b).1.length <= 3.
-     Still needs: (qOf (enc p) b).toNat and (enc p).toNat as Nat sums (from
-     or_shl_toNat), nOf (enc p) = p.length, the new-state equation
-     q ||| (m <<< 24) = enc (p ++ [b]), and vsB/vspB/cpV of a packed word =
-     isVS/isVSP/cpOf for lengths 2..4 (bytes_of_toNat + secondB_eq + contB_eq
-     reduce these to Bool goals over byte ranges, which still need closing);
-     then the case analysis of step as in stepM_nil.
-  2. runM v out mem bs = (enc s', endAddr out t, writeCps mem out t) where
-     (s', t) = decodeBuffer s bs and v = enc s  (induction using 1);
-     endAddr out t = ofNat (out + 4*|t|) (have endAddr_toNat);
-     bytesAt (writeCps mem out t) out (4*|t|) = textBytes t and
-     sameOutside mem (writeCps mem out t) out (4*|t|)  (write32 lemmas);
-     t.length <= 2 * bs.length  (from stepM_len, already proved).
-  3. decode_done: enc s = 0 <-> s = [] (enc_eq_zero, proved) and the write32 layout
-     lemma, to get DoneOk.
-  4. Assembly: Realizes decoderModule RefDecoder with R := Rel, the 2^32 edge case
-     (see above), then ShippedModuleCorrect by rewriting with
-     decoderModule_decodes and RefDecoder_correct.
+NOT PROVED
+  Nothing inside the claim.  Outside it (trusted, see REPORT.txt section 2):
+  wasm-tools print, the meaning of Talos's WAT decoder and semantics,
+  instantiation and validation (not modelled by Talos), the JS wrapper.
 
-NEXT STEPS
-  1 (bit/byte lemmas), then 2-4 in that order.  No further Wasm-semantics work is
-  needed: everything left is pure Lean about UInt32/UInt8/Mem.write32.
+PURE-LAYER LEMMAS (2026-11-12): ProofPureExtras.lean's isVSP4, step_length,
+step_text_length and decodeBuffer_bounds moved to candidates/pure-lean/
+Utf8StepFacts.lean (namespace Utf8Pure, same statements; decodeBuffer_bounds
+is now derived from the general decodeBuffer_count_bound).  ProofPureExtras.lean
+is gone; ProofRefine imports Utf8StepFacts (copy in this directory).
 
-ESTIMATE OF REMAINING WORK
-  About 1.5-2.5 hours for an agent: 1 is the bulk (vsB/vspB/cpV of a packed
-  word = isVS/isVSP/cpOf for lengths 2..4 -- a draft got down to closing Bool
-  goals over byte ranges, where `decide +revert` / generalize tactics fought
-  me; then the three non-empty pending cases of stepM), 2-3 about 45 minutes,
-  4 about 15 minutes.
+CHECK
+  ./check.sh from a clean build directory: 2 min 06 s wall (contended machine,
+  8 vCPU, other agents running), of which Lean about 95 s (ProofFuncs 47 s,
+  ProofStep 18 s, DecoderModule 15 s; ProofRefine 1 s, ProofMain 1 s; the pure
+  layer 6 s) and difftest about 32 s.  Final line:
+  PASS: Utf8Boundary.ShippedModuleCorrect proved (Utf8Wasm.shippedModuleCorrect,
+  exact Boundary type, axioms [propext, Classical.choice, Quot.sound]); shipped
+  wasm = rebuild, printed text matches, clean build, Talos at pinned commit,
+  kernel replay of 11635 constants OK, difftest PASS
+  Third session (non-vacuity), clean build: 3 min 49 s wall (replay 129 s of
+  11,652 constants, ProofWrapper 1 s, difftest 34 s); final line:
+  PASS: Utf8Boundary.ShippedModuleCorrect proved (Utf8Wasm.shippedModuleCorrect)
+  and non-vacuity Utf8Boundary.ShippedWrapperCovered proved
+  (Utf8Wasm.shippedWrapperCovered: every call the wrapper makes meets the
+  guarantees' conditions), exact Boundary types, axioms [propext,
+  Classical.choice, Quot.sound]; wrapper layout constants and memory size =
+  Boundary's; shipped wasm = rebuild, printed text matches, clean build, Talos
+  at pinned commit, kernel replay of 11652 constants OK, difftest PASS
+  (Line above as of 2026-11-12 after the audit fixes; the run of 2026-11-12 after the
+  AUDIT FIX below took 3 min 41 s wall from a clean build, replay included.)
+
+AUDIT FIX (2026-11-12): AUDIT.txt finding M2 resolved
+  M2 said ShippedModuleCorrect, an implication `∀ m, decodeForVerification
+  printedWat = .ok m → ∃ D, D.Correct ∧ Realizes m D`, would be vacuously true
+  read alone if Talos's decoder rejected the text.  Boundary.lean now states
+  `∃ m, decodeForVerification printedWat = .ok m ∧ ∃ D, D.Correct ∧ Realizes m D`
+  (same name; header comment and docstring updated), so the reviewed file
+  carries the decoding claim itself.  New pinned hash
+  a24de03cc09cb18e2b9b9d22ec48efa59a123d98e5c76890c99ff80acd83dbbc.
+  ProofMain.lean: shippedModuleCorrect now supplies decoderModule and
+  decoderModule_decodes as witnesses; ShippedModuleCorrect_v1 keeps the old
+  statement's text and shippedModuleCorrect_implies_v1 proves new -> old
+  (decoding is a function, so the decoded module is unique).  check.sh pins
+  the implication's type, axioms and the text of ShippedModuleCorrect_v1
+  (check.expected.txt extended).  With the old Boundary.lean restored, check.sh
+  fails at the hash pin ("Boundary.lean differs from the reviewed version").
+
+NON-VACUITY (2026-11-12, third session): Utf8Boundary.ShippedWrapperCovered
+  Why: a sibling candidate's fully proved claim had unsatisfiable call
+  conditions for the real module (wasmcert-coq AUDIT.txt, "Critical finding").
+  The Talos audit had judged by reading that decoder.mjs meets the conditions;
+  this is now a theorem.
+  Conditions the guarantees place on a call (found by reading Boundary.lean):
+    decode_start_state: memory pages <= 65536.
+    decode_buffer(v, inp, len, out): R s v; pages <= 65536; inp + len <= out;
+      out + 8*len <= pages*65536 (BufferLayout).  No 2^32 condition beyond these.
+    decode_done(v, out): R s v; pages <= 65536; out + 4 <= pages*65536.
+  What the wrapper does: inp = 0, len <= 2^20 (chunks), out = 2^20 for both
+  decode_buffer and decode_done; memory 160 pages (10 MiB), never grown (the
+  wrapper never calls grow, the module has no memory.grow); host writes only
+  bytes [0, len).  Largest output end 9 MiB <= 10 MiB.  Nothing vacuous found.
+  Chaining: Realizes is already phrased so that call N+1's conditions follow
+  from call N's conclusions: StartOk concludes R D.start v, BufferOk concludes
+  R s' v' (decode_done does not change the state value, the wrapper keeps it),
+  and every guarantee ends in storeWith m mem' with sameOutside (same page
+  count).  So the base case plus "same page count is kept" suffice.
+  Boundary.lean (new section, new hash 9058323c...): constants
+  wrapperInputAddr = 0, wrapperMaxChunk = 1048576, wrapperOutputAddr = 1048576,
+  shippedMemoryPages = 160; WrapperMem mem := mem.pages = shippedMemoryPages;
+  WrapperCallsCovered m := initial store's memory is WrapperMem ∧ storeWith m
+  (initial mem) = initialStore ∧ input area before output area ∧ largest output
+  area inside memory ∧ for every WrapperMem memory: StartOk's, BufferLayout (every
+  len <= max chunk, wrapper addresses) and DoneOk's memory conditions ∧
+  sameOutside keeps WrapperMem.  ShippedWrapperCovered := ∃ m, decode printedWat
+  = .ok m ∧ WrapperCallsCovered m (second top-level claim; ShippedModuleCorrect
+  unchanged).
+  ProofWrapper.lean (40 lines): decoderModule_pages (rfl on the decoded module),
+  wrapperCallsCovered, shippedWrapperCovered.  check.sh: exact-type and axiom
+  check of the new theorem, kernel replay checks its type, both pinned in
+  check.expected.txt (decoderModule_pages / wrapperCallsCovered use only
+  [propext, Quot.sound]); a new step compares the three "// LAYOUT" lines of
+  decoder.mjs and the "(memory (;0;) N)" line of decoder.printed.wat with
+  Boundary's constants and rejects memory.grow in the module.  decoder.mjs:
+  constants written as decimal literals on marked lines (1 << 20 = 1048576, OUT
+  was CHUNK); behaviour unchanged, difftest PASS.
+  Mutations (scratch copies): wrapperOutputAddr := 2097153 in Boundary (output
+  area 1 byte past memory) -> ProofWrapper fails (decide); module memory 160 ->
+  144 pages in decoder.printed.wat -> decoderModule_pages fails (rfl);
+  decoder.mjs OUT = 1048580 -> layout step FAIL; CHUNK = 1 << 20 (non-literal)
+  -> FAIL; LAYOUT marker removed -> FAIL; module text 144 pages -> layout step
+  FAIL as well.
+  Not covered by the theorem (checked by reading): that decoder.mjs actually uses
+  IN/CHUNK/OUT as described, never grows memory, and passes back only state
+  values the module returned.
+
+IMPROVEMENT PASS (2026-11-12, 03:34-04:03; details in IMPROVEMENT.txt)
+  Same theorems and statements (check.expected.txt unchanged).  Candidate's
+  Lean CPU 94 s -> 34 s (72 s -> 13 s without DecoderModule's unchanged
+  kernel decode); ProofFuncs 47 -> 2.7 s, ProofStep 17 -> 2.1 s.  Causes: a
+  quadratic `repeat (any_goals ...)` driver, trial-and-error instruction
+  rules (20-30 ms per failed attempt), and unevaluated local-variable lists
+  re-evaluated by every local.get.  No maxHeartbeats override left (was 0 in
+  four files).  Audit mutation m07, which hung for 17 min, now fails in 10 s
+  (the hang was an unbounded defeq check in the final `Reach.refl` on the
+  wrong path); h01 (and-operand swap) now needs no proof edit.  New files
+  ProofLayout.lean, ProofPureExtras.lean; duplicates and dead code removed.
+  check.sh from a clean build: PASS, 2 min 47 s wall (contended), kernel
+  replay of 11644 constants 128 s.
+
+NEXT STEPS (suggested, not done)
+  - Independent audit (HANDOVER section 7 item 4): rerun from a clean copy, read
+    Boundary.lean as a hostile reviewer, mutation tests on decoder.wat.
 
 FILES
   decoder.wat decoder.wasm decoder.printed.wat decoder.mjs   implementation
   Boundary.lean                                              reviewable statement
   DecoderModule.lean  module literal + kernel decode theorem
-  ProofMach.lean      Reach, wstep/wauto/wcalls symbolic execution machinery
+  ProofMach.lean      Reach; wstep/wcall/wlocals/wauto/wfinish symbolic execution;
+                      header has the file map and what a decoder.wat edit requires
   ProofFuncs.lean     helper call lemmas     ProofStep.lean  $step call lemma
+  ProofLayout.lean    writeCps / endAddr / bytesAt memory layout (improvement pass)
   ProofLoop.lean      loop                   ProofBuffer.lean decode_buffer export
   ProofDone.lean      enc / Rel, decode_start_state, decode_done
-  ProofModel.lean     model refinement (empty-pending case only)
+  ProofModel.lean     empty-pending refinement + byte-level lemmas
+  ProofRefine.lean    per-byte refinement stepM_enc
+  ProofMain.lean      runM_enc, exports, shippedModuleCorrect
+  ProofWrapper.lean   non-vacuity: shippedWrapperCovered (third session)
   Axioms.lean         #print axioms          check.sh        full re-check
+  check.expected.txt  recorded #check / #print axioms output of intermediate results
+  IMPROVEMENT.txt     improvement pass: profile, changes, before/after
   Utf8*.lean          byte-identical copies of spec-lean / pure-lean
