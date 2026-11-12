@@ -20,6 +20,7 @@ EXPORTED DEFINITIONS (Utf8Ref.lean; stable)
   Pending   state invariant
  (Utf8Bits.lean) enc32, encoding_eq : encoding cp = if cp.toNat < 0x200000 then some (enc32 cp) else none
  (Utf8Table.lean) completion (bytes completing a pending state)
+ Each file's header lists its own exports.
 
 SPEC LAWS (each `<law>_proved : <law>`)
   bit8_value_sum_proved bit8_value_word_proved u32_byte4_bits_proved
@@ -39,7 +40,7 @@ SUPPORTING LEMMAS
            isVS_iff (is_valid_sequence), isVSP_iff (is_valid_sequence_prefix),
            encodes_one/two/three/four (ranges + shift/mask value per length),
            is_unicode_scalar_iff (toNat form), cpOf_one..four (toNat form),
-           secondOk_iff, isCont_iff, isLead1..4_iff, isVS_isVSP, isVSP_prefix, isVS_not_proper,
+           secondOk_iff, isCont_iff, isLead1..4_iff, lead1_not..lead3_not, isVS_isVSP, isVSP_prefix, isVS_not_proper,
            isVSP_of_isVS_append, isVSP_extends, completion_spec, isVS_length
   step:    step_nil, step_complete, step_extend, step_bad_fresh,
            step_bad_pending, decodeBuffer_nil, decodeBuffer_cons,
@@ -56,6 +57,8 @@ native code.  Axioms: at most propext, Classical.choice, Quot.sound.
 Arithmetic bridges: Utf8Bits one/two/three/four_shape (tuple-of-bools shapes
 -> Nat arithmetic on cp.toNat), Utf8Table cpOf_one/two/three/four
 (shift/mask cpOf -> Nat arithmetic), secondOk_iff, isLead*_iff, isCont_iff.
+CHECK TIME: about 6 s per Lean version for the whole layer (was 57 s); see
+IMPROVEMENT.txt for what made the first version slow.
 -/
 import Utf8Table
 
@@ -338,7 +341,7 @@ theorem run_decodes (bytes : List UInt8) : ∀ p, Pending p →
     simp only [run, step]
     have hq : p ++ b :: r = (p ++ [b]) ++ r := by simp
     by_cases h1 : isVS (p ++ [b]) = true
-    · simp only [h1, ↓reduceIte, List.singleton_append, List.cons_append]
+    · simp only [h1, ↓reduceIte, List.cons_append]
       rw [hq]
       exact decodes_cons _ _ _ r (df_scalar _ r h1) (ih [] (Or.inl rfl))
     by_cases h2 : isVSP (p ++ [b]) = true

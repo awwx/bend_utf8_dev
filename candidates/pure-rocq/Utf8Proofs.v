@@ -1,24 +1,29 @@
 (* Utf8Proofs.v: proofs of the laws of Utf8Laws.v and of RefDecoder_correct.
 
-   Exported for downstream use (see also Utf8Ref.v for the definitions
-   RefDecoder, step, step_empty, State, vp, vs, seq_value, seq_cp, bN,
-   seq_len, lo2, hi2, is_cont, second_ok):
+   Re-exports Utf8Bridge.v (U32/N bridge, byte-range table lemmas,
+   encodes_iff, seq_cp_value, seq_value_scalar, pending_completion; see
+   its header), so downstream files need only import Utf8Ref and this.
+   Definitions (RefDecoder, step, step_empty, step_acc, State, vp, vs,
+   seq_value, seq_cp, bN, seq_len, lo2, hi2, is_cont, second_ok, FFFD) are
+   in Utf8Ref.v.
 
+   Exported here:
    - <law>_proved : <law>   for each spec-internal law of Utf8Laws.v
    - RefDecoder_correct : Decoder_correct RefDecoder
-   - encodes_iff : encodes s cp <-> vs s = true /\ cp = seq_cp s
-   - valid_sequence_iff : is_valid_sequence s <-> vs s = true
-   - valid_sequence_prefix_iff : is_valid_sequence_prefix s <-> vp s = true
-   - seq_cp_value : vs s = true -> U32_to_N (seq_cp s) = seq_value s
-   - seq_value_scalar : vs s = true -> seq_value s <= 0x10FFFF /\ not surrogate
-   - run, run_app, ref_decode_buffer_run, step_inv, Inv (state invariant)
-   - step_output_ok : every code point output by step is a scalar or U+FFFD
-   - byte-range equations: see section "Range lemmas" at the end. *)
+     (RefDecoder_decodes, RefDecoder_safe, RefDecoder_prompt)
+   - valid_sequence_iff, valid_sequence_prefix_iff, encodes_vs, vs_encodes
+   - Inv (state invariant), step_inv, run_inv, Inv_len (at most 3 bytes)
+   - run, run_app, ref_decode_buffer_run, feed_run, step_dec, run_dec
+     (refinement core: decodes (st ++ bytes ++ rest) ...)
+   - step_output_ok, ref_done_output_ok: every output is U+FFFD or a scalar
+   - seq_cp_value1..4 (value of the decoded code point from the bytes),
+     step_empty_ascii, step_empty_lead, step_empty_bad, step_pending *)
 
 From Stdlib Require Import List NArith Arith Bool Lia.
 From Stdlib Require Strings.Byte Strings.Ascii.
 Import Corelib.Init.Byte ListNotations.
-From Utf8 Require Import Utf8Laws Utf8Ref Utf8Check.
+From Utf8 Require Import Utf8Laws Utf8Ref.
+From Utf8 Require Export Utf8Bridge.
 
 Local Open Scope N_scope.
 
@@ -36,118 +41,18 @@ Proof. unfold u32_byte4_bits; intros; reflexivity. Qed.
 Theorem is_surrogate_code_point_examples_proved : is_surrogate_code_point_examples.
 Proof. vm_compute. repeat split. Qed.
 
-(** * U32 round trip *)
-
-Lemma tb0 b x : N.testbit (N.b2n b + 2 * x) 0 = b.
-Proof.
-  destruct b; simpl N.b2n;
-    [rewrite N.add_comm; apply N.testbit_odd_0|rewrite N.add_0_l; apply N.testbit_even_0].
-Qed.
-
-Lemma tbS b x p : N.testbit (N.b2n b + 2 * x) (N.pos p) = N.testbit x (Pos.pred_N p).
-Proof.
-  rewrite <- (N.succ_pos_pred p) at 1.
-  destruct b; simpl N.b2n;
-    [rewrite N.add_comm; apply N.testbit_odd_succ|rewrite N.add_0_l; apply N.testbit_even_succ]; lia.
-Qed.
-
-Lemma tb_last b : N.testbit (N.b2n b) 0 = b.
-Proof. destruct b; reflexivity. Qed.
-
-(* ~8 s: 528 rewrites. *)
-Lemma U32_of_to x : U32_of_N (U32_to_N x) = x.
-Proof.
-  destruct x; unfold U32_to_N, U32_of_N.
-  repeat (first [rewrite tb0 | rewrite tbS]; cbv [Pos.pred_N Pos.pred_double]).
-  rewrite !tb_last. reflexivity.
-Qed.
-
-Lemma U32_to_N_inj x y : U32_to_N x = U32_to_N y -> x = y.
-Proof. intros H; rewrite <- (U32_of_to x), <- (U32_of_to y), H; reflexivity. Qed.
-
-Lemma scalar_bounds cp :
-  is_unicode_scalar cp = true -> U32_to_N cp <= 0x10FFFF /\ is_surr_N (U32_to_N cp) = false.
-Proof.
-  unfold is_unicode_scalar, is_surrogate_code_point, U32_is_ge, U32_is_le.
-  assert (E1 : U32_to_N (U32_of_N 0) = 0) by reflexivity.
-  assert (E2 : U32_to_N (U32_of_N 0x10FFFF) = 0x10FFFF) by reflexivity.
-  assert (E3 : U32_to_N (U32_of_N 0xD800) = 0xD800) by reflexivity.
-  assert (E4 : U32_to_N (U32_of_N 0xDFFF) = 0xDFFF) by reflexivity.
-  rewrite E1, E2, E3, E4. unfold is_surr_N.
-  intros H; repeat rewrite andb_true_iff in H. destruct H as [[_ H1] H2].
-  apply N.leb_le in H1. split; auto. apply negb_true_iff in H2.
-  rewrite <- H2; f_equal.
-Qed.
-
-(** * Valid sequences: central characterization *)
-
-Lemma vs_vp s : vs s = true -> vp s = true.
-Proof. unfold vs; intros H; apply andb_true_iff in H; tauto. Qed.
-
-Lemma vs_nil : vs [] = false.
-Proof. reflexivity. Qed.
+(** * Valid sequences: consequences of encodes_iff (Utf8Bridge.v) *)
 
 Lemma encodes_vs s cp : encodes s cp -> vs s = true /\ cp = seq_cp s.
-Proof.
-  intros [Hsc Hen]. destruct (scalar_bounds _ Hsc) as [Hb Hs].
-  rewrite <- (U32_of_to cp) in Hen.
-  destruct (checkA _ Hb Hs) as (_ & He & Hv & Hval & _).
-  rewrite He in Hen; injection Hen as <-. split; auto.
-  unfold seq_cp; rewrite Hval; symmetry; apply U32_of_to.
-Qed.
-
-Lemma vs_fB s : vs s = true ->
-  scalarN (seq_value s) = true /\ enc_N (seq_value s) = s.
-Proof.
-  intros H. pose proof (checkB s (vs_vp s H)) as HB. unfold fB in HB.
-  rewrite H in HB; cbn [implb negb andb] in HB. apply andb_true_iff in HB as [HB _].
-  apply andb_true_iff in HB as [H1 H2]. split; auto. apply bytes_eqb_eq; auto.
-Qed.
-
-Lemma seq_value_scalar s : vs s = true ->
-  seq_value s <= 0x10FFFF /\ ~ (0xD800 <= seq_value s <= 0xDFFF).
-Proof.
-  intros H; destruct (vs_fB s H) as [H1 _]. unfold scalarN, is_surr_N in H1.
-  apply andb_true_iff in H1 as [H1 H2]. apply N.leb_le in H1. split; auto.
-  apply negb_true_iff in H2. intros [A B].
-  apply N.leb_le in A; apply N.leb_le in B. rewrite A, B in H2; discriminate.
-Qed.
+Proof. apply encodes_iff. Qed.
 
 Lemma vs_encodes s : vs s = true -> encodes s (seq_cp s).
-Proof.
-  intros H; destruct (vs_fB s H) as [H1 H2].
-  unfold scalarN in H1; apply andb_true_iff in H1 as [H1 H3].
-  apply N.leb_le in H1; apply negb_true_iff in H3.
-  destruct (checkA _ H1 H3) as (Hs & He & _).
-  split; unfold seq_cp; auto. rewrite He, H2; reflexivity.
-Qed.
-
-Lemma seq_cp_value s : vs s = true -> U32_to_N (seq_cp s) = seq_value s.
-Proof.
-  intros H; destruct (vs_fB s H) as [H1 _].
-  unfold scalarN in H1; apply andb_true_iff in H1 as [H1 H3].
-  apply N.leb_le in H1; apply negb_true_iff in H3.
-  destruct (checkA _ H1 H3) as (_ & _ & _ & _ & E); exact E.
-Qed.
-
-Theorem encodes_iff s cp : encodes s cp <-> vs s = true /\ cp = seq_cp s.
-Proof.
-  split; [apply encodes_vs|]. intros [H ->]; apply vs_encodes; auto.
-Qed.
+Proof. intros H; apply encodes_iff; auto. Qed.
 
 Theorem valid_sequence_iff s : is_valid_sequence s <-> vs s = true.
 Proof.
   split; [intros [cp H]; apply (encodes_vs _ _ H)|].
   intros H; exists (seq_cp s); apply vs_encodes; auto.
-Qed.
-
-Lemma pending_completion s : vp s = true -> vs s = false ->
-  vs (s ++ completion s) = true /\ seq_value (s ++ completion s) <> 0xFFFD.
-Proof.
-  intros H1 H2. pose proof (checkB s H1) as HB. unfold fB in HB.
-  rewrite H2 in HB; cbn [implb negb andb] in HB.
-  apply andb_true_iff in HB as [A B]. split; auto.
-  apply negb_true_iff in B. intros E; rewrite E in B; discriminate.
 Qed.
 
 Theorem valid_sequence_prefix_iff s : is_valid_sequence_prefix s <-> vp s = true.
@@ -159,14 +64,6 @@ Proof.
     destruct (vs (b1 :: m)) eqn:E.
     + exists []; rewrite app_nil_r; apply valid_sequence_iff; auto.
     + exists (completion (b1 :: m)); apply valid_sequence_iff, pending_completion; auto.
-Qed.
-
-Lemma vs_prefix_free s t : vs s = true -> vs (s ++ t) = true -> t = [].
-Proof.
-  destruct s as [|b1 m]; [discriminate|]. unfold vs.
-  intros H1 H2. apply andb_true_iff in H1 as [_ H1]. apply andb_true_iff in H2 as [_ H2].
-  cbn [app length] in H1, H2. apply Nat.eqb_eq in H1, H2. rewrite length_app in H2.
-  destruct t; auto. cbn [length] in *. lia.
 Qed.
 
 Lemma pending_no_valid_prefix st : vp st = true -> vs st = false ->
@@ -570,65 +467,6 @@ Proof.
   destruct st as [|b1 r]; [discriminate|].
   pose proof (vp_len_lead _ _ H1) as L. pose proof (seq_len_le4 (bN b1)).
   unfold vs in H2. rewrite H1 in H2. cbn [andb] in H2. apply Nat.eqb_neq in H2. lia.
-Qed.
-
-(* Lead-byte table. *)
-Lemma seq_len_cases n :
-  (n <= 0x7F /\ seq_len n = 1%nat) \/
-  (0xC2 <= n <= 0xDF /\ seq_len n = 2%nat) \/
-  (0xE0 <= n <= 0xEF /\ seq_len n = 3%nat) \/
-  (0xF0 <= n <= 0xF4 /\ seq_len n = 4%nat) \/
-  (((0x80 <= n <= 0xC1) \/ 0xF5 <= n) /\ seq_len n = 0%nat).
-Proof.
-  unfold seq_len.
-  destruct (N.leb_spec n 0x7F); [left; auto|].
-  destruct (N.leb_spec 0xC2 n), (N.leb_spec n 0xDF); cbn [andb];
-    try (right; left; split; [lia|reflexivity]);
-  destruct (N.leb_spec 0xE0 n), (N.leb_spec n 0xEF); cbn [andb];
-    try (right; right; left; split; [lia|reflexivity]);
-  destruct (N.leb_spec 0xF0 n), (N.leb_spec n 0xF4); cbn [andb];
-    try (right; right; right; left; split; [lia|reflexivity]);
-  right; right; right; right; split; auto; lia.
-Qed.
-
-Lemma vp_one b : vp [b] = (Nat.ltb 0 (seq_len (bN b))).
-Proof.
-  unfold vp. cbn [length]. destruct (seq_len (bN b)) as [|[|k]]; reflexivity.
-Qed.
-
-Lemma vp_one_iff b : vp [b] = true <-> bN b <= 0x7F \/ 0xC2 <= bN b <= 0xF4.
-Proof.
-  rewrite vp_one, Nat.ltb_lt. destruct (seq_len_cases (bN b)) as [[A ->]|[[A ->]|[[A ->]|[[A ->]|[A ->]]]]];
-    split; intros; try lia.
-Qed.
-
-Lemma vs_one_iff b : vs [b] = true <-> bN b <= 0x7F.
-Proof.
-  unfold vs. rewrite vp_one. cbn [length].
-  destruct (seq_len_cases (bN b)) as [[A ->]|[[A ->]|[[A ->]|[[A ->]|[A ->]]]]];
-    cbn; split; intros; try lia; try discriminate; auto.
-Qed.
-
-Lemma vp_cons2 b1 b2 r :
-  vp (b1 :: b2 :: r) = true <->
-  (2 + length r <= seq_len (bN b1))%nat /\
-  lo2 (bN b1) <= bN b2 <= hi2 (bN b1) /\
-  Forall (fun b => 0x80 <= bN b <= 0xBF) r.
-Proof.
-  unfold vp, second_ok, is_cont. cbn [length].
-  rewrite !andb_true_iff, Nat.ltb_lt, Nat.leb_le, !N.leb_le, forallb_forall, Forall_forall.
-  split.
-  - intros [[A B] [[C D] E]]. split; [lia|split; [lia|]]. intros x Hx.
-    specialize (E x Hx). apply andb_true_iff in E as [E1 E2]. apply N.leb_le in E1, E2; lia.
-  - intros [A [B C]]. split; [lia|split; [lia|]]. intros x Hx.
-    specialize (C x Hx). apply andb_true_iff; split; apply N.leb_le; lia.
-Qed.
-
-Lemma vs_vp_len s : vs s = true <-> vp s = true /\
-  match s with [] => False | b1 :: _ => length s = seq_len (bN b1) end.
-Proof.
-  unfold vs. destruct s as [|b1 r]; [cbn; split; [discriminate|tauto]|].
-  rewrite andb_true_iff, Nat.eqb_eq; tauto.
 Qed.
 
 (* Arithmetic value of the decoded code point (for shifts and masks). *)

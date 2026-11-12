@@ -1,0 +1,84 @@
+IMPROVEMENT PASS (2026-11-11, EC2 instance, Rocq 9.2.0, stdlib only)
+
+Goal: replace the brute-force vm_compute bridge (Utf8Check.v) between the
+32-boolean U32 of the spec and byte ranges by symbolic proofs, the way a
+skilled Rocq user would; cut check time, size, and improve structure.
+
+BEFORE / AFTER (per file; "before" = BASELINE-EC2.txt, make TIMED=1, uncontended;
+"after" = make TIMED=1 in the scratch copy while other agents were running, load
+average ~2.5 on 8 vCPU, so wall numbers are contended; CPU (user) is the fairer
+comparison.  An uncontended re-measurement is planned.)
+
+  file           before: wall / lines / lemmas      after: wall (user) / lines / lemmas
+  Utf8Laws.v     0.4 s  / 905 / -   (spec)           0.43 s (0.32)  / 905 / -   (unchanged)
+  Utf8Ref.v      0.2 s  / 124 / 0   (19 defs)        0.21 s (0.13)  / 124 / 0   (unchanged)
+  Utf8Check.v    508.9 s/ 224 / 20  (14 defs)        -- deleted --
+  Utf8Bridge.v   --                                  9.04 s (8.78)  / 370 / 34  (6 defs, 5 Ltac)
+  Utf8Proofs.v   6.3 s  / 673 / 82  (3 defs)         1.08 s (0.94)  / 511 / 62  (3 defs)
+  proof total    ~516 s / 1021 lines / 102 lemmas    ~10.8 s / 1005 lines / 96 lemmas
+  check.sh       8:40.5 wall, 520.5 s CPU            0:22.7 wall, 22.7 s CPU (21.8u+0.9s)
+                                                     (includes rocq makefile, hole grep,
+                                                     Print Assumptions; contended)
+  stub-build/    6 files (stub with the two         deleted (no longer needed)
+                 enumeration lemmas Admitted)
+
+  WasmCert-Coq decoder `make all` against the new layer: passes, 22.6 s wall
+  (baseline 21.5 s), wip/StepWIP.v also compiles.  Its Print Assumptions output
+  is unchanged (only WasmCert library axioms).
+
+  Axioms: none.  check.sh Print Assumptions: "Closed under the global context"
+  for all 15 <law>_proved, RefDecoder_correct, step_output_ok.
+
+WHAT REPLACED THE ENUMERATIONS
+  checkA (all 1,112,064 scalars: encoding of U32_of_N n, value round trip) and
+  checkB (all valid prefixes: value is a scalar, re-encodes, completion) are gone.
+  Utf8Bridge.v instead has a few central lemmas:
+  - U32_to_of : n < 2^32 -> U32_to_N (U32_of_N n) = n.  Via a helper
+      low_bits k j n (value of bits j..j+k-1) = (n / 2^j) mod 2^k, by induction
+      with N.div_pow2_bits, N.bit0_mod, N.Div0.mod_mul_r.  U32_to_N_inj by
+      peeling b2n b + 2 * x = b2n c + 2 * y 32 times; U32_of_to from those
+      (was 528 rewrites, 8 s; now 0.1 s).
+  - utf8_form s n : the UTF-8 layout of n (Unicode Table 3-6 as arithmetic: the
+      length chosen by the range of n, lead byte >= C0/E0/F0, continuation bytes
+      80..BF, n = ((b1 - lead) * 64 + (b2 - 0x80)) * 64 + ...).
+  - encoding_form cp : encoding cp is Some s with utf8_form s (U32_to_N cp), or
+      None and U32_to_N cp >= 0x200000.  Proof: split on exactly the bits the shape
+      patterns test, in the order the compiled matches test them (about 30 cases,
+      not 2^32), rewrite bytes by bN_bit8 (weighted bit sum), lia.  ~2 s.
+  - utf8_form_unique : a number has one layout.
+  - vs_form / form_vs : vs s = true iff s is the utf8_form of seq_value s and that
+      value is a scalar.  Case split on byte *classes* (seq_len_cases, lo2_hi2_cases),
+      then the mods in seq_value become subtractions (mod_offset) and lia closes it.
+  - encodes_iff (same statement as before) follows in a few lines;
+    pending_completion (same statement) by the same class split.
+  Utf8Proofs.v kept its structure (laws, step machine invariant, streaming laws,
+  downstream lemmas); the bridging section shrank to two corollaries of
+  encodes_iff, and the byte-table lemmas moved to Utf8Bridge.v (re-exported, so
+  downstream short names still resolve).
+
+NAMES PRESERVED
+  Every <law>_proved with exactly the spec proposition; RefDecoder,
+  RefDecoder_correct; Utf8Ref.v is byte-identical.  Names used by
+  ../wasmcert-coq/decoder and its wip/ (found by grepping identifiers):
+  RefDecoder, RefDecoder_correct, State, step, step_empty, step_acc,
+  ref_decode_buffer, ref_done, FFFD, Inv, Inv_len, step_inv -- all unchanged.
+  All downstream lemmas listed in the old STATUS (encodes_iff, valid_sequence_iff,
+  valid_sequence_prefix_iff, seq_cp_value(1..4), seq_value_scalar, seq_len_cases,
+  vp_one_iff, vs_one_iff, vp_cons2, vs_vp_len, step equations, Inv, run, ...)
+  keep name and statement (some moved from Utf8Proofs.v to Utf8Bridge.v).
+  Removed: only the enumeration machinery (list in STATUS.txt), none used
+  outside this directory.
+
+WHAT A FURTHER PASS COULD DO
+  - Utf8Bridge.v is 9 s; the big items are encoding_form (~2 s, lia per leaf with
+    N subtraction), form_vs / vs_form / pending_completion (~1.5 s each).  Stating
+    utf8_form without N subtraction (or with digits as separate variables) and
+    clearing irrelevant hypotheses before lia would likely halve it.
+  - utf8_form could replace the hand-written range table (seq_len/lo2/hi2) as the
+    single description of valid sequences, if downstream agreed; Utf8Ref.v was
+    kept byte-identical here because the WasmCert decoder unfolds its definitions.
+  - A machine-friendly state view (pending count, partial code point, next-byte
+    bounds) for the Wasm refinement is still not provided (as before).
+  - Suggested (not done, statement kept): seq_cp_value1..4 could be derived for
+    downstream directly from utf8_form (form_vs) in the linear "b - 0x80" form,
+    which matches shift-and-mask code better than the mod form.

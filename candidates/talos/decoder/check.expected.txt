@@ -1,0 +1,90 @@
+Utf8Wasm.decoderModule_decodes : Wasm.Decoder.Wat.decodeForVerification Utf8Wasm.printedWat =
+  Except.ok Utf8Wasm.decoderModule
+'Utf8Wasm.decoderModule_decodes' depends on axioms: [propext, Classical.choice, Quot.sound]
+Utf8Wasm.start_ok : ∀ (mem : Wasm.Mem),
+  mem.pages ≤ 65536 →
+    Utf8Boundary.Calls Utf8Wasm.decoderModule "decode_start_state" mem [] fun ws final =>
+      ∃ v, ws = [v] ∧ Utf8Wasm.Rel [] v ∧ final = Utf8Boundary.storeWith Utf8Wasm.decoderModule mem
+'Utf8Wasm.start_ok' depends on axioms: [propext, Classical.choice, Quot.sound]
+Utf8Wasm.done_runs : ∀ (mem : Wasm.Mem) (v out : UInt32),
+  out.toNat + 4 ≤ mem.pages * 65536 →
+    Utf8Boundary.Calls Utf8Wasm.decoderModule "decode_done" mem [v, out] fun ws final =>
+      (v = 0 → ws = [out] ∧ final = Utf8Boundary.storeWith Utf8Wasm.decoderModule mem) ∧
+        (v ≠ 0 → ws = [4 + out] ∧ final = Utf8Boundary.storeWith Utf8Wasm.decoderModule (mem.write32 out 65533))
+'Utf8Wasm.done_runs' depends on axioms: [propext, Classical.choice, Quot.sound]
+Utf8Wasm.buffer_runs : ∀ (mem : Wasm.Mem) (v inp len out : UInt32),
+  mem.pages ≤ 65536 →
+    inp.toNat + len.toNat ≤ out.toNat →
+      out.toNat + 8 * len.toNat ≤ mem.pages * 65536 →
+        out.toNat + 8 * len.toNat < 2 ^ 32 →
+          Utf8Boundary.Calls Utf8Wasm.decoderModule "decode_buffer" mem [v, inp, len, out] fun ws final =>
+            ws =
+                [(Utf8Wasm.runM v out mem (Utf8Boundary.bytesAt mem inp.toNat len.toNat)).fst,
+                  (Utf8Wasm.runM v out mem (Utf8Boundary.bytesAt mem inp.toNat len.toNat)).snd.fst] ∧
+              final =
+                Utf8Boundary.storeWith Utf8Wasm.decoderModule
+                  (Utf8Wasm.runM v out mem (Utf8Boundary.bytesAt mem inp.toNat len.toNat)).snd.snd
+'Utf8Wasm.buffer_runs' depends on axioms: [propext, Classical.choice, Quot.sound]
+@Utf8Wasm.call_step : ∀ {w : Wasm.Store Unit} {s b out : UInt32} {params lv values : List Wasm.Value}
+  {code : List Wasm.Instruction} {arity : Nat} {rem : List Wasm.Value} {controls : List Wasm.SmallStep.ControlFrame}
+  {calls : List Wasm.SmallStep.CallFrame},
+  w.mem.pages ≤ 65536 →
+    out.toNat + 8 ≤ w.mem.pages * 65536 →
+      Utf8Wasm.Reach
+        {
+          expr :=
+            Wasm.SmallStep.Expr.running
+              {
+                locals :=
+                  { params := params, locals := lv,
+                    values := Wasm.Value.i32 out :: Wasm.Value.i32 b :: Wasm.Value.i32 s :: values },
+                code := Wasm.Instruction.call 5 :: code, resultArity := arity, callerRemainder := rem,
+                control := controls, calls := calls },
+          store := { runtime := Utf8Wasm.rt0, wasm := w } }
+        {
+          expr :=
+            Wasm.SmallStep.Expr.running
+              {
+                locals :=
+                  { params := params, locals := lv,
+                    values :=
+                      Wasm.Value.i32 (Utf8Wasm.endAddr out (Utf8Wasm.stepM s b).snd) ::
+                        Wasm.Value.i32 (Utf8Wasm.stepM s b).fst :: values },
+                code := code, resultArity := arity, callerRemainder := rem, control := controls, calls := calls },
+          store :=
+            { runtime := Utf8Wasm.rt0,
+              wasm :=
+                { globals := w.globals, globalIds := w.globalIds, functionIds := w.functionIds,
+                  mem := Utf8Wasm.writeCps w.mem out (Utf8Wasm.stepM s b).snd, extraMems := w.extraMems,
+                  memoryCaps := w.memoryCaps, memoryIds := w.memoryIds, dataSegments := w.dataSegments,
+                  tables := w.tables, tableIds := w.tableIds, elementSegments := w.elementSegments,
+                  elementValues := w.elementValues, tagIds := w.tagIds, exns := w.exns, gcHeap := w.gcHeap,
+                  host := w.host } } }
+'Utf8Wasm.call_step' depends on axioms: [propext, Classical.choice, Quot.sound]
+Utf8Wasm.loop_correct : ∀ (n : Nat) (w : Wasm.Store Unit) (s inp len out : UInt32),
+  len.toNat = n →
+    w.mem.pages ≤ 65536 →
+      inp.toNat + n ≤ out.toNat →
+        out.toNat + 8 * n ≤ w.mem.pages * 65536 →
+          out.toNat + 8 * n < 2 ^ 32 →
+            Utf8Wasm.Reach (Utf8Wasm.loopHead w s inp len out)
+              {
+                expr :=
+                  Wasm.SmallStep.Expr.done
+                    [Wasm.Value.i32 (Utf8Wasm.runM s out w.mem (Utf8Boundary.bytesAt w.mem inp.toNat n)).snd.fst,
+                      Wasm.Value.i32 (Utf8Wasm.runM s out w.mem (Utf8Boundary.bytesAt w.mem inp.toNat n)).fst],
+                store :=
+                  { runtime := Utf8Wasm.rt0,
+                    wasm :=
+                      { globals := w.globals, globalIds := w.globalIds, functionIds := w.functionIds,
+                        mem := (Utf8Wasm.runM s out w.mem (Utf8Boundary.bytesAt w.mem inp.toNat n)).snd.snd,
+                        extraMems := w.extraMems, memoryCaps := w.memoryCaps, memoryIds := w.memoryIds,
+                        dataSegments := w.dataSegments, tables := w.tables, tableIds := w.tableIds,
+                        elementSegments := w.elementSegments, elementValues := w.elementValues, tagIds := w.tagIds,
+                        exns := w.exns, gcHeap := w.gcHeap, host := w.host } } }
+'Utf8Wasm.loop_correct' depends on axioms: [propext, Classical.choice, Quot.sound]
+Utf8Wasm.stepM_nil : ∀ (x : UInt8),
+  Utf8Wasm.stepM 0 x.toUInt32 = (Utf8Wasm.enc (Utf8Pure.step [] x).fst, (Utf8Pure.step [] x).snd)
+'Utf8Wasm.stepM_nil' depends on axioms: [propext, Classical.choice, Quot.sound]
+Utf8Pure.RefDecoder_correct : Utf8Pure.RefDecoder.Correct
+'Utf8Pure.RefDecoder_correct' depends on axioms: [propext, Classical.choice, Quot.sound]

@@ -1,0 +1,83 @@
+BASELINE PROOF-CHECK TIMES ON THE EC2 INSTANCE (2026-11-11)
+Measurement only. No scripts, proofs, specs or sources were edited. Nothing was installed.
+Raw logs and /usr/bin/time -v output: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/baseline/
+  (<name>.log, <name>.time; breakdown.txt; rocq_pure_timed.log; wasmcert_timed.log)
+
+MACHINE
+  Intel(R) Xeon(R) 6975P-C, 8 vCPU (4 cores x 2 threads, 1 socket), 30 GB RAM,
+  Ubuntu 26.04.1 LTS, kernel 7.0.0-1017-aws.  Nothing else running; scripts run one at a time,
+  each from a clean build state.  Everything run via /root/bend/utf8/... (symlink).
+TOOLCHAINS
+  Lean: elan 4.2.4 (no default toolchain); leanprover/lean4:v4.35.0 (Talos, pure-lean) and
+        v4.36.0-rc2 (Aeneas, pure-lean)
+  Rocq 9.2 (OCaml 5.4.0, opam 2.5.0, switch wasmcert)
+  rustc/cargo 1.99.1 stable; aeneas pin nightly-2026-09-17
+  node v26.13.0; bend 2.0.40
+  Aeneas nightly-2026.11.10-0d21a9e (= the version in candidates/aeneas/SETUP.md; MATCH)
+  wasm-tools 1.251.0 (candidates/talos/tools)
+
+SUMMARY (wall = /usr/bin/time elapsed; CPU = user+sys; RSS = peak of the largest process)
+  #  script                              result  wall     CPU(user+sys)   peak RSS
+  1  candidates/pure-lean/check.sh       PASS    1:55.4   159.2 s         2.53 GB
+  2  candidates/pure-rocq/check.sh       PASS    8:40.5   520.5 s         0.58 GB
+  3  candidates/aeneas/decoder/check.sh  PASS*   1:45.5   145.1 s         2.85 GB   (*after mkdir workaround; first run FAILED)
+  4  candidates/talos/decoder/check.sh    PASS    2:55.5   207.3 s         2.53 GB
+  5  candidates/wasmcert-coq/decoder/check.sh PASS 0:57.5  63.2 s          0.86 GB
+  6  bend PROOF.bend (repo root)         PASS    0:02.0   2.9 s           0.37 GB
+  7  node candidates/difftest/run.mjs selftest (selftest/run.mjs) PASS 1:00.0 63.1 s 1.85 GB
+  Exact values: 1: 156.49u+2.72s, 2653576 KB.  2: 519.66u+0.79s, 609312 KB.  3: 140.04u+5.09s, 2984728 KB.
+  4: 202.50u+4.77s, 2649624 KB.  5: 59.52u+3.67s, 905532 KB.  6: 2.68u+0.26s, 390568 KB.  7: 59.93u+3.14s, 1943080 KB.
+
+DETAIL PER SCRIPT
+-- 1. pure-lean  (cd /root/bend/utf8 && candidates/pure-lean/check.sh)
+   Decisive line: "ALL CHECKS PASSED" (both toolchains "OK", 16 axiom results each, only propext/Classical.choice/Quot.sound).
+   Clean state: nothing to remove (script builds into mktemp dirs).
+   Sub-steps (separate timing pass; the check itself prints none), per toolchain, v4.35.0 / v4.36.0-rc2:
+     Utf8Laws 0.4/0.3 s, Utf8Bits 11.6/11.7, Utf8Ref 0.2/0.2, Utf8Table 44.4/44.7, Utf8Proofs 0.6/0.6,
+     Utf8Eval 0.2/0.2, axioms listing ~0.1.  => about 57.5 s per toolchain, 115 s total.  Utf8Table is 77%.
+   Workarounds: none.  Tracked files modified: none.
+-- 2. pure-rocq  (candidates/pure-rocq/check.sh)
+   Decisive: "Closed under the global context" for all 15 laws, RefDecoder_correct, step_output_ok; no holes.
+   Clean state: removed .vo/.vos/.vok/.glob/.aux/.lia.cache/CoqMakefile* in the top directory (stub-build/ left alone).
+   Sub-steps (make TIMED=1, second clean build, total 516 s):
+     Utf8Laws 0.4 s, Utf8Ref 0.2, Utf8Check 508.9 s (98%; vm_compute checkA/checkB), Utf8Proofs 6.3 s.
+     The rest of check.sh (hole grep, PrintAssumptions) is a few seconds.  -j2 gives no gain: Utf8Check is serial.
+   Workarounds: none.  Tracked files modified: none.
+-- 3. aeneas/decoder  (candidates/aeneas/decoder/check.sh)
+   ATTEMPT 1: FAIL, 2.6 s wall (log: aeneas-attempt1-nobuilddir.log).  After steps 1-4 passed, step 5:
+     "== pure Utf8Laws / failed to write '.../lean/build/Utf8Laws.olean': failed to create file"
+     (known issue: build_pure.sh never creates lean/build).
+   WORKAROUND: rm -rf target lean/build, then `mkdir -p candidates/aeneas/decoder/lean/build`, rerun.
+   ATTEMPT 2: PASS.  Decisive line: "=== ALL CHECKS PASSED (106s)"; difftest P1/P2/P3 PASS.
+   Regeneration identity check (Charon+Aeneas for host and wasm32 vs committed lean/Decoder): PASSED
+     ("generated Lean identical for host and wasm32 translations").  Installed nightly-2026.11.10-0d21a9e equals SETUP.md's version.
+   Script-reported step times: 1-4 about 3 s (cargo wasm build ~0.1 s, Charon+Aeneas ~1 s each target);
+     5 build Lean 3 -> 71 s; 6 axioms 71 -> 73 s; 7 difftest 73 -> 106 s.
+   Per-file (separate timing pass): pure Utf8Laws 0.3, Utf8Bits 12.1, Utf8Ref 0.2, Utf8Table 44.8, Utf8Proofs 0.6 (pure total ~58 s);
+     candidate's own Lean: Decoder/Types 1.3, Decoder/Funs 1.6, Boundary 1.5, Proofs 4.1, Axioms 1.4 (~10 s);
+     difftest 33.1 s.
+   Tracked files modified: none (the script re-copies the pure layer and spec; all byte-identical, no diff).
+-- 4. talos/decoder  (candidates/talos/decoder/check.sh)
+   Decisive: "CHECK PASSED (see STATUS.txt ...)"; difftest P1/P2/P3 PASS.  Clean state: rm -rf decoder/build.
+   Sub-steps printed by the script (s): Utf8Laws 1, Utf8Bits 12, Utf8Ref 0, Utf8Table 44, Utf8Proofs 0,
+     DecoderModule 16, Boundary 0, ProofMach 1, ProofFuncs 47, ProofStep 17, ProofLoop 1, ProofBuffer 1, ProofDone 1,
+     ProofModel 1  => 141 s of Lean.  Remainder is Axioms.lean (0.6 s), wasm-tools steps (<0.1 s), difftest (31.7 s separately).
+   Workarounds: none.  Tracked files modified: none.
+-- 5. wasmcert-coq/decoder  (candidates/wasmcert-coq/decoder/check.sh)
+   Decisive: difftest "RESULT: PASS" after build, holes grep, Print Assumptions (only WasmCert library axioms, as in STATUS).
+   Clean state: git clean -fdX of the decoder directory (ref-WasmCert-Coq untouched).  It requires pure-rocq's .vo, which
+     was freshly built by run 2 (so the order 2 -> 5 matters).
+   Sub-steps: make all 21.5 s (script's own `time`: 22.5u+2.5s, 0.9 GB); decoder.wasm emit 0.7 s; Print Assumptions 6.6 s;
+     difftest ~28.5 s.  Per file (TIMED): Decode.v 15.5 s (70% of build), Binary 1.3, Exports 0.9, Steps 0.9, Mem 0.8, all others <=0.8.
+   Workarounds: none.  Tracked files modified: none (decoder.wasm is regenerated; no diff vs committed).
+-- 6. bend PROOF.bend  (repo root)  Decisive: "ALL PROOFS CHECK".  2.0 s wall.  (Old VM: ~5 s.)
+-- 7. difftest self-test  (cd candidates/difftest && node selftest/run.mjs; README: "about 1 minute")
+   Pass: good.mjs passes, all five broken adapters fail as expected (OK lines, exit 0).  60.0 s wall.
+
+ANOMALIES
+  - Aeneas check.sh fails from a clean state (lean/build missing); needed mkdir -p lean/build (see above).
+  - No tracked file was modified or deleted by any script (git status only shows the three pre-existing SETUP.md changes).
+  - Difftest stack traces and the selftest print paths as /root/utf8/... because node resolves the symlink; harmless.
+  - Peak RSS values are for the largest single process (time -v reports max over children), not the sum.
+  - The script wall times include only what the script runs; the pure-lean timing script runs 115 s because it
+    builds twice (both Lean versions).

@@ -1,5 +1,0 @@
-STUB BUILD. Admitted lemmas (Utf8Check.v), and only these:
-  checkA_comp : all2 fA 1088 = true
-  checkB_comp : check_all fB = true
-All other files are copies of the real sources. Same logical path: -Q <dir> Utf8.
-Do not use for final verification; use the real build in ../ (check.sh).

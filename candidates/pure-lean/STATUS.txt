@@ -22,7 +22,8 @@ Quot.sound; builds under leanprover/lean4:v4.35.0 and v4.36.0-rc2; see check.sh)
       isVSP_iff, encodes_one/two/three/four (byte ranges + shift/mask value
       per length, the form Wasm/Rust compute), cpOf_one..four (toNat
       arithmetic), secondOk_iff (E0/ED/F0/F4 second-byte ranges),
-      isLead1..4_iff, isCont_iff, is_unicode_scalar_iff, isVS_length.
+      isLead1..4_iff, isCont_iff, lead1_not..lead3_not (lead classes
+      disjoint), is_unicode_scalar_iff, isVS_length.
     - step equations: step_nil, step_complete, step_extend, step_bad_fresh,
       step_bad_pending, decodeBuffer_nil/cons/eq, run_append, feed_eq.
     - state invariant: Pending, decodeBuffer_pending, pending_length (<= 3).
@@ -48,16 +49,19 @@ CAVEATS
     pending bytes packed (e.g. a count plus up to 3 bytes, or a partial code
     point + expected length).  Its refinement relation must map to this List.
     The pending bytes are always a prefix accepted by isVSP (Pending).
-  - Utf8Table.lean takes ~2 minutes per toolchain (completion_spec, omega on
-    many case splits, maxHeartbeats raised to 2000000 for that one lemma);
-    check.sh takes several minutes in total.
+  - Check time (improvement pass 2026-11-11, see IMPROVEMENT.txt): about
+    6-7 s wall per toolchain for the whole layer (was ~57-60 s); check.sh
+    about 14 s in total.  No raised maxHeartbeats.
   - A first version used bv_decide (allowed by the brief); it worked but each
     call adds a native-code axiom (`*._native.bv_decide.ax_*`).  It was
     replaced by omega/decide proofs; check.sh now rejects bv_decide and any
     axiom other than propext / Classical.choice / Quot.sound.
 
 NEXT STEPS (if continued)
-  - Speed up completion_spec (split by lead class before calling omega).
+  - encodes_of_isVS / isVS_of_encodes are the slowest proofs left (~2 s CPU
+    each); a per-lead-class form of secondOk would shorten and speed them.
+  - cpOf_one..four: a single `x * 2^k ||| y = x * 2^k + y` simp lemma
+    would replace the rw chains (statements must stay; Aeneas uses them).
   - Optionally add an alternative state representation (e.g. needed-count +
     accumulated code point + lower/upper bound for the next byte, as in the
     Unicode/Hoehrmann DFA style) proved equivalent to State := List UInt8,

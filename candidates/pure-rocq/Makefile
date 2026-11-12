@@ -1,4 +1,4 @@
-# Build: make   (uses rocq makefile; Utf8Check.v takes ~10 min: exhaustive vm_compute)
+# Build: make   (uses rocq makefile; about 15 s, Utf8Bridge.v is most of it)
 SPEC := ../spec-rocq/Utf8Laws.v
 
 all: spec-copy CoqMakefile

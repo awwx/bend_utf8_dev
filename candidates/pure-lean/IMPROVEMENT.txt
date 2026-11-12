@@ -1,0 +1,128 @@
+IMPROVEMENT PASS ON candidates/pure-lean (2026-11-11, EC2, about 30 min of work)
+
+Goal: the same theorems (same names, same statements), checked much faster,
+with better-shaped proofs.  Spec Utf8Laws.lean untouched; Utf8Ref.lean
+(RefDecoder and the byte-table definitions) untouched; Utf8Eval.lean untouched.
+
+RESULT
+  check.sh (both toolchains, axioms, eval test): 13.3 s wall / 26.7 s CPU
+  in scratch, contended machine (baseline on the idle machine: 115 s wall,
+  159 s CPU).
+
+PER FILE, before -> after (this run, same contended conditions; wall is
+contended and will be re-measured; CPU = user+sys is the fairer comparison)
+
+  file         toolchain     wall before  wall after  CPU before  CPU after
+  Utf8Laws     v4.35.0          0.39         0.36        0.54        0.49
+  Utf8Bits     v4.35.0         13.75         2.08       30.26        4.44
+  Utf8Ref      v4.35.0          0.23         0.20        0.27        0.24
+  Utf8Table    v4.35.0         45.85         2.57       54.27        5.75
+  Utf8Proofs   v4.35.0          0.62         0.74        1.78        1.88
+  total        v4.35.0         60.8          5.95       87.1        12.8
+  Utf8Laws     v4.36.0-rc2      0.32         0.46        0.43        0.61
+  Utf8Bits     v4.36.0-rc2     13.46         2.88       30.29        5.75
+  Utf8Ref      v4.36.0-rc2      0.20         0.26        0.23        0.31
+  Utf8Table    v4.36.0-rc2     45.64         2.86       53.23        6.36
+  Utf8Proofs   v4.36.0-rc2      0.62         0.63        1.73        1.73
+  total        v4.36.0-rc2     60.2          7.1        85.9        14.8
+  (CPU > wall because Lean elaborates theorem bodies in parallel.)
+  Per version the layer now takes about 10% of its former wall time and
+  15% of its former CPU time.  Utf8Bits + Utf8Table: 59 s -> 5 s wall.
+
+SIZE (code lines without comments / blank lines; theorems)
+  Utf8Bits    146 -> 126 lines;  8 -> 10 theorems (+2 macros)
+  Utf8Table   184 -> 209 lines; 25 -> 30 theorems (-1 macro)
+  Utf8Proofs  487 -> 487 lines; 65 -> 65 theorems (one unused simp argument removed)
+  Utf8Ref 96 lines / Utf8Eval 15 lines: unchanged.
+  Total file lines incl. comments 1132 -> 1185 (new header comments listing
+  exports and method).
+
+PROFILE FINDINGS (set_option trace.profiler / profiler, v4.36.0-rc2)
+  Utf8Table: completion_spec took 76 of ~85 s (three omega calls of 22, 12
+    and 9 s, many smaller, maxHeartbeats raised to 2000000).  Cause: the
+    `byte_table` macro rewrote everything at once (secondOk_iff, a 5-way
+    disjunction, plus isLead*/isCont ranges and the toNat value of cpOf)
+    and handed omega whole-table goals; omega then case-split on byte
+    values and disjunctions.  The rest: encodes_of_isVS 2.3 s,
+    isVSP_of_isVS_append 2.6 s, isVS_of_encodes 1.5 s, isVS_isVSP 1.0 s.
+  Utf8Bits: each of one/two/three/four_shape had omega calls of 1-4 s plus
+    0.5-1.2 s kernel checking.  Cause: every goal had all 25-32 bit atoms
+    `cp.toNat / 2^i % 2` in context (each becomes several omega variables
+    with div/mod constraints); omega had to rediscover how they combine.
+    Giving omega the explicit 32-term bit sum made it slower (timeouts;
+    17 s with the bits generalised to variables): the number of div/mod
+    atoms in one omega call is the cost, not missing facts.
+
+WHAT CHANGED
+  Utf8Bits: bounds without omega (Nat.testBit_lt_two_pow for "below 2^k ->
+    high bits clear", Nat.lt_pow_two_of_testBit for the converse, one bit
+    position at a time); byte values one byte per omega call, with only
+    that byte's <= 8 bits and `lowBits (n / 2^k) b = n / 2^k % 2^b` in
+    context (macro byte_value).  Statements of the shape lemmas, enc32 and
+    encoding_eq unchanged.
+  Utf8Table: completion_spec splits on the lead class (isLead2/3/4 as
+    Bools), not on byte values; "cpOf <> U+FFFD" because every completion
+    ends in 0x80, so the code point is 0 mod 64 while 0xFFFD is 61 mod 64.
+    New lemmas secondOk_80, secondOk_secondLo.  isVS_isVSP,
+    isVSP_of_isVS_append, isVS_not_proper are Bool reasoning (simp_all)
+    plus three disjointness lemmas lead1_not/lead2_not/lead3_not; no omega.
+    secondOk_iff proved by `split` on the definition's ifs instead of 16
+    by_cases and a `first | omega | ... | simp_all <;> omega` combinator.
+    Removed: the `byte_table` macro, `set_option maxHeartbeats 2000000`,
+    unused simp arguments.  cpOf_one..four, encodes_of_isVS, isVS_of_encodes
+    unchanged (fast enough: 0.2-2 s each).
+  No linter warnings remain on either toolchain.
+
+BV_DECIDE VS ARITHMETIC (measured; delivered version uses neither bv_decide
+nor native_decide)
+  Micro-benchmark, same four facts each way (2-, 3-, 4-byte valid sequence ->
+  code point range incl. "not a surrogate"; completion code point <> U+FFFD),
+  in scratch bv/BvTest.lean and bv/ArTest.lean:
+    bv_decide:  0.38 s wall per file (v4.36.0-rc2), 0.37 s (v4.35.0)
+    arithmetic (toNat + omega with the lemmas above): 0.46 s
+  Axioms: each bv_decide call adds its own axiom, e.g.
+    'bv_two' depends on axioms: [propext, Classical.choice, Quot.sound,
+                                 bv_two._native.bv_decide.ax_1_6]
+    axiom bv_two._native.bv_decide.ax_1_6 :
+      Std.Tactic.BVDecide.Reflect.verifyBVExpr bv_two._expr_def_1_2 bv_two._cert_def_1_2 = true
+  i.e. the LRAT certificate check is run by compiled code and its result is
+  trusted as an axiom (the compiler and the native code are trusted; the
+  kernel does not re-check).  The first agent's all-bv_decide version
+  passed check.sh in 52 s on the old VM (journal) and produced ~870 lines of
+  such axioms.  With well-shaped lemmas the arithmetic route is as fast as
+  bv_decide here, so there is no case for it.  It also needs
+  `import Std.Tactic.BVDecide`.
+
+NAMES PRESERVED (grep of candidates/aeneas/decoder/lean/ excluding pure/,
+and candidates/talos/decoder/ excluding its Utf8*.lean copies)
+  Pending RefDecoder RefDecoder_correct State cpOf cpOf_one cpOf_two
+  cpOf_three cpOf_four decodeBuffer decodeBuffer_pending decodeDone
+  decodeDone_pending isCont isLead1 isLead2 isLead3 isLead4 isVS isVSP
+  secondOk step stepAcc stepFresh step_nil
+  All keep name and statement (definitions in Utf8Ref.lean unchanged; the
+  lemmas are in unchanged parts of Utf8Table/Utf8Proofs).  All 15
+  <law>_proved and RefDecoder_correct unchanged.  Every other previously
+  exported name also still exists with the same statement; added names:
+  lead1_not lead2_not lead3_not secondOk_80 secondOk_secondLo
+  getLsbD_eq_testBit testBit_toNat lowBits lowBits_eq testBit_high
+  lt_of_testBit; removed (internal to Utf8Bits, unused elsewhere):
+  getLsbD_toNat, getLsbD_false.  File names and import order unchanged, so
+  the Aeneas/Talos build scripts need no change.
+  Compiled copies of the Aeneas Lean (Decoder/*, Boundary, Proofs, Axioms,
+  against ~/aeneas-nightly) and of the Talos Lean (DecoderModule ...
+  ProofModel, Axioms, against the Talos interpreter build) against the new
+  layer in scratch: both compile, axioms propext/Classical.choice/Quot.sound.
+  Their check scripts were not run (another agent owns them).
+
+WHAT A FURTHER PASS COULD DO
+  - encodes_of_isVS / isVS_of_encodes (2 s and 1.7 s CPU) are the slowest
+    proofs left: four near-identical 10-line cases each.  A single generic
+    proof for all lengths (tried: 13 lines instead of 45) works but is
+    1 s slower; a lemma giving secondOk per lead class without a 5-way
+    disjunction (e.g. "isLead2 a -> secondOk a b = isCont b") would make
+    both shorter and faster.
+  - cpOf_one..four use rw chains with explicit nat_or_add arguments; a
+    single `x * 2^k ||| y = x * 2^k + y` simp lemma would read better
+    (statements must stay: Aeneas uses them).
+  - Utf8Proofs (0.6 s) was not restructured; it is list reasoning and
+    already fast.

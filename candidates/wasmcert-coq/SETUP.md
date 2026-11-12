@@ -90,3 +90,31 @@ Disk: `~/.opam` 1.9 GB (switch 1.6 GB); reference clone 7.7 MB (plus its
 - opam: `~/.opam`, switch `wasmcert` with the packages in the table above
   (63 packages).
 - git clone: `candidates/wasmcert-coq/ref-WasmCert-Coq` at v2.2.1.
+
+## Ubuntu 26.04 / EC2 (2026-11-11)
+
+Machine: Ubuntu 26.04, x86-64, 8 vCPU, 30 GB, root. Replayed the commands
+above; the spike (`make && make test && make crosscheck`) passes
+("spike tests passed"; crosscheck prints 0,0,1,1,1,0).
+
+Differences from the Debian 13 run:
+
+- apt gives opam 2.5.0 and system OCaml 5.4.0 (not 2.3.0 / 5.3.0). The
+  `ocaml-system` switch works as is: opam resolved the same package set
+  (Rocq 9.2.0, coq-wasm 2.2.1, coq-compcert 3.18, mathcomp 2.6.0, wasm
+  2.0.2; camlp-streams 5.0.1 from opam). No opam-compiled OCaml needed.
+- The camlp-streams trap still applies in principle: `apt install opam`
+  pulled in `libcamlp-streams-ocaml` (5.0.1-3build8), which was removed
+  right after (`apt-get remove -y libcamlp-streams-ocaml
+  libcamlp-streams-ocaml-dev`) and before the opam install, so the install
+  succeeded first time with no rebuilds.
+- `opam install -y -j 4 coq-wasm`: 7 min 10 s wall clock (11:01:59 to
+  11:09:09), versus 25-27 min estimated for `-j 2` on the old VM. Whole
+  setup (apt, opam init, switch, install, spike) took about 10 min.
+  Only the install step was timed this way; the spike rebuild took ~7 s.
+- npm tools: nothing in SETUP.md, the spike or the decoder directory refers
+  to `wabt` or `binaryen`, so none were installed. Node is v26.13.0 via nvm.
+- Not run here: the full decoder check and the pure-rocq check.
+
+Activate: `eval $(opam env --switch=wasmcert)` (prints a harmless "Running as
+root" warning).

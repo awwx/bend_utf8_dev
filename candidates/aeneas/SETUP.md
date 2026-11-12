@@ -47,3 +47,12 @@ cargo build --release --target wasm32-unknown-unknown -j2
 (cd lean && ./build.sh)                      # ~30 s; prints axioms
 node test.mjs
 ```
+
+## Ubuntu 26.04 / EC2 (2026-11-11)
+Replayed on a fresh Ubuntu 26.04 x86-64 EC2 instance (8 vCPU, 30 GB). Setup took about 3 min wall-clock (10:59:41 to 11:02:12;
+`lake exe cache get` ran 1.3 min, much faster than before). No steps differed from above, except:
+- rustup was not preinstalled: `curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.99.1 -t wasm32-unknown-unknown`,
+  then the `nightly-2026-09-17` command from step 4. No extra apt packages were needed (gcc, make, git were present).
+- PATH must include `$HOME/.cargo/bin:$HOME/.elan/bin` (non-login shells do not have cargo on PATH).
+- `spike/charon.sh` runs `rm -f lean/Spike/*.lean`, which also deletes the tracked `Spec.lean` and `Proofs.lean`. After running it,
+  `git checkout -- lean/Spike/Spec.lean lean/Spike/Proofs.lean` before `lean/build.sh`. (Types.lean/Funs.lean regenerate identically.)

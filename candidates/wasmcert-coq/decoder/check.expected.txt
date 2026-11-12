@@ -1,0 +1,145 @@
+decoder_module_correct_if_step
+     : (forall hs : host.host_state, step_spec hs) -> decoder_module_correct
+where
+?hfc : [ |- datatypes.host_function_class]
+?memory : [ |- memory.BlockUpdateMemory]
+?ho : [ |- host.host]
+decoder_bytes_parse_back
+     : binary_format_parser.run_parse_module decoder_bytes =
+       Some Module.decoder_module
+decoder_bytes =
+binary_format_printer.binary_of_module Module.decoder_module
+     : list Byte.byte
+step_spec =
+fun (hfc : datatypes.host_function_class) (memory : memory.BlockUpdateMemory)
+  (ho : host.host) (hs : host.host_state) =>
+forall (s1 : datatypes.store_record) (m1 : datatypes.meminst)
+  (st : Utf8Ref.State) (b : Byte.byte) (wb : bytes.byte) 
+  (L : BinNums.Z) (i : nat) (o : BinNums.Z) (junk : list datatypes.value),
+List.nth_error (datatypes.s_mems s1) 0 = Some m1 ->
+Utf8Proofs.Inv st ->
+length junk = 7 ->
+memory.mem_lookup (BinNat.N.of_nat i) (datatypes.meminst_data m1) = Some wb ->
+byte_as_mem b wb ->
+BinInt.Z.le BinNums.Z0 o ->
+BinNat.N.le
+  (BinNat.N.add (BinInt.Z.to_N o)
+     (BinNat.N.pos (BinNums.xO (BinNums.xO BinNums.xH))))
+  (operations.mem_length m1) ->
+BinInt.Z.lt
+  (BinInt.Z.add o (BinInt.Z.pos (BinNums.xO (BinNums.xO BinNums.xH))))
+  numerics.Wasm_int.Int32.modulus ->
+BinInt.Z.lt (BinInt.Z.of_nat i) numerics.Wasm_int.Int32.modulus ->
+Wp.wp hs s1 (frame_of st L i o junk) nil Module.step_code
+  (fun (s2 : datatypes.store_record) (f2 : datatypes.frame)
+     (stk2 : list datatypes.value) =>
+   stk2 = nil /\
+   (exists (m2 : datatypes.meminst) (junk' : list datatypes.value),
+      s2 = WpMem.upd_mem0 s1 m2 /\
+      f2 =
+      frame_of (fst (Utf8Ref.step st b)) L i
+        (BinInt.Z.add o
+           (BinInt.Z.of_nat (length (utf16le (snd (Utf8Ref.step st b))))))
+        junk' /\
+      length junk' = 7 /\
+      writes m1 m2 (BinInt.Z.to_N o) (utf16le (snd (Utf8Ref.step st b))) /\
+      length (utf16le (snd (Utf8Ref.step st b))) <= 4))
+     : forall {hfc : datatypes.host_function_class}
+         {memory : memory.BlockUpdateMemory} {ho : host.host},
+       host.host_state -> Prop
+
+Arguments step_spec {hfc memory ho} hs
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec :
+  forall P : nat -> Prop,
+  (forall n : nat, {P n} + {~ P n}) ->
+  {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep :
+  forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+  (forall x : A, f x = g x) -> f = g
+Classical_Prop.classic : forall P : Prop, P \/ ~ P
+simd_execute.SIMD_ops.app_vunop_str :
+  datatypes.vunop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vtestop_str :
+  datatypes.vtestop -> String.string -> String.string
+simd_execute.SIMD_ops.app_vternop_str :
+  datatypes.vternop ->
+  String.string -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vshiftop_str :
+  datatypes.vshiftop -> String.string -> String.string -> String.string
+simd_execute.SIMD_ops.app_vbinop_str :
+  datatypes.vbinop -> String.string -> String.string -> String.string

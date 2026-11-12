@@ -1,43 +1,33 @@
-STATUS (pure-rocq, Rocq 9.2.0, stdlib only)
+STATUS (pure-rocq, Rocq 9.2.0, stdlib only)   -- updated 2026-11-11 after the improvement pass
+(see IMPROVEMENT.txt for before/after numbers; JOURNAL.txt for history)
+
+CURRENT STATE: FULLY CHECKED.  ./check.sh prints "ALL CHECKS PASSED"; about 22 s
+  wall in total on the EC2 instance (Utf8Bridge.v ~9 s, everything else ~3 s, the
+  rest is rocq makefile + Print Assumptions).  No Admitted/admit/Axiom/Parameter/
+  Abort.  Print Assumptions: "Closed under the global context" for all 15
+  <law>_proved, RefDecoder_correct and step_output_ok.
 
 Files
   Utf8Laws.v   byte-identical copy of ../spec-rocq/Utf8Laws.v (Makefile re-copies and cmp's it)
-  Utf8Ref.v    definitions only: N-range table (seq_len, lo2, hi2, is_cont, second_ok),
-               vp (valid prefix test), vs (valid sequence test), seq_value, seq_cp,
-               State := list byte, step_empty, step, ref_decode_buffer (fold_left of step),
-               ref_done, RefDecoder, ref_decode
-  Utf8Check.v  exhaustive vm_compute checks (checkA: all 1,112,064 scalars;
-               checkB: all valid sequence prefixes) and their reflection lemmas
-  Utf8Proofs.v all laws, RefDecoder_correct, downstream lemmas (header lists them)
+  Utf8Ref.v    definitions only (unchanged): N-range table (seq_len, lo2, hi2, is_cont,
+               second_ok), vp (valid prefix test), vs (valid sequence test), seq_value,
+               seq_cp, State := list byte, step_empty, step, step_acc, ref_decode_buffer
+               (fold_left of step_acc), ref_done, RefDecoder, ref_decode
+  Utf8Bridge.v bit-level spec -> arithmetic, symbolically (no enumeration):
+               U32 <-> N (U32_to_of, U32_of_to, U32_to_N_inj, is_unicode_scalar_iff),
+               utf8_form (UTF-8 layout of a number) and encoding_form (what `encoding`
+               computes), byte-range table lemmas, vs_form / form_vs, encodes_iff,
+               completion, pending_completion.  Header lists every export.
+  Utf8Proofs.v all laws, RefDecoder_correct, streaming/refinement lemmas, downstream
+               lemmas; re-exports Utf8Bridge (Require Export).  Header lists exports.
   check.sh     make + hole grep + Print Assumptions
 
-LOAD PATHS FOR DOWNSTREAM (same module names Utf8.Utf8Laws, Utf8.Utf8Ref, Utf8.Utf8Check, Utf8.Utf8Proofs):
-  real build:  -Q /root/bend/utf8/candidates/pure-rocq Utf8
-  stub build:  -Q /root/bend/utf8/candidates/pure-rocq/stub-build Utf8
-  (stub: only checkA_comp and checkB_comp Admitted; see stub-build/THIS_IS_A_STUB.txt)
+LOAD PATH FOR DOWNSTREAM: -Q /root/bend/utf8/candidates/pure-rocq Utf8
+  (modules Utf8.Utf8Laws, Utf8.Utf8Ref, Utf8.Utf8Bridge, Utf8.Utf8Proofs).
+  Utf8Check.v and the stub-build/ directory (a build with the two slow
+  enumeration lemmas Admitted) no longer exist: the whole check takes seconds.
 
-CURRENT STATE (15:05, after 30-min extension): FULLY CHECKED.
-  ./check.sh ran to completion (14:49:50 -> 15:05:06, real 15m16s; Utf8Check.v is
-  ~14.5 min of it: checkA_comp ~9.5 min, checkB_comp ~4-5 min, both vm_compute + Qed).
-  No Admitted/admit/Axiom/Parameter/Abort in the real build.  Print Assumptions:
-  "Closed under the global context" for all 15 <law>_proved, RefDecoder_correct and
-  step_output_ok.  Full log: check_run.log.
-  Not done: speeding up checkA_comp (no time for another 15-min rebuild).
-
-HISTORICAL: STATE AT THE END OF THE ORIGINAL TIME BOX
-  - Utf8Laws.v, Utf8Ref.v compile.  Utf8Proofs.v compiles (all theorems below, no
-    Admitted in it) against a scratch copy of Utf8Check.v in which the two pure
-    computation lemmas checkA_comp and checkB_comp were Admitted.
-  - checkA_comp (all scalars) WAS checked once, vm_compute + Qed, in a 9.5 min run.
-  - checkB_comp (all valid prefixes, Utf8Check.v) has NOT yet been seen to finish.
-    A first version was accidentally 256^4 (implb/orb are strict in the VM); fixed
-    with if-then-else, but it still takes > 100 s for one evaluation.  If it is too
-    slow, shrink fB or split the check by lead byte; the statement is true (it is the
-    Unicode table) but unverified until `./check.sh` completes.
-  - So: everything below is "proved modulo checkB_comp completing", and check.sh has not
-    been run to completion.  Expected build time: 15-25 min (Utf8Check.v).
-
-Proved (each `<law>_proved : <law>`, exact spec proposition), modulo the above:
+Proved (each `<law>_proved : <law>`, exact spec proposition):
   bit8_value_sum, bit8_value_word, u32_byte4_bits, is_surrogate_code_point_examples,
   begins_with_scalar_unique, not_valid_sequence_prefix_extended, maximal_subpart_exists,
   maximal_subpart_unique, decodes_first_exists, decodes_first_unique, decodes_first_empty,
@@ -45,30 +35,22 @@ Proved (each `<law>_proved : <law>`, exact spec proposition), modulo the above:
   RefDecoder_correct : Decoder_correct RefDecoder
     (RefDecoder_decodes, RefDecoder_safe, RefDecoder_prompt)
 
-Downstream lemmas (Utf8Proofs.v, over N via bN = Byte.to_N and U32_to_N):
+Names used by ../wasmcert-coq/decoder (and its wip/), all kept with the same
+statements/definitions:
+  RefDecoder, RefDecoder_correct, State, step, step_empty, step_acc,
+  ref_decode_buffer, ref_done, FFFD, Inv, Inv_len, step_inv  (plus the spec's names).
+
+Other downstream lemmas (same names and statements as before the pass):
   encodes_iff, valid_sequence_iff, valid_sequence_prefix_iff, seq_value_scalar,
-  seq_cp_value, seq_cp_value1..4 (U32_to_N cp = low-bit combination),
-  seq_len_cases (lead byte table), vp_one_iff, vs_one_iff, vp_cons2 (second byte in
-  [lo2 b1, hi2 b1], i.e. A0..BF after E0, 80..9F after ED, 90..BF after F0, 80..8F after
-  F4; later bytes 80..BF; length bound), vs_vp_len,
-  step_empty_ascii / step_empty_lead / step_empty_bad / step_pending (step equations),
-  Inv (state invariant), step_inv, run_inv, Inv_len (pending <= 3 bytes),
-  run, run_app, ref_decode_buffer_run, feed_run, step_dec / run_dec (refinement core),
-  step_output_ok, ref_done_output_ok (every output is U+FFFD or a scalar with
-  U32_to_N <= 0x10FFFF and not in D800..DFFF), FFFD_value.
+  seq_cp_value, seq_cp_value1..4, seq_len_cases, vp_one, vp_one_iff, vs_one_iff, vp_cons2,
+  vs_vp_len, vp_app, vp_len, vp_len_lead, seq_len_le4, vs_vp, vs_prefix_free,
+  completion, pending_completion, byte_of, U32_of_to, U32_to_N_inj,
+  step_empty_ascii / step_empty_lead / step_empty_bad / step_pending, Inv, step_inv,
+  run_inv, Inv_len, run, run_app, ref_decode_buffer_run, feed_run, step_dec, run_dec,
+  step_output_ok, ref_done_output_ok, output_ok, FFFD_value.
+  Removed (enumeration machinery, unused outside Utf8Check.v/Utf8Proofs.v): enc_N,
+  fA, fB, checkA(_comp), checkB(_comp), check_all(_ok), all_from, all2, all_bytes*,
+  bytes_eqb, opt_eqb, is_surr_N, scalarN, vp1..vp3, orb_left_false, tb0, tbS, tb_last,
+  scalar_bounds, vs_fB, vs_nil.
 
-Assumptions: see check.sh output (Print Assumptions); expected "Closed under the
-  global context" (no axioms used; everything is by computation and stdlib lemmas).
-
-Not done / caveats
-  - Build time: Utf8Check.v takes ~10 min (vm_compute over 1.1M scalars, done twice:
-    tactic + Qed kernel check).  U32_of_N/U32_to_N are slow in the VM (~40us).
-  - Step equations are stated per case on the N ranges but only for step_empty fully
-    unfolded; for pending states, step_pending + vp_cons2/vs_vp_len give the ranges.
-    A per-state "need/lower/upper" formulation (as a Wasm loop would hold it) is not
-    provided; the downstream refinement must relate its state to the pending list.
-Next steps
-  - Speed up checkA: replace the U32 enumeration by a symbolic proof of
-    encoding (U32_of_N n) for n in each range (or split checkA across files for -j2).
-  - Add a machine-friendly state view (pending count, partial code point, next-byte
-    bounds) with an abstraction function to State, and step equations in that view.
+Not done / possible next steps: see IMPROVEMENT.txt.

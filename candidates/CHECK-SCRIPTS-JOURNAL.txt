@@ -1,0 +1,39 @@
+12:00 start; read HANDOVER, BASELINE, AUDIT
+12:02 aeneas check.sh rewritten; build_pure.sh mkdir; spike charon.sh rm fixed. Running aeneas clean (rm -rf target lean/build)
+12:05 aeneas clean run PASS (107s). wasmcert: expected output recorded to check.expected.txt; rerun
+12:08 talos: bv_decide-in-comment false positive fixed; expected output recorded in check.expected.txt; full rerun
+12:14 found: restoring a mutated file with cp -p leaves a newer stale .vo (make trusts mtimes). wasmcert check now deletes candidate .vo before build
+12:01 Read all five scripts plus build_pure.sh/build.sh/charon.sh/Makefiles. Main findings before any change:
+      aeneas: the four audit gaps confirmed by reading; wasm overwritten, never compared.
+      talos: `lean ... | grep error && fail` (a lean failure without the word "error" is swallowed);
+        copy-then-cmp tautology; decoder.wasm OVERWRITTEN from decoder.wat (shipped file never compared);
+        axiom names never counted; no type check; unqualified "CHECK PASSED" although the
+        top-level theorem is not proved.
+      wasmcert: /bin/sh + set -e only; `rocq c Assumptions.v | grep -v` swallows rocq errors; assumptions
+        printed but never compared; tracked decoder.wasm deleted and regenerated (never compared);
+        pure-rocq dependency only tested by existence of Utf8Proofs.vo; no pass/partial line at all.
+      pure-rocq: final `coqc PrintAssumptions.v | grep -v` swallows a failing Check; "Closed under the
+        global context" never asserted.  pure-lean: `#print axioms` only, no type check of *_proved.
+12:03 Aeneas check.sh rewritten (pins, real cmp, wasm compare, clean candidate oleans, sha256-stamped
+      --fast cache, exact axiom output, `example : Boundary.Verified := DecoderProofs.verified`).
+12:04 Aeneas from clean (no target/, no lean/build): ALL CHECKS PASSED.
+12:05-12:08 wasmcert and talos rewritten; first talos run tripped on `bv_decide` in a pure-layer
+      comment (my stricter grep) -> use the comment-tolerant rule from pure-lean.  Expected
+      #check/#print axioms output recorded in check.expected.txt (talos, wasmcert).
+12:12-12:17 mutations (see AUDIT).  Surprise: W5 (step_spec made unsatisfiable by `/\ 1 = 2`) still
+      BUILDS, so the conditional theorem becomes vacuous; only the new step_spec pin catches it.
+      Perl s/// without /g hit a comment in decoder.wat first (T6) -> kept as a control run.
+12:21 pure-rocq replaced by the other agent at 12:20 (Utf8Check.v -> Utf8Bridge.v; my check.sh edits preserved). pure-rocq/check.sh passes on the new layer. Rerunning wasmcert against it
+12:22 decoder_hex.out vanished: another agent was running 'make -f Makefile.coq clean; make all' in wasmcert-coq/decoder concurrently (seen in ps). Waited for it; check.sh now tolerates a missing hex intermediate
+12:20 talos T8 (weaker stepM_nil) caught by check.expected.txt diff.
+12:21 pure-rocq injection: old script exit 0 with a failing Check, new exit 1.
+12:23 wasmcert PARTIAL run on the new pure-rocq layer.  12:25 pure-lean PASS both toolchains.
+12:26 spike charon.sh run: Spec.lean/Proofs.lean survive; regenerated Types/Funs identical.
+12:28 aeneas --fast and stamp-mismatch runs PASS.  Wrote CHECK-SCRIPTS-AUDIT.txt.  Stopping here:
+      remaining ideas (tool-version pins, pinning definitions behind partial statements,
+      hash-based pure-rocq staleness) listed in the audit rather than half-done.
+12:28 pure-lean replaced by its agent at 12:26:31 (my check.sh edit preserved). Rerunning pure-lean, aeneas (full), talos on the new layer
+12:29-12:31 Final runs on the new pure-lean layer: pure-lean ALL CHECKS PASSED; aeneas ALL CHECKS
+      PASSED (refreshed its tracked lean/pure copies of Utf8Bits/Utf8Table/Utf8Proofs, as designed);
+      talos PARTIAL line (refreshed its tracked Utf8Bits/Utf8Table/Utf8Proofs copies).
+12:32 Done.  ~32 min used.

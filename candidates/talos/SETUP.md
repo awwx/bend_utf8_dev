@@ -74,3 +74,24 @@ iris-lean. The spike copies that elaborator into its own file (about 40 lines) i
 
 The spike is not a Lake package. It is checked with `lean` and the interpreter's
 `LEAN_PATH` (`lake env printenv LEAN_PATH` run in `talos/interpreter`).
+
+## Ubuntu 26.04 / EC2 (2026-11-11)
+
+Machine: 8 vCPU, 30 GB, Ubuntu 26.04 x86-64, root. Nothing in the steps above
+needed to change; the existing `talos/` checkout (with its `.lake` build) and
+`tools/wasm-tools-1.251.0-x86_64-linux/` were copied from the Debian 13 VM and
+worked as is.
+
+Differences:
+- elan was installed fresh: `curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none`
+  (elan 4.2.4), then `elan toolchain install leanprover/lean4:v4.35.0` and
+  `leanprover/lean4:v4.36.0-rc2` (the latter for Aeneas). No default toolchain
+  is set; the `lean-toolchain` files select 4.35.0. Add `~/.elan/bin` to PATH.
+- Commands must run via the path `/root/bend/utf8/...` (symlink to `/root/utf8`),
+  because `lean_path.txt` and the copied `.lake` contain that absolute path.
+- Needed `git config --global --add safe.directory '*'` (the copied checkout is
+  owned by another uid, so git refuses it and lake's manifest check can fail).
+- No rebuild was needed: `lake build` of the five spike modules finished in 29 s
+  (all up to date), `lake update` and `lake exe cache get` were not rerun.
+  `spike/check.sh` passed in about 18 s ("all tests passed"). Node comes from nvm
+  (v26.13.0, `~/.nvm/versions/node/v26.13.0/bin`).

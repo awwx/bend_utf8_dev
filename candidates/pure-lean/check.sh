@@ -42,8 +42,14 @@ for TC in leanprover/lean4:v4.35.0 leanprover/lean4:v4.36.0-rc2; do
   echo "evaluation sanity test: true"
   AX="$OUT/Axioms.lean"
   { echo "import Utf8Proofs"; echo "open Utf8Pure";
-    for t in $THMS; do echo "#print axioms $t"; done; } > "$AX"
-  LEAN_PATH=$OUT elan run "$TC" lean "$AX" 2>&1 | tee "$OUT/axioms.txt"
+    for t in $THMS; do echo "#print axioms $t"; done
+    # Each theorem has exactly the type of the spec's law (a failure is a build error).
+    for t in $THMS; do case $t in
+      RefDecoder_correct) echo "example : Decoder.Correct RefDecoder := RefDecoder_correct" ;;
+      *) echo "example : ${t%_proved} := $t" ;; esac; done; } > "$AX"
+  LEAN_PATH=$OUT elan run "$TC" lean "$AX" > "$OUT/axioms.txt" 2>&1 \
+    || { cat "$OUT/axioms.txt"; echo "FAIL: theorem types / axioms check"; exit 1; }
+  cat "$OUT/axioms.txt"
   if grep -q sorryAx "$OUT/axioms.txt"; then echo "FAIL: sorryAx"; exit 1; fi
   BAD=$(tr -d '\n' < "$OUT/axioms.txt" | grep -o '\[[^]]*\]' | tr -d '[] ' | tr ',' '\n' \
         | grep -vE '^(propext|Classical\.choice|Quot\.sound)$' || true)

@@ -1,0 +1,67 @@
+PROOF-CHECK TIMES ON THE EC2 INSTANCE AFTER IMPROVEMENT PASS 1 (2026-11-11)
+Measurement only. No scripts, proofs, specs or sources were edited. Nothing was installed. Nothing committed.
+Raw logs and /usr/bin/time -v output: /tmp/claude-0/-root-utf8/d392f9bd-a7a4-401d-ac80-5c3761725fdf/scratchpad/after-pass1/
+  (<name>.log, <name>.time, <name>.status.before/after, <name>.hashdiff; breakdown-*.txt; rocq_pure_timed.log; wasmcert_timed.log)
+Same machine and method as BASELINE-EC2.txt: Xeon 6975P-C, 8 vCPU, 30 GB, Ubuntu 26.04, nothing else running,
+scripts run one at a time via /root/bend/utf8/..., each from clean build state (git clean -fdX of the directory;
+pure-lean builds into mktemp dirs; third-party checkouts untouched), under /usr/bin/time -v.
+
+SUMMARY: before (BASELINE) -> after
+  #  script                               before wall  after wall   before CPU -> after CPU   before RSS -> after RSS
+  1  candidates/pure-lean/check.sh        1:55.4       0:11.9       159.2 -> 25.3 s            2.53 GB -> 0.77 GB
+  2  candidates/pure-rocq/check.sh        8:40.5       0:22.0       520.5 -> 22.0 s            0.58 GB -> 0.77 GB
+  3  candidates/aeneas/decoder/check.sh   1:45.5*      0:52.2       145.1 -> 70.4 s            2.85 GB -> 2.85 GB   (*needed workaround before; none now)
+  4  candidates/talos/decoder/check.sh    2:55.5       2:03.4       207.3 -> 140.6 s           2.53 GB -> 2.15 GB
+  5  candidates/wasmcert-coq/decoder/check.sh 0:57.5    0:58.9       63.2 -> 64.8 s             0.86 GB -> 0.86 GB
+  Exact: 1: 24.19u+1.11s, 771036 KB.  2: 21.15u+0.82s, 771468 KB.  3: 65.85u+4.55s, 2989484 KB.
+         4: 136.54u+4.06s, 2251780 KB.  5: 60.94u+3.82s, 905304 KB.
+  All five exit 0.  Total of the five: 13:48 -> 4:48.
+
+VERDICT LINES
+  1 "ALL CHECKS PASSED" (both toolchains OK, 16 axiom results each)
+  2 "ALL CHECKS PASSED (15 laws, RefDecoder_correct, step_output_ok: no axioms)"
+  3 "=== ALL CHECKS PASSED (52s)"  (difftest P1/P2/P3 PASS; regeneration identity and shipped-wasm comparison pass)
+  4 "PARTIAL: checks above passed (shipped wasm = rebuild, printed text matches, clean build, statements and axioms as recorded, difftest PASS); top-level theorem Utf8Boundary.ShippedModuleCorrect NOT proved"
+  5 "PARTIAL: checks above passed (shipped wasm = bytes printed from the term, build, statements and assumptions as recorded, difftest PASS); decoder_module_correct proved only conditionally on the unproved step_spec"
+
+SUB-STEP BREAKDOWN (separate timing pass, one at a time; wall seconds)
+-- 1/2/3/4 pure Lean layer, per file, before -> after (identical on v4.35.0 and v4.36.0-rc2)
+     Utf8Laws 0.4 -> 0.4 / 0.3 | Utf8Bits 11.6 -> 2.1 | Utf8Ref 0.2 | Utf8Table 44.4 -> 2.5 | Utf8Proofs 0.6 | Utf8Eval 0.2
+     per toolchain about 6 s (was 57.5 s); two toolchains in pure-lean/check.sh ~12 s total.
+     Measured: v4.35.0 Bits 2.1 Table 2.5; v4.36.0-rc2 Bits 2.1 Table 2.5.
+-- 2 pure-rocq (make TIMED=1, clean): Utf8Laws 0.43, Utf8Ref 0.21, Utf8Bridge 11.66 (new; replaces Utf8Check 508.9),
+     Utf8Proofs 1.04 (was 6.3).  make total ~13.4 s; rest of check.sh (hole grep, Print Assumptions, 17 closed) ~8.5 s.
+-- 3 aeneas/decoder: pure Utf8Laws 0.3, Bits 2.1 (12.1), Ref 0.2, Table 2.5 (44.8), Proofs 0.6 => pure ~5.7 s (was 58);
+     own Lean: Decoder/Types 1.2, Decoder/Funs 1.6, Boundary 1.5, Proofs 4.2, Axioms 1.4 (~10 s, unchanged);
+     difftest full 34.5 s (was 33.1).  Script total 52 s: difftest is now ~65%, the rest is Lean ~16 s + cargo/Charon/Aeneas + checks.
+-- 4 talos/decoder (script-printed Lean times): Utf8Laws 0, Bits 2 (12), Ref 0, Table 3 (44), Proofs 1 (0),
+     DecoderModule 15 (16), Boundary 0, ProofMach 1, ProofFuncs 47 (47), ProofStep 18 (17), ProofLoop 1, ProofBuffer 0,
+     ProofModel/Done 1 each => ~90 s of Lean (was 141 s); difftest 32.0 s; remainder (wasm-tools, statements/axioms) ~1 s.
+-- 5 wasmcert-coq/decoder: make all TIMED 21.5 s: Decode.v 15.21 (70%), Binary 1.27, Steps 0.88, Exports 0.84, Wp 0.78,
+     Mem 0.77, Theorems 0.72, others 0.66-0.70; decoder.wasm emit 0.8 s; Print Assumptions 7.6 s; difftest 29.3 s.
+     Against the new pure-rocq layer: unchanged (baseline 21.5 / 0.7 / 6.6 / 28.5).
+-- difftest harness (node run.mjs on decoder.mjs, full): 34.5 s (aeneas), 32.0 s (talos), 29.3 s (wasmcert); about 30 s each.
+
+MAIN REMAINING COSTS
+  1 pure-lean: Utf8Bits + Utf8Table (~4.6 s of ~6 s per toolchain); process start dominates small files.
+  2 pure-rocq: Utf8Bridge 11.7 s (of ~22 s).
+  3 aeneas: difftest 34 s; then Lean ~16 s.
+  4 talos: ProofFuncs 47 s, ProofStep 18 s, DecoderModule 15 s (Lean ~90 s), difftest 32 s.
+  5 wasmcert: Decode.v 15 s, difftest 29 s, Print Assumptions 7.6 s.
+
+GIT STATE (a)
+  `git status --short` after each script is identical to before it, and identical to the pre-run status
+  (41 lines, all pre-existing uncommitted changes).  A sha256 of every tracked file before/after each script
+  differs in no file (hashdiff empty for all five).  So no script modified any tracked file, including
+  decoder.wasm and decoder_hex.out (wasmcert deletes and regenerates them; same bytes).  The Aeneas and Talos
+  scripts' refresh of the pure copies was a no-op because the copies were already current.
+(b) candidates/aeneas/decoder/lean/pure/Utf8{Laws,Bits,Ref,Table,Proofs}.lean and
+    candidates/talos/decoder/Utf8{...}.lean are byte-identical to candidates/pure-lean/ (cmp, all 10); pure-lean/Utf8Laws.lean = spec-lean.
+(c) wasmcert-coq/decoder/Makefile `clean:` still runs `rm -f Makefile.coq Makefile.coq.conf decoder_hex.out ...`,
+    and decoder_hex.out is tracked (git ls-files lists it).  So `make clean` still removes a tracked file.  (Not run.)
+    check.sh itself removes and regenerates it, and it came back byte-identical.
+(d) No failures, no nondeterminism seen: all five passed first try; no status-2 build failure.  Aeneas passes from clean now
+    (lean/build is created).  Only note: each timing pass was a separate run, and numbers vary by ~0.3 s.
+OTHER NOTES
+  - The Talos script run exceeded the tool's 120 s foreground limit and was moved to the background by the harness; it ran to completion unaffected.
+  - Stub-build directory in pure-rocq is gone (deleted tracked files, pre-existing change).

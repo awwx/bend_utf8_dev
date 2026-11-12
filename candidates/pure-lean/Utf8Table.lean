@@ -1,7 +1,24 @@
 /-
-Byte-table facts: `encodes_iff` (the spec's encodes <-> table membership and
-shift/mask value) and finite facts about `isVS`/`isVSP`.
-Kernel-checked: `omega` over `toNat` values, no `bv_decide`.
+Utf8Table.lean -- the byte table (`isVS`/`isVSP`/`cpOf` of Utf8Ref) against
+the spec's `encodes`, and finite facts about valid sequences.
+
+EXPORTS
+  cpOf_one cpOf_two cpOf_three cpOf_four   `(cpOf [..]).toNat` as Nat arithmetic
+                                           (statements used by the Aeneas proofs)
+  secondOk_iff isCont_iff isLead1_iff .. isLead4_iff   byte classes as toNat ranges
+  is_unicode_scalar_iff                    toNat form of the spec's scalar test
+  encodes_iff : encodes seq cp ↔ isVS seq = true ∧ cp = cpOf seq
+  lead1_not lead2_not lead3_not            the lead classes are disjoint
+  isVS_isVSP isVSP_of_isVS_append isVS_not_proper   structural facts
+  completion, completion_spec, isVSP_extends  every pending prefix can be completed
+                                              to a valid sequence whose code point
+                                              is not U+FFFD
+
+METHOD
+  Arithmetic facts go through `toNat` and `omega`; each `omega` call sees one
+  sequence length and one lead-byte class, never a split over byte values.
+  Structural facts are Bool reasoning (`simp_all`) plus class disjointness.
+  Kernel-checked; no `bv_decide`.
 -/
 import Utf8Bits
 import Utf8Ref
@@ -30,7 +47,7 @@ theorem cpOf_two (b1 b2 : UInt8) :
   have h1 := b1.toNat_lt; have h2 := b2.toNat_lt
   simp only [cpOf, UInt32.toNat_or, UInt32.toNat_and, UInt32.toNat_shiftLeft, UInt8.toNat_toUInt32,
     UInt32.toNat_ofNat, Nat.shiftLeft_eq]
-  simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_7, and_mask_63]
+  simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_63]
   rw [Nat.mod_eq_of_lt (by omega), nat_or_add _ _ 6 (by simp only [Nat.reducePow]; omega) (by simp only [Nat.reducePow]; omega)]
   all_goals omega
 
@@ -39,7 +56,7 @@ theorem cpOf_three (b1 b2 b3 : UInt8) :
   have h1 := b1.toNat_lt; have h2 := b2.toNat_lt; have h3 := b3.toNat_lt
   simp only [cpOf, UInt32.toNat_or, UInt32.toNat_and, UInt32.toNat_shiftLeft, UInt8.toNat_toUInt32,
     UInt32.toNat_ofNat, Nat.shiftLeft_eq]
-  simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_7, and_mask_63]
+  simp only [Nat.reducePow, Nat.reduceMod, and_mask_15, and_mask_63]
   rw [Nat.mod_eq_of_lt (a := _ * 4096) (by omega), Nat.mod_eq_of_lt (a := _ * 64) (by omega),
     nat_or_add (b1.toNat % 16 * 4096) (b2.toNat % 64 * 64) 12 (by simp only [Nat.reducePow]; omega) (by simp only [Nat.reducePow]; omega),
     nat_or_add (b1.toNat % 16 * 4096 + b2.toNat % 64 * 64) _ 6 (by simp only [Nat.reducePow]; omega) (by simp only [Nat.reducePow]; omega)]
@@ -50,7 +67,7 @@ theorem cpOf_four (b1 b2 b3 b4 : UInt8) :
   have h1 := b1.toNat_lt; have h2 := b2.toNat_lt; have h3 := b3.toNat_lt; have h4 := b4.toNat_lt
   simp only [cpOf, UInt32.toNat_or, UInt32.toNat_and, UInt32.toNat_shiftLeft, UInt8.toNat_toUInt32,
     UInt32.toNat_ofNat, Nat.shiftLeft_eq]
-  simp only [Nat.reducePow, Nat.reduceMod, and_mask_31, and_mask_15, and_mask_7, and_mask_63]
+  simp only [Nat.reducePow, Nat.reduceMod, and_mask_7, and_mask_63]
   rw [Nat.mod_eq_of_lt (a := _ * 262144) (by omega), Nat.mod_eq_of_lt (a := _ * 4096) (by omega),
     Nat.mod_eq_of_lt (a := _ * 64) (by omega),
     nat_or_add (b1.toNat % 8 * 262144) (b2.toNat % 64 * 4096) 18 (by simp only [Nat.reducePow]; omega) (by simp only [Nat.reducePow]; omega),
@@ -71,10 +88,8 @@ theorem secondOk_iff (b1 b2 : UInt8) : secondOk b1 b2 = true ↔
   have k : ∀ c : UInt8, b1 = c ↔ b1.toNat = c.toNat := fun c => UInt8.toNat_inj.symm
   unfold secondOk
   simp only [k, UInt8.toNat_ofNat, UInt8.le_iff_toNat_le, Nat.reducePow, Nat.reduceMod]
-  by_cases h1 : b1.toNat = 0xE0 <;> by_cases h2 : b1.toNat = 0xED <;>
-    by_cases h3 : b1.toNat = 0xF0 <;> by_cases h4 : b1.toNat = 0xF4 <;>
-    simp only [h1, h2, h3, h4, ↓reduceIte, Bool.and_eq_true, decide_eq_true_eq] <;>
-    (first | omega | (constructor <;> intro h <;> omega) | (simp_all <;> omega))
+  repeat' split
+  all_goals simp only [Bool.and_eq_true, decide_eq_true_eq]; constructor <;> intro <;> omega
 
 theorem isCont_iff (b : UInt8) : isCont b = true ↔ 0x80 ≤ b.toNat ∧ b.toNat ≤ 0xBF := by
   simp [isCont, UInt8.le_iff_toNat_le]
@@ -93,13 +108,6 @@ theorem is_unicode_scalar_iff (cp : UInt32) :
     Bool.not_eq_true', Bool.and_eq_false_iff, decide_eq_false_iff_not, ge_iff_le,
     UInt32.le_iff_toNat_le, UInt32.toNat_ofNat, Nat.reducePow, Nat.reduceMod]
   constructor <;> intro h <;> omega
-
-macro "byte_table" : tactic => `(tactic| (
-  simp only [isVS, isVSP, List.cons_append, List.nil_append, List.append_nil, Bool.false_eq_true,
-    Bool.eq_false_iff, ne_eq, Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_true,
-    isCont_iff, isLead1_iff, isLead2_iff, isLead3_iff, isLead4_iff, secondOk_iff,
-    cpOf_one, cpOf_two, cpOf_three, cpOf_four] at * <;>
-  first | done | omega | (simp_all <;> omega)))
 
 theorem encodes_of_isVS (seq : List UInt8) (h : isVS seq = true) : encodes seq (cpOf seq) := by
   unfold encodes
@@ -171,20 +179,32 @@ theorem encodes_iff (seq : List UInt8) (cp : UInt32) :
     encodes seq cp ↔ isVS seq = true ∧ cp = cpOf seq :=
   ⟨isVS_of_encodes seq cp, fun ⟨h, e⟩ => e ▸ encodes_of_isVS seq h⟩
 
-/-! ## Byte-table facts (finite case analysis + `omega`) -/
+/-! ## Structural facts about `isVS` / `isVSP` (Bool reasoning; byte classes are disjoint) -/
+
+/-- The lead-byte classes are pairwise disjoint (conditional `simp` rewrites). -/
+theorem lead1_not (a : UInt8) (h : isLead1 a = true) :
+    isLead2 a = false ∧ isLead3 a = false ∧ isLead4 a = false := by
+  simp only [Bool.eq_false_iff, ne_eq, isLead1_iff, isLead2_iff, isLead3_iff, isLead4_iff] at *; omega
+theorem lead2_not (a : UInt8) (h : isLead2 a = true) : isLead3 a = false ∧ isLead4 a = false := by
+  simp only [Bool.eq_false_iff, ne_eq, isLead2_iff, isLead3_iff, isLead4_iff] at *; omega
+theorem lead3_not (a : UInt8) (h : isLead3 a = true) : isLead4 a = false := by
+  simp only [Bool.eq_false_iff, ne_eq, isLead3_iff, isLead4_iff] at *; omega
 
 theorem isVS_isVSP (l : List UInt8) (h : isVS l = true) : isVSP l = true := by
-  rcases l with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, _ | ⟨e, l⟩⟩⟩⟩⟩ <;> byte_table
+  match l with
+  | [_] | [_, _] | [_, _, _] | [_, _, _, _] => simp_all [isVS, isVSP]
+  | [] | _ :: _ :: _ :: _ :: _ :: _ => simp [isVS] at h
 
 theorem isVSP_of_isVS_append (l r : List UInt8) (hne : l ≠ []) (h : isVS (l ++ r) = true) :
     isVSP l = true := by
   rcases l with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, _ | ⟨e, l⟩⟩⟩⟩⟩ <;>
-  rcases r with _ | ⟨x, _ | ⟨y, _ | ⟨z, _ | ⟨w, r⟩⟩⟩⟩ <;> first | exact absurd rfl hne | byte_table
+  rcases r with _ | ⟨x, _ | ⟨y, _ | ⟨z, _ | ⟨w, r⟩⟩⟩⟩ <;> simp_all [isVS, isVSP]
 
 theorem isVS_not_proper (l : List UInt8) (c : UInt8) (e : List UInt8) (h : isVS l = true) :
     isVSP (l ++ c :: e) = false := by
   rcases l with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, _ | ⟨e, l⟩⟩⟩⟩⟩ <;>
-  rcases e with _ | ⟨x, _ | ⟨y, _ | ⟨z, e⟩⟩⟩ <;> byte_table
+  rcases e with _ | ⟨x, _ | ⟨y, _ | ⟨z, e⟩⟩⟩ <;>
+  simp_all [isVS, isVSP, lead1_not, lead2_not, lead3_not]
 
 /-- Second byte that completes a lead byte: the low end of its allowed range. -/
 def secondLo (a : UInt8) : UInt8 :=
@@ -197,20 +217,47 @@ def completion : List UInt8 → List UInt8
   | [a, _] => if isLead3 a then [0x80] else [0x80, 0x80]
   | _ => [0x80]
 
-set_option maxHeartbeats 2000000 in
+theorem secondOk_80 (a : UInt8) (h1 : a ≠ 0xE0) (h2 : a ≠ 0xF0) : secondOk a 0x80 = true := by
+  unfold secondOk; simp only [h1, h2, ite_false]
+  repeat' split
+  all_goals decide
+
+theorem secondOk_secondLo (a : UInt8) : secondOk a (secondLo a) = true := by
+  by_cases h1 : a = 0xE0
+  · subst h1; decide
+  by_cases h2 : a = 0xF0
+  · subst h2; decide
+  simp only [secondLo, h1, h2, ite_false]; exact secondOk_80 a h1 h2
+
+/-- Every completion ends in the byte 0x80, so the completed code point is
+`0 mod 64`, while U+FFFD is `61 mod 64`. -/
 theorem completion_spec (p : List UInt8) (h1 : isVSP p = true) (h2 : isVS p = false) :
     isVS (p ++ completion p) = true ∧ cpOf (p ++ completion p) ≠ 0xFFFD := by
+  have c80 : isCont 0x80 = true := rfl
   rw [ne_eq, ← UInt32.toNat_inj]
-  rcases p with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, l⟩⟩⟩⟩
-  · simp [isVSP] at h1
-  · have k : ∀ c : UInt8, a = c ↔ a.toNat = c.toNat := fun c => UInt8.toNat_inj.symm
+  match p, h1, h2 with
+  | [a], h1, h2 =>
+    simp only [isVS, isVSP] at h1 h2
     simp only [completion]
-    by_cases e0 : a.toNat = 0xE0 <;> by_cases f0 : a.toNat = 0xF0 <;>
-      simp only [secondLo, k, e0, f0, UInt8.toNat_ofNat, Nat.reducePow, Nat.reduceMod, ↓reduceIte] <;>
-      split <;> (try split) <;> byte_table
-  · simp only [completion]; split <;> byte_table
-  · simp only [completion]; byte_table
-  · rcases l with _ | ⟨e, l⟩ <;> byte_table
+    by_cases l2 : isLead2 a = true
+    · have e0 : a ≠ 0xE0 := by rintro rfl; exact absurd l2 (by decide)
+      have f0 : a ≠ 0xF0 := by rintro rfl; exact absurd l2 (by decide)
+      simp [l2, isVS, secondOk_80 a e0 f0, cpOf_two]; omega
+    by_cases l3 : isLead3 a = true
+    · simp [l2, l3, isVS, secondOk_secondLo, c80, cpOf_three]; omega
+    · have l4 : isLead4 a = true := by simp_all
+      simp [l2, l3, l4, isVS, secondOk_secondLo, c80, cpOf_four]; omega
+  | [a, b], h1, h2 =>
+    simp only [isVS, isVSP, Bool.and_eq_true, Bool.or_eq_true] at h1 h2
+    simp only [completion]
+    cases l2 : isLead2 a <;> cases l3 : isLead3 a <;> cases l4 : isLead4 a <;>
+      simp_all [isVS, cpOf_three, cpOf_four] <;> omega
+  | [a, b, c], h1, h2 =>
+    simp only [isVS, isVSP, Bool.and_eq_true, Bool.or_eq_true] at h1 h2
+    simp only [completion]
+    cases l3 : isLead3 a <;> cases l4 : isLead4 a <;> simp_all [isVS, cpOf_four] <;> omega
+  | [_, _, _, _], h1, h2 => simp_all [isVS, isVSP]
+  | [], h1, _ | _ :: _ :: _ :: _ :: _ :: _, h1, _ => simp [isVSP] at h1
 
 theorem isVSP_extends (l : List UInt8) (h : isVSP l = true) : ∃ r, isVS (l ++ r) = true := by
   cases hv : isVS l

@@ -1,0 +1,265 @@
+CHECK-SCRIPTS AUDIT AND HARDENING (2026-11-11, EC2 instance, 12:00-13:00 UTC)
+
+Scope: candidates/aeneas/decoder/check.sh (+ lean/build_pure.sh, lean/build.sh, charon.sh),
+candidates/aeneas/spike/charon.sh, candidates/talos/decoder/check.sh,
+candidates/wasmcert-coq/decoder/check.sh (+ Makefile), candidates/pure-lean/check.sh,
+candidates/pure-rocq/check.sh (+ Makefile).  Journal: CHECK-SCRIPTS-JOURNAL.txt.
+No spec, Boundary file, proof, decoder source or .wasm was changed (only temporary
+mutations, each restored and compared byte for byte afterwards).
+
+VERDICT LINES NOW
+  aeneas/decoder/check.sh       "=== ALL CHECKS PASSED (Ns)"                        exit 0
+  talos/decoder/check.sh        "PARTIAL: checks above passed (...); top-level theorem
+                                 Utf8Boundary.ShippedModuleCorrect NOT proved"      exit 0
+  wasmcert-coq/decoder/check.sh "PARTIAL: checks above passed (...); decoder_module_correct
+                                 proved only conditionally on the unproved step_spec" exit 0
+  pure-lean/check.sh            "ALL CHECKS PASSED"                                  exit 0
+  pure-rocq/check.sh            "ALL CHECKS PASSED (15 laws, RefDecoder_correct,
+                                 step_output_ok: no axioms)"                         exit 0
+  Every failure prints "FAIL: <reason>" and exits non-zero.  PARTIAL exits 0 because no
+  check failed; read the line, not the exit code, for the verdict.
+
+New tracked files: talos/decoder/check.expected.txt and wasmcert-coq/decoder/check.expected.txt
+(the recorded #check / Print / axiom output the scripts compare against; regenerate only
+after reviewing a deliberate statement change).
+
+======================================================================================
+1. aeneas/decoder/check.sh
+--------------------------------------------------------------------------------------
+FINDINGS (before)
+  A-1 Fails from a clean copy: build_pure.sh never created lean/build.            [audit (1)]
+  A-2 `build.sh Types Funs Boundary Proofs | grep ... || true` swallowed every build
+      error; with a stale lean/build a broken Boundary.lean still passed (--fast). [audit (2)]
+  A-3 Step 1 copied spec/pure files and then cmp'd the copy with its own source:
+      tautological "byte-identical".                                             [audit (3)]
+  A-4 No assertion of the type of DecoderProofs.verified; no pin of Boundary.lean. [audit (4)]
+  A-5 decoder.wasm was overwritten by the rebuild, never compared with the shipped file.
+  A-6 --fast reused pure-layer .olean files without checking they match the sources.
+  A-7 Axiom check counted lines and rejected unknown names but did not require the
+      three named theorems; forbidden-word grep lacked unsafe/opaque/skipKernelTC/#exit.
+  A-8 spike/charon.sh: `rm -f lean/Spike/*.lean` deleted tracked Spec.lean, Proofs.lean.
+FIXES
+  - build_pure.sh: mkdir -p build.  check.sh: every build step fatal (no pipes into
+    grep), candidate .olean files deleted before building; "declaration uses sorry"
+    warnings fatal.
+  - Step 0: sha256 pins of spec-lean/Utf8Laws.lean and lean/Boundary.lean (constants at
+    the top of the script; update only after re-review).
+  - Step 1: pure-lean/Utf8Laws.lean vs spec-lean (can fail); lean/pure/* refreshed only
+    when stale (with a note), then compared with pure-lean/* and the pinned spec.
+  - Step 2: rebuild, then cmp with the shipped decoder.wasm (no overwrite).
+  - Step 5 --fast: pure .olean reused only if a sha256 stamp of the five pure sources
+    plus the Lean toolchain matches.
+  - Step 6: generated check file with `example : Boundary.Verified :=
+    DecoderProofs.verified` and `example : Boundary.Verified = (∃ D : Decoder,
+    D.Correct ∧ Boundary.Realizes D) := rfl`; the #print axioms output must equal the
+    expected three lines exactly.
+  - Difftest output must contain "RESULT: PASS" (its exit code is also checked).
+  - Prints a NOT CHECKED paragraph before the pass line.  Repo located from $0.
+  - spike/charon.sh removes only Types.lean and Funs.lean.
+STILL NOT CHECKED
+  Charon/Aeneas/Lean versions (not pinned; AENEAS_BIN/AENEAS_LEAN can redirect);
+  rustc/LLVM release build vs the dev-profile MIR Charon translates; the unsafe shim; the
+  JS wrapper; the Wasm engine.  LEAN_PATH puts the Aeneas library before lean/build, so a
+  library module named Boundary/Proofs would shadow ours (none exists today).
+  The pin is a constant in the script: someone editing Boundary.lean and the pin together
+  is visible only in a diff of check.sh.
+
+======================================================================================
+2. talos/decoder/check.sh
+--------------------------------------------------------------------------------------
+FINDINGS (before)
+  T-1 Printed an unqualified "CHECK PASSED" although ShippedModuleCorrect is not proved
+      (the parenthesis pointed to STATUS.txt).
+  T-2 `lean ... | grep -E error && { FAIL }`: under pipefail a failing lean whose output
+      lacks the word "error" made the && list false, and set -e does not fire there:
+      swallowed.  build/ was never cleaned, so stale .olean files from earlier runs fed
+      later files.
+  T-3 decoder.wasm (tracked, shipped, loaded by decoder.mjs) was OVERWRITTEN by a rebuild
+      from decoder.wat; the shipped artefact was never compared.  (The printed text
+      decoder.printed.wat, which Boundary.lean include_str's, was compared with the
+      rebuild: good, but about the rebuilt bytes, not the shipped ones.)
+  T-4 Copy-then-cmp of the pure layer: tautological (as A-3).  The cmp of the spec with
+      pure-lean's copy was real.
+  T-5 No statement checks at all; #print axioms output checked for unknown names only
+      (a missing theorem would have printed an error line, which the old grep did not
+      reject, but the lean exit code was ignored).
+  T-6 Forbidden-word grep only on the candidate's own files; no pin of Boundary.lean.
+  T-7 Dependencies (Talos checkout built, wasm-tools) were implicit.
+FIXES
+  - Final line now "PARTIAL: ... top-level theorem Utf8Boundary.ShippedModuleCorrect NOT
+    proved", plus a NOT CHECKED paragraph.
+  - Explicit dependency checks (wasm-tools present, Talos .lake/build present, same Lean
+    toolchain) with clear FAIL messages.
+  - sha256 pins of the spec and Boundary.lean.
+  - decoder.wat is rebuilt into a temp dir and must equal the shipped decoder.wasm;
+    `wasm-tools print` of the SHIPPED bytes must equal decoder.printed.wat.  So the bytes
+    the difftest loads are the bytes whose printed text the Lean theorems are about.
+  - rm -rf build before building; every lean failure fatal; sorry warnings fatal.
+  - Generated check file: `example : Utf8Boundary.printedWat = Utf8Wasm.printedWat := rfl`,
+    then `#check @T` and `#print axioms T` for the eight proved partial results; output
+    must equal check.expected.txt (statements and axioms pinned).
+  - Grep extended (unsafe/opaque/skipKernelTC/#exit/debug options) and applied to the
+    pure-layer copies too (bv_decide allowed in comments, as in pure-lean).
+STILL NOT CHECKED
+  The top-level theorem (not proved).  Definitions the partial statements use (runM,
+  stepM, Rel, ... in proof files) are not pinned, only the statement text.  wasm-tools
+  print/parse and Talos's semantics/decoder are trusted; the Talos checkout's commit is
+  not pinned.  Instantiation/validation not modelled.  Wrapper and engine: difftest only.
+
+======================================================================================
+3. wasmcert-coq/decoder/check.sh
+--------------------------------------------------------------------------------------
+FINDINGS (before)
+  W-1 No verdict line at all (last line was the difftest's RESULT: PASS); nothing said the
+      theorem is conditional.
+  W-2 /bin/sh with set -e only; `rocq c Assumptions.v | grep -v ...` took grep's exit
+      status, so a failing Check/Print was swallowed.  The assumption list was printed but
+      never compared with an expected list.
+  W-3 Tracked decoder.wasm and decoder_hex.out were deleted and regenerated; the shipped
+      file was never compared with the regeneration.
+  W-4 The pure-rocq dependency was `test -f ../../pure-rocq/Utf8Proofs.vo` only: stale or
+      partial builds counted.  No check that pure-rocq/Utf8Laws.v is the spec.
+  W-5 Candidate .vo files trusted by make's timestamps (a file restored with an older
+      mtime keeps a newer, stale .vo -- observed during the mutations).
+  W-6 Nothing pinned the meaning of the hypothesis: making step_spec unsatisfiable keeps
+      every file building and every Print Assumptions unchanged (mutation W5 below), so
+      decoder_module_correct_if_step would become vacuous unnoticed.  No Boundary pin.
+FIXES
+  - bash, set -euo pipefail, every rocq/make step's exit status checked.
+  - sha256 pins of spec-rocq/Utf8Laws.v and Boundary.v.
+  - pure-rocq: Utf8Laws.v must equal the spec; every .vo of its _CoqProject must exist and
+    be newer than its .v, else FAIL "run pure-rocq/check.sh first" (not rebuilt here:
+    9 min).  Its axioms are covered transitively by the Print Assumptions comparison.
+  - Hole grep extended (Axioms/Parameters/Conjecture, Unset ... Checking, Bypass, Admit
+    Obligations).  Candidate .vo/.glob deleted before `make all`.
+  - decoder.wasm regenerated from the term must equal the shipped copy; on mismatch the
+    shipped file is restored, the regeneration kept as decoder.wasm.regenerated, FAIL.
+  - Generated check file: Check decoder_module_correct_if_step, Check
+    decoder_bytes_parse_back, Print decoder_bytes, Print step_spec, Print Assumptions of
+    five theorems; output must equal check.expected.txt.
+  - Final "PARTIAL: ..." line and NOT CHECKED paragraph.
+STILL NOT CHECKED
+  step_spec (not proved), determinism, WasmCert's printer (parse-back is checked), its
+  semantics and library axioms (listed and pinned), the node hex-to-bytes step, wrapper and
+  engine.  Pure-rocq staleness is mtime-based.  decoder.roundtrip.wat (tracked) is not
+  checked: `wasm-tools print decoder.wasm` differs from it textually (it came from another
+  printer); it is documentation only.  check.expected.txt prints pure-layer names
+  (Utf8Proofs.Inv, Utf8Ref.step): the concurrent pure-rocq rewrite may change them, and
+  then this script FAILS loudly until the new output is reviewed and recorded.
+
+======================================================================================
+4. pure-lean/check.sh (small edit; proof files untouched)
+--------------------------------------------------------------------------------------
+FINDINGS  P-L1 #print axioms only: `foo_proved` could have any type.  P-L2 the axiom file's
+  lean run was piped into tee (exit status of lean ignored except via pipefail; fine) --
+  now run to a file and checked explicitly.  P-L3 copy-then-cmp of the spec is
+  tautological but harmless (the build uses the copied spec).  P-L4 mktemp dirs leak on
+  failure (cosmetic).  Clean-checkout: OK (builds into temp dirs).
+FIX  The generated Axioms.lean also contains `example : <law> := <law>_proved` for the 15
+  laws and `example : Decoder.Correct RefDecoder := RefDecoder_correct`; lean's exit
+  status is checked.
+STILL NOT CHECKED  bv_decide is allowed in comments by a heuristic (`^[^-]*`); the axiom
+  list is the backstop.
+
+======================================================================================
+5. pure-rocq/check.sh (small edit; proof files untouched)
+--------------------------------------------------------------------------------------
+FINDINGS  P-R1 `coqc PrintAssumptions.v | grep -v 'Running as root'`: under /bin/sh the
+  pipeline's status is grep's, so a failing `Check X : T` (type mismatch) or a missing
+  theorem was swallowed.  P-R2 "Closed under the global context" never asserted, so an
+  axiom would only be visible to a reader.  P-R3 no pass line.  Spec copy: the Makefile
+  copies spec-rocq/Utf8Laws.v when different and cmp's (fine).  Clean checkout: OK.
+FIX  bash + set -euo pipefail; coqc output to a temp file with its exit status checked;
+  exactly 17 "Closed under the global context" required; pass line added.
+STILL NOT CHECKED  Unset Guard Checking etc. are not grepped (Print Assumptions would
+  list them, so the count check catches them in the 17 theorems).
+
+======================================================================================
+6. MUTATIONS (each restored and cmp-verified; logs in the session scratchpad chk/)
+--------------------------------------------------------------------------------------
+Format: time name: exit code, verdict line.  'Old' = what the pre-audit script would have done (by reading / where run).
+  12:12 A1-boundary-corrupt: exit=1  last verdict: FAIL: lean/Boundary.lean differs from the reviewed version
+  12:12 A2-spec-lean-changed: exit=1  last verdict: FAIL: spec-lean/Utf8Laws.lean is not the audited spec
+  12:12 A3-pure-lean-spec-copy-changed: exit=1  last verdict: FAIL: pure-lean/Utf8Laws.lean differs from spec-lean/Utf8Laws.lean
+  12:12 A4-sorry-in-proofs: exit=1  last verdict: FAIL: forbidden construct in lean/Proofs.lean
+  12:12 A5-wasm-altered: exit=1  last verdict: FAIL: shipped decoder.wasm differs from a rebuild of src/lib.rs (copy target/wasm32-unknown-unknown/release/decoder.wasm over it if the source change is intended)
+  12:12 A6-rust-source-changed: exit=1  last verdict: FAIL: shipped decoder.wasm differs from a rebuild of src/lib.rs (copy target/wasm32-unknown-unknown/release/decoder.wasm over it if the source change is intended)
+  12:13 A7-weaken-verified-type: exit=1  last verdict: FAIL: top-level statement check
+  12:13 A8-boundary-noncompiling-pin-updated: exit=1  last verdict: FAIL: build of lean/Boundary.lean
+  12:13 W1-boundary-corrupt: exit=1  last verdict: FAIL: Boundary.v differs from the reviewed version
+  12:13 W2-spec-rocq-changed: exit=1  last verdict: FAIL: spec-rocq/Utf8Laws.v is not the audited spec
+  12:13 W3-wasm-altered: exit=1  last verdict: FAIL: shipped decoder.wasm differs from the bytes printed from decoder_module (kept as decoder.wasm.regenerated)
+  12:13 W4-admitted-in-decode: exit=1  last verdict: FAIL: proof holes found
+  12:14 W5-step_spec-made-unsatisfiable: exit=1  last verdict: FAIL: statements or assumptions differ from check.expected.txt
+  12:14 T1-boundary-corrupt: exit=1  last verdict: FAIL: Boundary.lean differs from the reviewed version
+  12:14 T2-wasm-altered: exit=1  last verdict: FAIL: shipped decoder.wasm differs from a rebuild of decoder.wat
+  12:14 T3-printed-wat-altered: exit=1  last verdict: FAIL: decoder.printed.wat is not the printed text of the shipped decoder.wasm
+  12:14 T4-sorry-in-proofmodel: exit=1  last verdict: FAIL: forbidden construct in ProofModel.lean
+  12:14 T5-pure-lean-spec-copy-changed: exit=1  last verdict: FAIL: pure-lean/Utf8Laws.lean differs from the spec
+  12:17 T6-wat-comment-changed (control, harmless edit): exit=0  last verdict: PARTIAL: checks above passed (shipped wasm = rebuild, printed text matches, clean build, statements and axioms as recorded, difftest PASS); top-level theorem Utf8Boundary.ShippedModuleCorrect NOT proved
+  12:17 T7-wat-code-changed: exit=1  last verdict: FAIL: shipped decoder.wasm differs from a rebuild of decoder.wat
+  12:20 T8-weaken-stepM_nil-statement: exit=1  last verdict: FAIL: statements or axioms of the partial results differ from check.expected.txt
+  12:21 PR1 pure-rocq: `Check RefDecoder_correct : False.` injected into the generated PrintAssumptions.v
+        (checker-level injection; proof files of pure-rocq are off-limits): OLD script exit 0
+        (error swallowed by `| grep`), NEW script exit 1 "FAIL: PrintAssumptions.v".  CAUGHT
+  12:23 PL1 pure-lean: generated check file with `example : bit8_value_word := bit8_value_sum_proved`
+        (mismatched type, run against built pure-layer oleans): lean exit 1 "Type mismatch";
+        the new check.sh runs exactly this kind of `example` per law and fails on lean's exit.  CAUGHT
+        (the old script had no type check; it would have passed).
+  12:27 A9 aeneas --fast with a corrupted pure-layer stamp: pure layer rebuilt, then PASS
+        (stale .olean files are no longer trusted).  As intended.
+Notes on the mutations
+  - All mutations caught except T6, a control (an edit inside a decoder.wat comment, which
+    leaves the stripped bytes unchanged) that correctly still passes.
+  - Old behaviour, for comparison: A1/A8 (Boundary broken, stale build) printed ALL CHECKS
+    PASSED under --fast (demonstrated by the earlier audit); A5/T2/W3 (shipped .wasm altered)
+    were silently overwritten by a rebuild, so the altered file was never checked but also
+    never shipped -- the tracked file changed under the user; A7 (verified : True) passed
+    (only axiom names were checked); W5 (step_spec made unsatisfiable, so the conditional
+    theorem is vacuous) builds and leaves every Print Assumptions unchanged -- the old
+    script passed it, only the new Print step_spec pin catches it; T8 (weaker stepM_nil)
+    passed the old script.
+  - A8 was run with a copy of check.sh whose Boundary pin had been updated to the
+    mutated file, to exercise the build-error path independently of the pin.
+  - Every mutated file was restored with cp -p and compared with its backup.  Restoring
+    with the old mtime can leave newer stale build outputs (cargo target/, Rocq .vo):
+    lib.rs was touched afterwards, and the WasmCert script now deletes candidate .vo
+    files before building, so this cannot produce a false pass.
+
+======================================================================================
+7. PATHS (task D)
+  All five check scripts locate the repo from their own path ($0); none contains
+  /root/bend/utf8.  The path still matters for: third-party Lean build metadata in
+  candidates/talos/talos/.lake (built at the old path; the /root/bend/utf8 symlink keeps
+  it working), generated Makefile.coq files (regenerated by make), and
+  difftest/adapters/bend_utf8.mjs (default BEND_UTF8 path; not used by these checks).
+
+8. REMAINING ISSUES / IDEAS NOT DONE
+  - Pin tool versions (Aeneas nightly hash, Talos commit, coq-wasm version, wasm-tools)
+    by printing and comparing them.
+  - Aeneas: put lean/build before the Aeneas library on LEAN_PATH, or check module origins.
+  - Talos/WasmCert: pin the definitions used in the partial statements (Print/#print of
+    runM, stepM, Rel, frame_of, writes ...), or better, finish the proofs so only the
+    Boundary statement matters.
+  - pure-rocq staleness by content hash instead of mtime (as Aeneas --fast now does).
+  - The Boundary pins live in each check.sh; a separate reviewed BOUNDARY.sha256 file
+    might make a pin update more visible to the user.
+
+9. CLEAN-CHECKOUT AND FINAL RUNS (contended machine; times not measurements)
+  aeneas   run with target/ and lean/build/ removed: ALL CHECKS PASSED (12:04); --fast after
+           the mutations: PASS (12:27); stamp-mismatch --fast: rebuilt, PASS (12:28).
+  talos    always rm -rf build first, so every run is a clean build: PARTIAL line (12:12, and
+           T6 control 12:17).  Third-party talos/talos and talos/tools must exist (checked).
+  wasmcert candidate .vo deleted before every build: PARTIAL line (12:23), run against the
+           NEW pure-rocq layer that the other agent copied back at about 12:20
+           (Utf8Check.v replaced by Utf8Bridge.v; check.expected.txt still matched).
+  pure-lean ALL CHECKS PASSED on both toolchains (12:25, current pure-lean files).
+  pure-rocq ALL CHECKS PASSED (12:21, on the new layer).  The other agent preserved my
+           check.sh edits and changed the hole-grep file list Utf8Check.v -> Utf8Bridge.v.
+  Interference seen: another agent ran `make -f Makefile.coq clean; make all` inside
+  wasmcert-coq/decoder at 12:22, which deleted the tracked decoder_hex.out mid-way through
+  my run (restored from git; the script now tolerates a missing hex intermediate).
+  Final runs 12:29-12:31 after the other agent replaced pure-lean (12:26): pure-lean PASS,
+  aeneas PASS, talos PARTIAL.  The aeneas and talos scripts refreshed their tracked copies
+  of Utf8Bits/Utf8Table/Utf8Proofs from the new pure-lean (shown as modified in git status;
+  intended -- they are duplicates the scripts keep equal to pure-lean).

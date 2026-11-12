@@ -39,3 +39,20 @@
 14:11 Kernel-only versions swapped in; Utf8Proofs needed only encodes_two reproved.
       Backup of the bv_decide version kept outside the project (scratchpad).
 14:18 check.sh (kernel-only version) passes on v4.35.0 and v4.36.0-rc2: ALL CHECKS PASSED, 6m22s wall. Axioms: subsets of propext, Classical.choice, Quot.sound. STATUS.txt written. Elapsed 34 min. Stop.
+
+2026-11-11 IMPROVEMENT PASS (EC2; work done in a scratch copy, copied back when check.sh passed there)
+12:00 Start. Read AGENTS.md, HANDOVER, BASELINE, STATUS, journal, sources.
+12:03 Scratch copies orig/ (untouched baseline) and new/ (work). Downstream names used (grep): Pending RefDecoder RefDecoder_correct State cpOf cpOf_one..four decodeBuffer decodeBuffer_pending decodeDone decodeDone_pending isCont isLead1..4 isVS isVSP secondOk step stepAcc stepFresh step_nil. Downstream build scripts hard-code the file list Utf8Laws Utf8Bits Utf8Ref Utf8Table Utf8Proofs -> keep the five file names.
+12:06 Profiled (4.36, trace.profiler): Utf8Table: completion_spec 76 s of ~85 s (3 omega calls of 22, 12, 9 s plus many smaller); others encodes_of_isVS 2.3, isVSP_of_isVS_append 2.6, isVS_of_encodes 1.5, isVS_isVSP 1.0 s. Utf8Bits: omega calls of 1-4 s in each of one/two/three/four_shape (20-32 div/mod atoms) plus type checking 0.5-1.2 s each.
+12:08 completion_spec rewritten: case split on lead class (isLead2/3/4 Bools), not on byte values; "cpOf <> U+FFFD" via "completion ends in 0x80, so cp = 0 mod 64". Utf8Table 44 s -> 3.2 s. Two small slips: simp did not close `isCont 0x80 = true` (needed it as a fact), `if_false` deprecated in favour of `ite_false`.
+12:10 Bits attempt 1 (dead end): give omega the 32-bit sum `cp.toNat = sum bit_i 2^i`: timeouts; with bits generalised to variables 17 s (slower than 12 s). omega's cost is the number of div/mod atoms in context, not missing facts.
+12:13 Bits attempt 2: no omega for bounds (Nat.testBit_lt_two_pow / Nat.lt_pow_two_of_testBit), per-byte omega with <= 8 atoms (macro byte_value). Slips: rcases pattern `rfl` inside a macro quotation is renamed by hygiene and became a plain name (fixed with `e` + subst); omega with 11-21 bit atoms in one goal times out -> per byte. All four shapes 1.8 s.
+12:16 Table: isVS_isVSP / isVSP_of_isVS_append / isVS_not_proper are Bool facts plus disjointness of the lead classes (lead1_not/lead2_not/lead3_not); simp_all without omega, first try. Removed the byte_table macro (simp at * + `first | omega | simp_all <;> omega`).
+12:17 Tried rcases on the 5-way secondOk disjunction before omega in encodes_of_isVS: no gain (2.5 s vs 2.1 s), reverted. Most of the remaining time is many 100-600 ms omega calls plus kernel checking.
+12:18 check.sh in scratch: ALL CHECKS PASSED, 13.9 s wall (both versions).
+12:19 bv_decide micro-benchmark (4 table facts): 0.38 s vs arithmetic 0.46 s; each call adds an axiom `<thm>._native.bv_decide.ax_*` (`verifyBVExpr e c = true`, checked by compiled code).
+12:21 Downstream: Aeneas copy (pure + own Lean, against ~/aeneas-nightly) compiles, axioms standard. Talos copy: my first script lacked decoder.printed.wat and passed a relative path (include_str needs the file's directory) - fixed in my script, not a pure-layer issue.
+12:23 Tried one generic proof for all four lengths of encodes_of_isVS (13 lines instead of 45): works, but 3.2 s vs 2.1 s; kept the faster explicit version.
+12:21 secondOk_iff: `repeat' split` on the definition's ifs, one omega per branch (was 16 by_cases + `first | omega | (constructor ...) | (simp_all <;> omega)`). secondOk_80: `repeat' split; all_goals decide` instead of `split <;> (try split) <;> decide`.
+12:24 Shape lemmas: `hne _ _ ... (by simp only [testBit_high ...]; rfl)` works with holes (the earlier timeout I had blamed on this was in byte_value), so the 21-argument explicit bit lists went.  Added docstrings and headers listing exports.
+12:26 Measured before/after per file, both toolchains (contended).  Wrote IMPROVEMENT.txt and STATUS.txt.  Statement diff old vs new: only additions plus two removed internal Bits lemmas (getLsbD_toNat, getLsbD_false).

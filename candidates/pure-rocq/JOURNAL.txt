@@ -46,3 +46,46 @@
       if-then-else fix to check_all was sufficient; checkB_comp just needed ~4-5 min.
       checkA_comp speed-up not attempted (a rebuild alone would exceed the remaining time).
 15:05:22 Stop.  Total ~75 min (60 + 15 of the 30-min extension).
+
+==== Improvement pass, 2026-11-11 (EC2), new agent; time box 60 min ====
+12:00 Start.  Read AGENTS.md, HANDOVER sections, BASELINE-EC2, STATUS, JOURNAL, sources.
+      Grepped ../wasmcert-coq/decoder (+wip) identifiers against this layer's names:
+      used = RefDecoder, RefDecoder_correct, State, step, step_empty, step_acc,
+      ref_decode_buffer, ref_done, FFFD, Inv, Inv_len, step_inv.  Decided: keep
+      Utf8Ref.v byte-identical, replace Utf8Check.v by a symbolic Utf8Bridge.v.
+      Worked in a scratch copy (scratchpad/pure-rocq-work).
+12:03 Prototype of the central lemma encoding_form (encoding cp as arithmetic).
+      First try destructed the 11 top bits fully (2048 cases): correct but 25 s.
+      Second try destructed bits MSB-first and stopped at the first true bit: the
+      shape matches got STUCK, because the compiled pattern match does not test the
+      bits in MSB order across the four byte groups (it tests e.g. bit 7 before
+      the second group).  Fix: a tactic that destructs exactly the variable a stuck
+      `if` scrutinizes, after each cbn -- about 30 leaves, 2 s.
+12:05 lia failed on the 4-byte leaves when utf8_form used n / 262144 and
+      (n / 4096) mod 64 over 21 symbolic bits.  Restated utf8_form linearly
+      (n = ((b1 - F0)*64 + (b2 - 80))*64 + ...); then all leaves close.
+12:07-12:10 Small tactic fights: rewrite with N.pow_succ_r' hit the wrong
+      occurrence (used explicit replace); `change ... with (low_bits 32 0 n)` not
+      convertible because of a trailing `+ 2 * 0` (used transitivity + N.add_0_r);
+      Python heredoc ate the trailing backslashes of `/\` line ends once (wrote
+      files more carefully after that).
+12:10 Discovered plain lia does NOT handle N.modulo by constants here ("Cannot
+      find witness" on x in 194..223 -> x mod 32 = x - 192).  zify;
+      Z.to_euclidean_division_equations; lia works, but made the file 33 s.
+      Adding `try (exfalso; lia)` right after the class split -> 13 s.
+12:12 pending_completion first version ran > 2 min (killed): rewrites of
+      hi2 and of bN x80 happened before cbn exposed them, so lia_mod ground on
+      goals with opaque atoms.  Reordered (cbn first, then rewrite) -> 2 s.
+12:14 Utf8Proofs.v adapted: dropped the moved/obsolete lemmas, compiled first try.
+12:16 Full check.sh in scratch: PASS, 26 s.  Copied back (sources, _CoqProject,
+      check.sh hole-grep file list, Makefile comment; deleted Utf8Check.v,
+      stub-build/, stale compiled files).  check.sh in place: PASS.
+      WasmCert decoder `make all` against it: PASS; wip/StepWIP.v compiles.
+      Mistake: `make clean` in the decoder dir deletes the tracked decoder_hex.out;
+      restored it with git checkout.  One decoder build exited with status 2
+      without an error message, probably colliding with another agent's
+      concurrent build there; a clean rebuild right after exited 0.
+12:19 Second pass: replaced the euclidean-division lia by rewriting each mod with
+      mod_offset once the byte class is known (plain lia after): Bridge 14 s -> 9 s.
+      Copied back again; check.sh in place PASS (22.7 s wall), decoder build PASS.
+12:24 Wrote STATUS.txt, IMPROVEMENT.txt, this entry.  Total ~25 min.
