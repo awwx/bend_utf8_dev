@@ -22,19 +22,20 @@ whether the next character begins a line, transforms incoming chunks, queues
 writes, and requests output closing. The bridge handles Node API adaptation
 and encoding conversion; it contains no line-prefix algorithm.
 
-Each call passes up to 4096 Unicode scalars as little-endian 32-bit words.
-Input occupies the first 16 KiB of a fixed 64 KiB Wasm memory; the other 48 KiB
-holds the worst-case output. A chunk takes one call into Wasm and one output
-write, including when it contains many lines. Each output write captures
-immutable text before the next call reuses memory. There is no whole-file
-size bound and no cumulative i32 file counter.
+Each call passes a JavaScript string of at most 4096 UTF-16 code units.
+The bridge avoids splitting surrogate pairs and passes the string directly
+as an externref. Wasm uses native `intoCharCodeArray` to copy it into an i16
+GC array, transforms the units, and uses `fromCharCodeArray` to capture the
+output string before queuing a single write. The module allocates two local
+arrays per callback and retains only its line-start flag and stream handles.
+There is no linear memory, whole-file size bound, or cumulative i32 counter.
 
 ## Build and verify
 
 Use the existing Talos environment described in
 [the setup notes](../candidates/talos/SETUP.md). The pinned dependencies are
 Lean 4.35.0, Talos commit `d7c84ac660757953b752bdfc9cb8dae3dab623ed`, and
-wasm-tools 1.251.0. Runtime tests were run with Node 26.13.0.
+wasm-tools 1.251.0. Runtime tests use Node 26.13.0 with native `js-string` builtin support.
 
 ```sh
 ./line-prefix/build.sh   # Rebuild the shipped bytes and canonical WAT.
@@ -51,32 +52,37 @@ run must include replay.
 The runtime tests include empty input, final and consecutive LFs, CRLF,
 supplementary characters, byte splits inside UTF-8 sequences, all raw
 partitions of a small Unicode input, chunk boundaries after LF, worst-case
-output capacity, delayed write completion and buffer reuse, every Unicode
-scalar, and real-file I/O. Tests check the trusted runtime boundary; they are
+output capacity, delayed write completion and immutable string capture, every
+Unicode scalar, and real-file I/O. They also check that the engine supplies
+both native builtin imports and the module exports no linear memory. Tests check the trusted runtime boundary; they are
 not substitutes for the universal proofs.
 
-The full check passed on 2026-11-13 on an m8i.2xlarge: 3 minutes 11 seconds
-wall time and approximately 6.8 GiB peak process RSS. Independent kernel
-replay checked 12,545 non-core declarations. All six audited results use only
-`propext`, `Classical.choice`, and `Quot.sound`. Runtime checks passed 376
-stream cases, the all-Unicode-scalars case, and real-file byte-split I/O.
+The full GC/builtin verification passed on 2026-11-13 on an m8i.2xlarge:
+2 minutes 54 seconds wall time and approximately 6.9 GiB peak process RSS.
+Independent kernel replay checked 12,614 non-core declarations. All eight
+audited results use only `propext`, `Classical.choice`, and `Quot.sound`.
+Runtime checks passed 463 stream cases, every Unicode scalar, and real-file
+byte-split I/O, using the native builtins.
 
 ## Specification and proof organization
 
 - `TextSpec.lean`: independent predecessor-based `prefixLines`, scalar validity,
   chunk composition and UTF-8 output properties. Reuses the accepted UTF-8
   laws and checked decoder facts from the earlier developments.
-- `WasmMemory.lean`: 32-bit memory roundtrips and preservation of disjoint regions.
-- `WasmTransform.lean`: the bounded memory transformation agrees with the text
-  algorithm, preserves input reads, and stays within the output region.
+- `Utf16.lean`: scalar/UTF-16 representation, surrogate bounds, decoding
+  roundtrip, and correctness of processing UTF-16 units.
+- `GcSupport.lean`: GC heap lookup/update and fixed-capacity output array facts.
+- `WasmGcHosts.lean`: builtin conversion and string-write invocation proofs.
+- `WasmGcEntry.lean` and `WasmGcExit.lean`: allocation, input conversion,
+  output conversion, and queueing at the callback boundaries.
 - `WasmModule.lean`: the exact module decoded from canonical WAT.
 - `Wasm.lean`: individual host operations, initialization and close callbacks.
 - `WasmLoop.lean` and `WasmCallback.lean`: actual Talos execution of the data
-  callback and its loop, including memory access and host argument bounds.
+  callback and its loop, including array access and host argument bounds.
 - `Execution.lean`: stream queues, asynchronous completion, progress, universal
   completed-output correctness and a concrete eager execution witness.
-- `WasmExecution.lean`: refinement using persistent Talos stores and actual
-  callback execution, connecting the module to the stream theorem.
+- `WasmExecution.lean`: refinement using persistent Talos stores, GC heaps, immutable
+  host strings, and actual callback execution, connecting the module to the stream theorem.
 - `Proof.lean`: the final claims, discharging the callback proof obligations
   for the shipped module. `Audit.lean` checks their types and axioms.
 
@@ -104,7 +110,8 @@ engine must agree with the pinned Talos semantics, including instance
 initialization. Node and the bridge must implement the individual contracts
 in `CONTRACTS.md`. JavaScript source itself is not formally verified.
 
-The representation avoids GC, string builtins, and linear-memory allocation.
-That is a choice for this demo, not a claim about Talos's support for future
-projects using those features. The proof does not establish timing,
-throughput, bounded host memory, or security noninterference.
+The string builtins have explicit formal host models; their implementations
+in Node/V8 remain trusted. The bridge enables them through Wasm compilation
+options and supplies no JavaScript conversion polyfills. GC is modeled as
+abstract allocation without reclamation. The proof does not establish timing,
+throughput, bounded host memory, collection latency, or security noninterference.

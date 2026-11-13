@@ -9,6 +9,17 @@ function expected(text) {
   const chars = Array.from(text);
   return chars.map((c, i) => (i === 0 || chars[i - 1] === '\n' ? '> ' : '') + c).join('');
 }
+// Confirm that the shipped module imports both native string builtins, and
+// that enabling them removes those imports from the JS linking interface.
+const wasmBytes = await readFile(new URL('./prefix.wasm', import.meta.url));
+const rawModule = new WebAssembly.Module(wasmBytes);
+assert.deepEqual(WebAssembly.Module.imports(rawModule)
+  .filter(i => i.module === 'wasm:js-string').map(i => i.name).sort(),
+  ['fromCharCodeArray', 'intoCharCodeArray']);
+const builtinModule = new WebAssembly.Module(wasmBytes, { builtins: ['js-string'] });
+assert(WebAssembly.Module.imports(builtinModule).every(i => i.module === 'bridge'));
+assert(!WebAssembly.Module.exports(builtinModule).some(e => e.kind === 'memory'));
+
 let cases = 0;
 async function check(text, buffers, chunkSize = MAX_CHUNK) {
   const accepted = [];
@@ -17,7 +28,7 @@ async function check(text, buffers, chunkSize = MAX_CHUNK) {
     const writer = new Writable({
       highWaterMark: 1, // Make write(false) common; acceptance must still be FIFO.
       write(bytes, encoding, done) {
-        // Defer completion until after Wasm has reused its output buffer.
+        // Defer completion beyond the callback and subsequent GC-array allocations.
         setImmediate(() => { accepted.push(Buffer.from(bytes)); done(); });
       },
     });
@@ -34,7 +45,7 @@ const examples = ['', 'hello', 'hello\n', 'hello\nworld', '\n', '\n\n',
   String.fromCodePoint(0xd7ff, 0xe000, 0x10ffff)];
 for (const text of examples) {
   const bytes = Buffer.from(text);
-  for (const chunkSize of [1, 2, 7, MAX_CHUNK]) {
+  for (const chunkSize of [1, 2, 3, 7, MAX_CHUNK]) {
     await check(text, bytes.length ? [bytes] : [], chunkSize);
     for (let cut = 1; cut < bytes.length; cut++)
       await check(text, [bytes.subarray(0, cut), bytes.subarray(cut)], chunkSize);
@@ -53,9 +64,11 @@ for (let mask = 0; mask < 1 << (smallBytes.length - 1); mask++) {
   buffers.push(smallBytes.subarray(start));
   await check(small, buffers, 2);
 }
-// Worst expansion exactly fills the output region; persistent line state crosses chunks.
+// Worst expansion exactly fills the output array; persistent line state crosses chunks.
 for (const text of ['\n'.repeat(MAX_CHUNK * 2 + 1),
-    'a'.repeat(MAX_CHUNK - 1) + '\n😀tail\n', 'a'.repeat(MAX_CHUNK * 2 + 1)])
+    'a'.repeat(MAX_CHUNK - 1) + '\n😀tail\n', 'a'.repeat(MAX_CHUNK * 2 + 1),
+    'a'.repeat(MAX_CHUNK - 1) + '😀\n𝄞tail',
+    '😀'.repeat(MAX_CHUNK + 1)])
   await check(text, [Buffer.from(text)]);
 // Exercise every Unicode scalar, including supplementary characters.
 const blocks = [];

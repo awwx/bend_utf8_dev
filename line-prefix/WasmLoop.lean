@@ -1,192 +1,197 @@
 import Wasm
-import WasmTransform
+import WasmGcExit
+import GcSupport
 import Interpreter.Wasm.Examples.UIntLemmas
-/-!
-The instruction proof splits into one iteration, induction on the remaining
-word count, and the final imported write. Every transition uses Talos's
-`SmallStep.Step`; no independent evaluator supplies the execution relation.
-Natural-number loop indices are related to i32 locals with checked bounds.
-One memory page holds 4096 input scalar words and 12288 output scalar words.
--/
 namespace PrefixWasm
-open Wasm SmallStep
+open Wasm SmallStep PrefixGc
 
 def prefixBody : Program :=
-  [.localGet 2, .const 62, .store32 0,
-   .localGet 2, .const 4, .add, .localSet 2,
-   .localGet 2, .const 32, .store32 0,
-   .localGet 2, .const 4, .add, .localSet 2]
+  [.localGet 3, .localGet 5, .const 62, .gc (.arraySet 0),
+   .localGet 5, .const 1, .add, .localSet 5,
+   .localGet 3, .localGet 5, .const 32, .gc (.arraySet 0),
+   .localGet 5, .const 1, .add, .localSet 5]
 def tailBody : Program :=
-  [.localGet 2, .localGet 3, .store32 0,
-   .localGet 2, .const 4, .add, .localSet 2,
-   .localGet 3, .const 10, .eq, .globalSet 0,
-   .localGet 1, .const 4, .add, .localSet 1,
-   .localGet 0, .const 1, .sub, .localSet 0, .br 0]
+  [.localGet 3, .localGet 5, .localGet 6, .gc (.arraySet 0),
+   .localGet 5, .const 1, .add, .localSet 5,
+   .localGet 6, .const 10, .eq, .globalSet 0,
+   .localGet 4, .const 1, .add, .localSet 4,
+   .localGet 1, .const 1, .sub, .localSet 1, .br 0]
 def loopBody : Program :=
-  [.localGet 0, .eqz, .br_if 1,
-   .localGet 1, .load32 0, .localSet 3,
+  [.localGet 1, .eqz, .br_if 1,
+   .localGet 2, .localGet 4, .gc (.arrayGetU 0), .localSet 6,
    .globalGet 0, .iff 0 0 prefixBody []] ++ tailBody
 def afterLoop : Program :=
-  [.globalGet 2, .const 16384, .localGet 2, .const 16384, .sub,
-   .const 4, .divU, .call 4]
+  [.globalGet 2, .localGet 3, .const 0, .localGet 5, .call 7, .call 4]
 def blockFrame : ControlFrame :=
   { kind := .block, paramArity := 0, resultArity := 0,
     body := [.loop 0 0 loopBody], continuation := afterLoop, belowStack := [] }
 def loopFrame : ControlFrame :=
   { kind := .loop, paramArity := 0, resultArity := 0,
     body := loopBody, continuation := [], belowStack := [] }
-def machine (s : Bool) (log : Host) (mem : Mem) : MachineStore Host :=
+def machine (s : Bool) (host : Host) (heap : List GcObject) : MachineStore Host :=
   { runtime := { instances := #[{ module := prefixModule, host := env }], entry := ⟨0⟩ }
-    wasm := store s log mem }
-def loopHead (s : Bool) (log : Host) (mem : Mem) (p n q : Nat) (c : UInt32) : Config Host :=
+    wasm := store s host heap }
+def loopHead (s : Bool) (host : Host) (heap : List GcObject)
+    (input written : List UInt32) (cap i n ref : Nat) (c : UInt32) : Config Host :=
   ⟨.running
-    { locals := { params := [.i32 (UInt32.ofNat n)],
-                  locals := [.i32 (UInt32.ofNat p), .i32 (UInt32.ofNat q), .i32 c] }
+    { locals := { params := [.externref (some ref), .i32 (UInt32.ofNat n)],
+                  locals := [.anyref (some (.array heap.length)), .anyref (some (.array (heap.length+1))),
+                    .i32 (UInt32.ofNat i), .i32 (UInt32.ofNat written.length), .i32 c] }
       code := loopBody, resultArity := 0, callerRemainder := []
-      control := [loopFrame, blockFrame] }, machine s log mem⟩
+      control := [loopFrame, blockFrame] },
+    machine s host (arrayHeap heap input (padded cap written))⟩
 
-theorem module_body : prefixModule.funcs[1]?.map (·.body) =
-    some ([.const 16384, .localSet 2, .block 0 0 [.loop 0 0 loopBody]] ++ afterLoop) := rfl
+theorem get_eval (s : Bool) (host : Host) (heap : List GcObject) (input output : List UInt32)
+    (i : Nat) (cp : UInt32) (hi : i < 2^32) (hc : input[i]? = some cp)
+    (params locals vs : List Value) :
+    execGcOp prefixModule (store s host (arrayHeap heap input output))
+      { params := params, locals := locals, values := .i32 (UInt32.ofNat i) :: .anyref (some (.array heap.length)) :: vs }
+      (.arrayGetU 0) =
+    .Fallthrough (store s host (arrayHeap heap input output))
+      { params := params, locals := locals, values := .i32 cp :: vs } := by
+  simp only [execGcOp, store, arrayHeap_input]
+  rw [UInt32.toNat_ofNat_of_lt' hi, List.getElem?_map, hc]
+  rfl
 
-def advance (s : Bool) (m : Mem) (p q : Nat) : Bool × Mem × Nat :=
-  let cp := m.read32 (UInt32.ofNat p)
-  let ys := LinePrefix.emit s cp
-  (cp == 10, writeWords m q ys, q + 4*ys.length)
+theorem set_eval (s : Bool) (host : Host) (heap : List GcObject) (input written : List UInt32)
+    (cap : Nat) (cp : UInt32) (hc : cp.toNat < 65536)
+    (hw : written.length < cap) (hcap : cap < 2^32)
+    (params locals vs : List Value) :
+    execGcOp prefixModule (store s host (arrayHeap heap input (padded cap written)))
+      { params := params, locals := locals, values := [.i32 cp, .i32 (UInt32.ofNat written.length), .anyref (some (.array (heap.length+1)))] ++ vs } (.arraySet 0) =
+    .Fallthrough (store s host (arrayHeap heap input (padded cap (written++[cp]))))
+      { params := params, locals := locals, values := vs } := by
+  have hi : written.length < 2^32 := by omega
+  simp only [List.cons_append, List.nil_append, execGcOp, store, arrayHeap_output]
+  rw [UInt32.toNat_ofNat_of_lt' hi]
+  have hl : ((padded cap written).map Value.i32).length = cap := by
+    simp [padded]; omega
+  rw [hl, ite_eq_right (by omega)]
+  change Continuation.Fallthrough { (store s host (arrayHeap heap input (padded cap written))) with
+    gcHeap := (arrayHeap heap input (padded cap written)).set (heap.length+1)
+      (.array 0 (((padded cap written).map Value.i32).set written.length (.i32 (cp &&& 65535)))) }
+    {params := params, locals := locals, values := vs} = _
+  rw [mask16 cp hc, arrayHeap_set_output, padded_push cap written cp hw]
+  rfl
 
 def iterTrace (s : Bool) : List StepKind :=
-  (([.localGet 0, .eqz, .br_if 1, .localGet 1, .load32 0, .localSet 3,
-    .globalGet 0, .iff 0 0 prefixBody []] : Program) ++ (if s then prefixBody else [])).map
-      StepKind.instruction ++ [.administrative .exitControl] ++ tailBody.map StepKind.instruction
+  (([.localGet 1, .eqz, .br_if 1, .localGet 2, .localGet 4, .gc (.arrayGetU 0),
+    .localSet 6, .globalGet 0, .iff 0 0 prefixBody []] : Program) ++
+    (if s then prefixBody else [])).map StepKind.instruction ++
+    [.administrative .exitControl] ++ tailBody.map StepKind.instruction
 
-theorem loop_iter (s : Bool) (log : Host) (mem : Mem) (p n q : Nat) (c : UInt32)
-    (hp : p+4*(n+1) ≤ 16384) (hq : q+12*(n+1) ≤ 65536) (hm : mem.pages = 1) :
-    let a := advance s mem p q
-    ∃ trace, Steps (loopHead s log mem p (n+1) q c) trace
-      (loopHead a.1 log a.2.1 (p+4) n a.2.2 (mem.read32 (UInt32.ofNat p))) := by
-  have hn : UInt32.ofNat (n+1) ≠ 0 := by
+theorem loop_iter (s : Bool) (host : Host) (heap : List GcObject)
+    (input written : List UInt32) (cap i n ref : Nat) (c cp : UInt32)
+    (hn : n+1 < 2^32) (hi : i+1 < 2^32)
+    (hw : written.length + 3 ≤ cap) (hcap : cap < 2^32)
+    (hc : input[i]? = some cp) (hunit : cp.toNat < 65536) :
+    Steps (loopHead s host heap input written cap i (n+1) ref c) (iterTrace s)
+      (loopHead (cp == 10) host heap input (written ++ LinePrefix.emit s cp)
+        cap (i+1) n ref cp) := by
+  have hn0 : UInt32.ofNat (n+1) ≠ 0 := by
     intro h
     have h' := congrArg UInt32.toNat h
-    rw [UInt32.toNat_ofNat_of_lt' (by simp [UInt32.size]; omega)] at h'
+    rw [UInt32.toNat_ofNat_of_lt' hn] at h'
     simp at h'
-  have pb : (UInt32.ofNat p).toNat + 0 + 4 ≤ mem.pages * 65536 := by
-    rw [UInt32.toNat_ofNat_of_lt' (by simp [UInt32.size]; omega), hm]; omega
-  have qb : (UInt32.ofNat q).toNat + 0 + 4 ≤ mem.pages * 65536 := by
-    rw [UInt32.toNat_ofNat_of_lt' (by simp [UInt32.size]; omega), hm]; omega
-  have qb4 : (4 + UInt32.ofNat q).toNat + 0 + 4 ≤ mem.pages * 65536 := by
-    rw [UInt32.toNat_add, UInt32.toNat_ofNat_of_lt' (by simp [UInt32.size]; omega), hm]
-    have : 4 + q < 2^32 := by omega
-    simp only [UInt32.toNat_ofNat] at *
-    rw [Nat.mod_eq_of_lt this]; omega
-  have qb8 : (4 + (4 + UInt32.ofNat q)).toNat + 0 + 4 ≤ mem.pages * 65536 := by
-    rw [UInt32.toNat_add, UInt32.toNat_add,
-      UInt32.toNat_ofNat_of_lt' (by simp [UInt32.size]; omega), hm]
-    simp only [UInt32.toNat_ofNat]
-    rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]; omega
-  have hadd (k : Nat) : 4 + UInt32.ofNat k = UInt32.ofNat (k+4) := by
+  have hadd (k : Nat) : 1 + UInt32.ofNat k = UInt32.ofNat (k+1) := by
     simp [UInt32.ofNat_add, UInt32.add_comm]
-  have hsub : UInt32.ofNat (n+1) - 1 = UInt32.ofNat n := by
-    simp [UInt32.ofNat_add]
+  have hsub : UInt32.ofNat (n+1) - 1 = UInt32.ofNat n := by simp [UInt32.ofNat_add]
   cases s
   case false =>
-    refine ⟨iterTrace false, ?_⟩
-    wasm_steps [(.localGet rfl), (.eqz (result := 0) (by simp only [hn, ↓reduceIte])), .brIfZero,
-      (.localGet rfl), (.load32 rfl (by exact pb)), (.localSet rfl),
-      (.globalGet rfl), (.iff (by rfl)), (.exitControl rfl),
-      (.localGet rfl), (.localGet rfl), (.store32 rfl (by exact qb)),
+    wasm_steps [(.localGet rfl), (.eqz (result := 0) (by simp only [hn0, ↓reduceIte])), .brIfZero,
+      (.localGet rfl), (.localGet rfl),
+      (.gcFallthrough (store := machine false host (arrayHeap heap input (padded cap written))) (get_eval false host heap input (padded cap written) i cp (by omega) hc _ _ [])),
+      (.localSet rfl), (.globalGet rfl), (.iff (by rfl)), (.exitControl rfl),
+      (.localGet rfl), (.localGet rfl), (.localGet rfl),
+      (.gcFallthrough (store := machine false host (arrayHeap heap input (padded cap written))) (set_eval false host heap input written cap cp hunit (by omega) hcap _ _ [])),
       (.localGet rfl), .const, .add, (.localSet rfl),
       (.localGet rfl), .const, (.eq rfl), (.globalSet rfl),
       (.localGet rfl), .const, .add, (.localSet rfl),
       (.localGet rfl), .const, .sub, (.localSet rfl)]
-    simp only [UInt32.add_zero, setMemory_eq, setGlobal_zero_eq]
-    simp only [hadd, hsub]
-    simp [loopHead, advance, LinePrefix.emit, writeWords, machine, store]
+    simp only [setGlobal_zero_eq, hadd, hsub]
+    simp [loopHead, LinePrefix.emit, machine, store]
     exact Steps.single (.br rfl)
-
   case true =>
-    refine ⟨iterTrace true, ?_⟩
-    wasm_steps [(.localGet rfl), (.eqz (result := 0) (by simp only [hn, ↓reduceIte])), .brIfZero,
-      (.localGet rfl), (.load32 rfl (by exact pb)), (.localSet rfl),
-      (.globalGet rfl), (.iff (by rfl)),
-      (.localGet rfl), .const, (.store32 rfl (by exact qb)),
-      (.localGet rfl), .const, .add, (.localSet rfl),
-      (.localGet rfl), .const, (.store32 rfl (by exact qb4)),
-      (.localGet rfl), .const, .add, (.localSet rfl), (.exitControl rfl),
-      (.localGet rfl), (.localGet rfl), (.store32 rfl (by exact qb8)),
+    wasm_steps [(.localGet rfl), (.eqz (result := 0) (by simp only [hn0, ↓reduceIte])), .brIfZero,
+      (.localGet rfl), (.localGet rfl),
+      (.gcFallthrough (store := machine true host (arrayHeap heap input (padded cap written))) (get_eval true host heap input (padded cap written) i cp (by omega) hc _ _ [])),
+      (.localSet rfl), (.globalGet rfl), (.iff (by rfl)),
+      (.localGet rfl), (.localGet rfl), .const,
+      (.gcFallthrough (store := machine true host (arrayHeap heap input (padded cap written))) (set_eval true host heap input written cap 62 (by decide) (by omega) hcap _ _ [])),
+      (.localGet rfl), .const, .add, (.localSet rfl)]
+    simp only [hadd]
+    have hl1 : (written ++ [62]).length = written.length+1 := by simp
+    rw [← hl1]
+    wasm_steps [(.localGet rfl), (.localGet rfl), .const,
+      (.gcFallthrough (store := machine true host (arrayHeap heap input (padded cap (written++[62])))) (set_eval true host heap input (written++[62]) cap 32 (by decide) (by simp; omega) hcap _ _ [])),
+      (.localGet rfl), .const, .add, (.localSet rfl), (.exitControl rfl)]
+    simp only [hadd]
+    have hl2 : ((written ++ [62]) ++ [32]).length = (written++[62]).length+1 := by simp
+    rw [← hl2]
+    wasm_steps [(.localGet rfl), (.localGet rfl), (.localGet rfl),
+      (.gcFallthrough (store := machine true host (arrayHeap heap input (padded cap ((written++[62])++[32])))) (set_eval true host heap input ((written++[62])++[32]) cap cp hunit (by simp; omega) hcap _ _ [])),
       (.localGet rfl), .const, .add, (.localSet rfl),
       (.localGet rfl), .const, (.eq rfl), (.globalSet rfl),
       (.localGet rfl), .const, .add, (.localSet rfl),
       (.localGet rfl), .const, .sub, (.localSet rfl)]
-    simp only [UInt32.add_zero, setMemory_eq, setGlobal_zero_eq]
-    simp only [hadd, hsub]
-    simp [loopHead, advance, LinePrefix.emit, writeWords, machine, store, Nat.add_assoc]
+    simp only [setGlobal_zero_eq, hadd, hsub]
+    simp [loopHead, LinePrefix.emit, machine, store, List.append_assoc, UInt32.add_assoc]
     exact Steps.single (.br rfl)
 
-def loopExit (s : Bool) (log : Host) (mem : Mem) (p q : Nat) (c : UInt32) : Config Host :=
-  ⟨.running
-    { locals := { params := [.i32 0],
-                  locals := [.i32 (UInt32.ofNat p), .i32 (UInt32.ofNat q), .i32 c] }
-      code := afterLoop, resultArity := 0, callerRemainder := [] }, machine s log mem⟩
-
-theorem loop_exit_steps (s : Bool) (log : Host) (mem : Mem) (p q : Nat) (c : UInt32) :
-    ∃ trace, Steps (loopHead s log mem p 0 q c) trace (loopExit s log mem p q c) := by
-  refine ⟨[.instruction (.localGet 0), .instruction .eqz, .instruction (.br_if 1)], ?_⟩
+theorem loop_exit_steps (s : Bool) (host : Host) (heap : List GcObject)
+    (input written : List UInt32) (cap i ref : Nat) (c : UInt32) :
+    Steps (loopHead s host heap input written cap i 0 ref c)
+      [.instruction (.localGet 1), .instruction .eqz, .instruction (.br_if 1)]
+      (loopExit s host heap input written cap i ref c) := by
   wasm_steps [(.localGet rfl), (.eqz rfl)]
   exact Steps.single (.brIf (by decide) rfl)
 
-theorem loop_correct (n : Nat) (s : Bool) (log : Host) (mem : Mem) (p q : Nat) (c : UInt32)
-    (hp : p+4*n ≤ 16384) (hq : q+12*n ≤ 65536) (hm : mem.pages = 1) :
-    let r := transform s mem p q n
-    ∃ p' c' trace, Steps (loopHead s log mem p n q c) trace
-      (loopExit r.1 log r.2.1 p' r.2.2 c') := by
-  induction n generalizing s mem p q c with
-  | zero =>
-    obtain ⟨t, ht⟩ := loop_exit_steps s log mem p q c
-    exact ⟨p, c, t, ht⟩
-  | succ n ih =>
-    obtain ⟨t, ht⟩ := loop_iter s log mem p n q c hp hq hm
-    let cp := mem.read32 (UInt32.ofNat p)
-    let ys := LinePrefix.emit s cp
-    have hlen : ys.length ≤ 3 := emit_length s cp
-    obtain ⟨p', c', t', ht'⟩ := ih (cp == 10) (writeWords mem q ys)
-      (p+4) (q+4*ys.length) cp (by omega) (by omega) (by rw [writeWords_pages]; exact hm)
-    exact ⟨p', c', t ++ t', Steps.trans ht ht'⟩
+theorem emit_length (s : Bool) (cp : UInt32) : (LinePrefix.emit s cp).length ≤ 3 := by
+  cases s <;> simp [LinePrefix.emit]
 
-/-- The imported write snapshots complete scalar words before returning. -/
-def exitOutput (q : Nat) (mem : Mem) : List UInt32 :=
-  readWords mem 16384 ((UInt32.ofNat q - 16384) / 4).toNat
-
-theorem exit_count (q : Nat) (hlo : 16384 ≤ q) (hhi : q ≤ 65536) :
-    ((UInt32.ofNat q - 16384) / 4).toNat = (q-16384)/4 := by
-  have hq : (UInt32.ofNat q).toNat = q :=
-    UInt32.toNat_ofNat_of_lt' (by simp [UInt32.size]; omega)
-  rw [UInt32.toNat_div, UInt32.toNat_sub_of_le _ _ (by
-    rw [UInt32.le_iff_toNat_le, hq]; exact hlo), hq]
-  rfl
-
-theorem exit_correct (s : Bool) (log : Host) (mem : Mem) (p q : Nat) (c : UInt32)
-    (hlo : 16384 ≤ q) (hhi : q ≤ 65536) (hm : mem.pages = 1) :
-    TerminatesWith (loopExit s log mem p q c) (fun vs st =>
-      vs = [] ∧ st.wasm = store s (log ++ [.write 1 (exitOutput q mem)]) mem) := by
-  have hg : 16384 + 4*((UInt32.ofNat q - 16384)/4).toNat ≤ mem.pages*65536 := by
-    rw [exit_count q hlo hhi, hm]
-    have := Nat.mul_div_le (q-16384) 4
+theorem run_length (s : Bool) (text : List UInt32) :
+    (LinePrefix.run s text).2.length ≤ 3*text.length := by
+  induction text generalizing s with
+  | nil => simp [LinePrefix.run]
+  | cons cp rest ih =>
+    have he := emit_length s cp
+    have hr := ih (cp == 10)
+    simp only [LinePrefix.run, List.length_append, List.length_cons]
     omega
-  have hi : writeOutput.invoke (store s log mem)
-      [.i32 1, .i32 16384, .i32 ((UInt32.ofNat q - 16384)/4)] =
-      .Return [] (store s (log ++ [.write 1 (exitOutput q mem)]) mem) := by
-    simp only [writeOutput, store]
-    change (if 16384 % 4 = 0 ∧ 16384 + 4*((UInt32.ofNat q - 16384)/4).toNat ≤ mem.pages*65536 then _ else _) = _
-    rw [ite_eq_left ⟨by decide, hg⟩]
-    rfl
-  refine ⟨[.instruction (.globalGet 2), .instruction (.const 16384),
-    .instruction (.localGet 2), .instruction (.const 16384), .instruction .sub,
-    .instruction (.const 4), .instruction .divU, .host 4, .administrative .finish],
-    [], machine s (log ++ [.write 1 (exitOutput q mem)]) mem, ?_, ⟨rfl, rfl⟩⟩
-  wasm_steps [(.globalGet rfl), .const, (.localGet rfl), .const, .sub,
-    .const, (.divU (by decide)), (.callHostReturn (by change 4 < 6; decide) rfl rfl hi)]
-  exact Steps.single .finish
+
+theorem loop_correct (rest : List UInt32) (s : Bool) (host : Host) (heap : List GcObject)
+    (past written : List UInt32) (cap ref : Nat) (c : UInt32)
+    (hinput : past.length + rest.length ≤ 4096)
+    (hspace : written.length + 3*rest.length ≤ cap) (hcap : cap ≤ 12288)
+    (hunits : ∀ u ∈ rest, u.toNat < 65536) :
+    ∃ i' c' trace,
+      Steps (loopHead s host heap (past++rest) written cap past.length rest.length ref c) trace
+        (loopExit (LinePrefix.run s rest).1 host heap (past++rest)
+          (written++(LinePrefix.run s rest).2) cap i' ref c') := by
+  induction rest generalizing s past written c with
+  | nil =>
+    refine ⟨past.length, c, [.instruction (.localGet 1), .instruction .eqz, .instruction (.br_if 1)], ?_⟩
+    simpa only [LinePrefix.run, List.append_nil, List.length_nil] using
+      (loop_exit_steps s host heap past written cap past.length ref c)
+  | cons cp rest ih =>
+    have hc : (past++cp::rest)[past.length]? = some cp := by
+      simp [List.getElem?_append_right]
+    have hcp := hunits cp (by simp)
+    have he := emit_length s cp
+    have hs := loop_iter s host heap (past++cp::rest) written cap past.length rest.length ref c cp
+      (by simp only [List.length_cons] at hinput; omega)
+      (by simp only [List.length_cons] at hinput; omega)
+      (by simp only [List.length_cons] at hspace; omega)
+      (by omega) hc hcp
+    obtain ⟨i', c', trace, ht⟩ := ih (cp == 10) (past++[cp]) (written++LinePrefix.emit s cp) cp
+      (by simp_all; omega) (by simp_all; omega) (by intro u hu; exact hunits u (by simp [hu]))
+    refine ⟨i', c', iterTrace s ++ trace, ?_⟩
+    have ht' : Steps
+      (loopHead (cp == 10) host heap (past++cp::rest) (written++LinePrefix.emit s cp)
+        cap (past.length+1) rest.length ref cp) trace
+      (loopExit (LinePrefix.run s (cp::rest)).1 host heap (past++cp::rest)
+        (written++(LinePrefix.run s (cp::rest)).2) cap i' ref c') := by
+      simpa [LinePrefix.run, List.append_assoc] using ht
+    exact Steps.trans hs ht'
 
 end PrefixWasm
-#print axioms PrefixWasm.loop_iter
-#print axioms PrefixWasm.loop_correct
-#print axioms PrefixWasm.exit_correct

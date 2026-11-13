@@ -1,24 +1,28 @@
 (module
-  (type (;0;) (func (result i32)))
-  (type (;1;) (func (param i32 i32)))
-  (type (;2;) (func (param i32 i32 i32)))
-  (type (;3;) (func (param i32)))
-  (type (;4;) (func))
-  (import "bridge" "create_input" (func (;0;) (type 0)))
-  (import "bridge" "create_output" (func (;1;) (type 0)))
-  (import "bridge" "on_data" (func (;2;) (type 1)))
-  (import "bridge" "on_close" (func (;3;) (type 1)))
-  (import "bridge" "write" (func (;4;) (type 2)))
-  (import "bridge" "end" (func (;5;) (type 3)))
-  (memory (;0;) 1 1)
+  (type (;0;) (array (mut i16)))
+  (type (;1;) (func (result i32)))
+  (type (;2;) (func (param i32 i32)))
+  (type (;3;) (func (param i32 externref)))
+  (type (;4;) (func (param i32)))
+  (type (;5;) (func (param externref (ref null 0) i32) (result i32)))
+  (type (;6;) (func (param (ref null 0) i32 i32) (result (ref extern))))
+  (type (;7;) (func))
+  (type (;8;) (func (param externref i32)))
+  (import "bridge" "create_input" (func (;0;) (type 1)))
+  (import "bridge" "create_output" (func (;1;) (type 1)))
+  (import "bridge" "on_data" (func (;2;) (type 2)))
+  (import "bridge" "on_close" (func (;3;) (type 2)))
+  (import "bridge" "write" (func (;4;) (type 3)))
+  (import "bridge" "end" (func (;5;) (type 4)))
+  (import "wasm:js-string" "intoCharCodeArray" (func (;6;) (type 5)))
+  (import "wasm:js-string" "fromCharCodeArray" (func (;7;) (type 6)))
   (global (;0;) (mut i32) i32.const 1)
   (global (;1;) (mut i32) i32.const 0)
   (global (;2;) (mut i32) i32.const 0)
-  (export "init" (func 6))
-  (export "memory" (memory 0))
-  (export "data" (func 7))
-  (export "close" (func 8))
-  (func (;6;) (type 4)
+  (export "init" (func 8))
+  (export "data" (func 9))
+  (export "close" (func 10))
+  (func (;8;) (type 7)
     call 0
     global.set 1
     call 1
@@ -30,67 +34,80 @@
     i32.const 2
     call 3
   )
-  (func (;7;) (type 3) (param i32)
-    (local i32 i32 i32)
-    i32.const 16384
+  (func (;9;) (type 8) (param externref i32)
+    (local (ref null 0) (ref null 0) i32 i32 i32)
+    local.get 1
+    array.new_default 0
     local.set 2
+    local.get 1
+    i32.const 3
+    i32.mul
+    array.new_default 0
+    local.set 3
+    local.get 0
+    local.get 2
+    i32.const 0
+    call 6
+    local.set 1
     block ;; label = @1
       loop ;; label = @2
-        local.get 0
+        local.get 1
         i32.eqz
         br_if 1 (;@1;)
-        local.get 1
-        i32.load
-        local.set 3
+        local.get 2
+        local.get 4
+        array.get_u 0
+        local.set 6
         global.get 0
         if ;; label = @3
-          local.get 2
+          local.get 3
+          local.get 5
           i32.const 62
-          i32.store
-          local.get 2
-          i32.const 4
+          array.set 0
+          local.get 5
+          i32.const 1
           i32.add
-          local.set 2
-          local.get 2
+          local.set 5
+          local.get 3
+          local.get 5
           i32.const 32
-          i32.store
-          local.get 2
-          i32.const 4
+          array.set 0
+          local.get 5
+          i32.const 1
           i32.add
-          local.set 2
+          local.set 5
         end
-        local.get 2
         local.get 3
-        i32.store
-        local.get 2
-        i32.const 4
+        local.get 5
+        local.get 6
+        array.set 0
+        local.get 5
+        i32.const 1
         i32.add
-        local.set 2
-        local.get 3
+        local.set 5
+        local.get 6
         i32.const 10
         i32.eq
         global.set 0
-        local.get 1
-        i32.const 4
+        local.get 4
+        i32.const 1
         i32.add
-        local.set 1
-        local.get 0
+        local.set 4
+        local.get 1
         i32.const 1
         i32.sub
-        local.set 0
+        local.set 1
         br 0 (;@2;)
       end
     end
     global.get 2
-    i32.const 16384
-    local.get 2
-    i32.const 16384
-    i32.sub
-    i32.const 4
-    i32.div_u
+    local.get 3
+    i32.const 0
+    local.get 5
+    call 7
     call 4
   )
-  (func (;8;) (type 4)
+  (func (;10;) (type 7)
     global.get 2
     call 5
   )

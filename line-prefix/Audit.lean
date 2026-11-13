@@ -8,3 +8,5 @@ example : PrefixWasm.ShippedExecutionsExist := PrefixWasm.shipped_executions_exi
 #print axioms LinePrefix.chunks_correct
 #print axioms LinePrefix.output_valid
 #print axioms PrefixWasm.prefixModule_decodes
+#print axioms LinePrefix.Utf16.run_encode
+#print axioms LinePrefix.Utf16.decode_encode

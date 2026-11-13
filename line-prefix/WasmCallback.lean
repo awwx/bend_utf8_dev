@@ -1,62 +1,54 @@
 import WasmLoop
+import WasmGcEntry
 
 namespace PrefixWasm
-open Wasm SmallStep
+open Wasm SmallStep PrefixGc
 
-def dataEntry (s : Bool) (log : Host) (mem : Mem) (n : Nat) : Config Host :=
-  ⟨.running
-    { locals := { params := [.i32 (UInt32.ofNat n)],
-                  locals := [.i32 0, .i32 0, .i32 0] }
-      code := [.const 16384, .localSet 2, .block 0 0 [.loop 0 0 loopBody]] ++ afterLoop
-      resultArity := 0, callerRemainder := [] }, machine s log mem⟩
+def dataCode : Program := [.block 0 0 [.loop 0 0 loopBody]] ++ afterLoop
 
-theorem data_entry (s : Bool) (log : Host) (mem : Mem) (n : Nat) :
+theorem data_entry (s : Bool) (host : Host) (heap : List GcObject)
+    (units : List UInt32) :
     startExportConfig? env prefixModule "data"
-      { initial := store s log mem, arguments := [.i32 (UInt32.ofNat n)] } =
-      some (dataEntry s log mem n) := rfl
+      { initial := store s (prepareHost host units) heap,
+        arguments := [.i32 (UInt32.ofNat units.length), .externref (some host.strings.length)] } =
+      some (dataStart s host heap units dataCode) := rfl
 
-theorem data_entry_steps (s : Bool) (log : Host) (mem : Mem) (n : Nat) :
-    Steps (dataEntry s log mem n)
-      [.instruction (.const 16384), .instruction (.localSet 2),
-        .instruction (.block 0 0 [.loop 0 0 loopBody]), .instruction (.loop 0 0 loopBody)]
-      (loopHead s log mem 0 n 16384 0) := by
-  wasm_steps [.const, (.localSet rfl), .block, .loop]
+theorem data_loop_entry (s : Bool) (host : Host) (heap : List GcObject)
+    (units : List UInt32) :
+    Steps (dataReady s host heap units dataCode)
+      [.instruction (.block 0 0 [.loop 0 0 loopBody]), .instruction (.loop 0 0 loopBody)]
+      (loopHead s (prepareHost host units) heap units [] (3*units.length)
+        0 units.length host.strings.length 0) := by
+  wasm_steps [.block, .loop]
   exact Steps.refl _
 
-/-- The actual bounded Wasm callback, for arbitrary persistent memory and log. -/
-theorem data_correct (s : Bool) (log : Host) (mem : Mem) (chunk : List UInt32)
-    (hp : mem.pages = 1) (hb : chunk.length ≤ 4096) :
-    Runs "data" (store s log (writeWords mem 0 chunk)) [.i32 (UInt32.ofNat chunk.length)]
-      (store (LinePrefix.run s chunk).1 (log ++ [.write 1 (LinePrefix.run s chunk).2])
-        (writeWords (writeWords mem 0 chunk) 16384 (LinePrefix.run s chunk).2)) := by
-  let prepared := writeWords mem 0 chunk
-  let result := LinePrefix.run s chunk
-  let finalMem := writeWords prepared 16384 result.2
-  have hpages : prepared.pages = 1 := by simpa [prepared, writeWords_pages] using hp
-  obtain ⟨p', c', trace, hloop⟩ := loop_correct chunk.length s log prepared 0 16384 0
-    (by omega) (by omega) hpages
-  have heq := transform_prepared s mem chunk hb
-  change transform s prepared 0 16384 chunk.length =
-    (result.1, finalMem, 16384+4*result.2.length) at heq
-  rw [heq] at hloop
-  have hbound : 16384+4*result.2.length ≤ 65536 := by
-    have hl := run_length s chunk
-    change result.2.length ≤ 3*chunk.length at hl
-    omega
-  have hfinalpages : finalMem.pages = 1 := by
-    simpa [finalMem, writeWords_pages] using hpages
-  have hout : exitOutput (16384+4*result.2.length) finalMem = result.2 := by
-    unfold exitOutput
-    rw [exit_count _ (by omega) hbound]
-    rw [show (16384+4*result.2.length-16384)/4 = result.2.length by omega]
-    exact readWords_writeWords prepared 16384 result.2 hbound
-  have hexit := exit_correct result.1 log finalMem p' (16384+4*result.2.length) c'
-    (by omega) hbound hfinalpages
-  rw [hout] at hexit
-  refine ⟨dataEntry s log prepared chunk.length, data_entry s log prepared chunk.length, ?_⟩
+/-- The concrete GC callback transforms UTF-16 code units, preserving module
+state and recording an immutable snapshot of its complete output. -/
+theorem data_correct (s : Bool) (host : Host) (heap : List GcObject)
+    (units : List UInt32) (hb : units.length ≤ 4096)
+    (hu : ∀ u ∈ units, u.toNat < 65536) :
+    Runs "data" (store s (prepareHost host units) heap)
+      [.i32 (UInt32.ofNat units.length), .externref (some host.strings.length)]
+      (store (LinePrefix.run s units).1 (callbackHost s host units)
+        (callbackHeap s heap units)) := by
+  obtain ⟨entryTrace, hentry⟩ := data_entry_copy s host heap units dataCode hb
+  obtain ⟨i', c', loopTrace, hloop⟩ := loop_correct units s (prepareHost host units) heap
+    [] [] (3*units.length) host.strings.length 0
+    (by simpa using hb) (by simp) (by omega) hu
+  have hlen := LinePrefix.run_length s units
+  have hexit := exit_correct (LinePrefix.run s units).1 (prepareHost host units) heap
+    units (LinePrefix.run s units).2 (3*units.length) i' host.strings.length c'
+    hlen (by omega)
+  refine ⟨dataStart s host heap units dataCode, data_entry s host heap units, ?_⟩
   obtain ⟨exitTrace, values, final, exitSteps, post⟩ := hexit
-  exact ⟨_, values, final,
-    Steps.trans (data_entry_steps s log prepared chunk.length) (Steps.trans hloop exitSteps), post⟩
+  refine ⟨entryTrace ++ [.instruction (.block 0 0 [.loop 0 0 loopBody]),
+    .instruction (.loop 0 0 loopBody)] ++ loopTrace ++ exitTrace, values, final, ?_, ?_⟩
+  · simpa only [List.append_assoc] using
+      (Steps.trans hentry (Steps.trans (data_loop_entry s host heap units)
+        (Steps.trans (by simpa using hloop) exitSteps)))
+  · rcases post with ⟨hv, hf⟩
+    refine ⟨hv, ?_⟩
+    simpa [callbackHost, callbackHeap, prepareHost, padded, arrayHeap,
+      List.append_assoc] using hf
 
 end PrefixWasm
-#print axioms PrefixWasm.data_correct

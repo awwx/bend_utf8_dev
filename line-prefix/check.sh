@@ -49,7 +49,7 @@ def visit(name):
     print(name)
 for name in sorted(files): visit(name)
 PY
-FORBID='\b(sorry|admit|axiom|native_decide|implemented_by|extern|unsafe|opaque|skipKernelTC)\b|#exit|set_option +debug\.'
+FORBID='\b(sorry|admit|axiom|native_decide|implemented_by|unsafe|opaque|skipKernelTC)\b|@\[[^]]*\bextern\b|#exit|set_option +debug\.'
 while read -r f; do
   if grep -nE "$FORBID" "$T/$f.lean"; then echo "FAIL: forbidden construct in $f"; exit 1; fi
   if grep -nE '^[^-]*\bbv_decide\b' "$T/$f.lean"; then exit 1; fi
@@ -68,7 +68,7 @@ cat "$T/axioms.txt"
 python3 - "$T/axioms.txt" <<'PY'
 import pathlib, re, sys
 text = pathlib.Path(sys.argv[1]).read_text()
-assert len(re.findall(r'depends on axioms|does not depend', text)) == 6, text
+assert len(re.findall(r'depends on axioms|does not depend', text)) == 8, text
 for names in re.findall(r'depends on axioms:\s*\[([^]]*)\]', text):
     assert set(names.replace(' ', '').replace('\n', '').split(',')) <= {'propext', 'Classical.choice', 'Quot.sound'}, names
 assert 'sorryAx' not in text

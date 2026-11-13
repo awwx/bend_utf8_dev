@@ -2,17 +2,13 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-// ABI: UInt32 scalars, little endian. Input and maximum output share one page.
+// ABI: strings cross as externrefs; Wasm uses the native js-string builtins.
+// The chunk limit counts UTF-16 code units, not Unicode scalars.
 export const MAX_CHUNK = 4096;
-export const INPUT_PTR = 0;
-export const OUTPUT_PTR = 16384;
 const INPUT_HANDLE = 0;
 const OUTPUT_HANDLE = 1;
 const DATA_CALLBACK = 1;
 const CLOSE_CALLBACK = 2;
-
-const scalar = c => Number.isInteger(c) && c >= 0 && c <= 0x10ffff &&
-  !(c >= 0xd800 && c <= 0xdfff);
 
 /** Run one instance. Factories are called by Wasm's initialization imports.
  * The reader must supply UTF-8 bytes (setEncoding performs stateful decoding).
@@ -58,19 +54,20 @@ export async function runWithStreams(makeInput, makeOutput, { chunkSize = MAX_CH
       registeredData = true;
       input.on('data', text => {
         try {
-          const memory = new DataView(instance.exports.memory.buffer);
-          let count = 0;
-          // JS iteration produces whole code points, never half a surrogate pair.
-          for (const character of text) {
-            const cp = character.codePointAt(0);
-            if (!scalar(cp)) throw new Error('reader delivered an isolated surrogate');
-            memory.setUint32(INPUT_PTR + 4 * count++, cp, true);
-            if (count === chunkSize) {
-              instance.exports.data(count);
-              count = 0;
+          // Only inspect potential split boundaries; no per-character copying.
+          // A size-one request still delivers a surrogate pair together.
+          for (let start = 0; start < text.length;) {
+            let end = Math.min(start + chunkSize, text.length);
+            if (end < text.length) {
+              const last = text.charCodeAt(end - 1);
+              const next = text.charCodeAt(end);
+              if (last >= 0xd800 && last <= 0xdbff && next >= 0xdc00 && next <= 0xdfff)
+                end += end - start === 1 ? 1 : -1;
             }
+            const chunk = text.slice(start, end);
+            instance.exports.data(chunk, chunk.length);
+            start = end;
           }
-          if (count !== 0) instance.exports.data(count);
         } catch (error) { fail(error); }
       });
     },
@@ -83,23 +80,12 @@ export async function runWithStreams(makeInput, makeOutput, { chunkSize = MAX_CH
         try { instance.exports.close(); } catch (error) { fail(error); }
       });
     },
-    write(handle, pointer, length) {
+    write(handle, text) {
       requireOutput(handle);
-      pointer >>>= 0;
-      length >>>= 0;
-      const memory = new DataView(instance.exports.memory.buffer);
-      if (pointer % 4 !== 0 || pointer + 4 * length > memory.byteLength)
-        throw new RangeError('invalid output memory range');
-      const codes = new Array(length);
-      for (let i = 0; i < length; i++) {
-        const cp = memory.getUint32(pointer + 4 * i, true);
-        if (!scalar(cp)) throw new Error('Wasm submitted a non-scalar');
-        codes[i] = cp;
-      }
-      // Capture immutable text before returning; later memory reuse is harmless.
-      // The maximum 12,288 arguments is bounded by the module's proven ABI.
-      output.write(String.fromCodePoint(...codes), 'utf8');
-      // Both true and false write returns accept the data. Backpressure is ignored.
+      if (typeof text !== 'string') throw new TypeError('Wasm submitted a non-string');
+      // fromCharCodeArray has already captured an immutable JavaScript string.
+      // Both true and false write returns accept it. Backpressure is ignored.
+      output.write(text, 'utf8');
     },
     end(handle) {
       requireOutput(handle);
@@ -107,7 +93,7 @@ export async function runWithStreams(makeInput, makeOutput, { chunkSize = MAX_CH
     },
   } };
   const bytes = await readFile(new URL('./prefix.wasm', import.meta.url));
-  ({ instance } = await WebAssembly.instantiate(bytes, imports));
+  ({ instance } = await WebAssembly.instantiate(bytes, imports, { builtins: ['js-string'] }));
   try { instance.exports.init(); } catch (error) { fail(error); }
   await completion;
 }

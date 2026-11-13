@@ -1,7 +1,6 @@
 import Interpreter.Wasm.Decoder.ProofEval
 import Interpreter.Wasm.Host.Run
 import Lean.Elab.Term
-import WasmMemory
 
 /-!
 The concrete module is decoded from text printed from the shipped binary.

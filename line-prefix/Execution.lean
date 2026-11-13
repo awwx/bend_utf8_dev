@@ -1,4 +1,4 @@
-import TextSpec
+import Utf16
 import StreamModel
 
 namespace LinePrefix
@@ -181,7 +181,7 @@ theorem executions_exist (chunks : List Text) : Nonempty (Execution (initial chu
 This allows empty deliveries and arbitrary extra splitting. -/
 def Delivery (buffers : List Bytes) (chunks : List Text) : Prop :=
   chunks.flatten = (Copier.textEvents buffers []).flatten ∧
-  ∀ chunk ∈ chunks, chunk.length ≤ 4096
+  ∀ chunk ∈ chunks, (Utf16.encode chunk).length ≤ 4096
 
 theorem delivery_decode {bytes : Bytes} {buffers : List Bytes} {chunks : List Text}
     (hp : Partition bytes buffers) (hd : Delivery buffers chunks) :
@@ -213,7 +213,9 @@ by
   · exact List.flatMap_singleton' _
   · intro chunk hc
     obtain ⟨c, _, rfl⟩ := List.mem_map.mp hc
-    simp
+    have h := Utf16.encode_length [c]
+    simp only [List.length_singleton] at h
+    omega
 
 /-- All permitted callback payloads are complete Unicode scalars. -/
 theorem delivery_scalars {buffers : List Bytes} {chunks : List Text}
