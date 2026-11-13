@@ -21,9 +21,11 @@ def initial (chunks : List Text) : Machine := ⟨chunks, true, [], [], false, fa
 Flush and finish are distinct host operations. A write returning false still
 queues its text. The complete output chunk is captured before callback return. -/
 inductive Step : Machine → Machine → Prop where
-  | data (c : Text) (cs : List Text) (s : Bool) (q : List Bytes) (out : Bytes) :
+  | data (c : Text) (cs : List Text) (s : Bool) (q : List Bytes) (out : Bytes)
+      (pieces : List Text) (contents : pieces.flatten = (run s c).2)
+      (bound : pieces.length ≤ (Utf16.encode c).length + 1) :
       Step ⟨c::cs, s, q, out, false, false⟩
-        ⟨cs, (run s c).1, q ++ [encodeText (run s c).2], out, false, false⟩
+        ⟨cs, (run s c).1, q ++ pieces.map encodeText, out, false, false⟩
   | close (s : Bool) (q : List Bytes) (out : Bytes) :
       Step ⟨[], s, q, out, false, false⟩ ⟨[], s, q, out, true, false⟩
   | flush (cs : List Text) (s : Bool) (b : Bytes) (q : List Bytes) (out : Bytes) (closing : Bool) :
@@ -35,17 +37,26 @@ def remaining (m : Machine) : Bytes :=
   m.output ++ m.pending.flatten ++ encodeText (run m.atStart m.events.flatten).2
 
 theorem step_remaining {m n : Machine} (h : Step m n) : remaining n = remaining m := by
-  cases h <;> simp [remaining, run, run_append,
-    encodeText_append, List.append_assoc]
+  cases h with
+  | data c cs s q out pieces contents bound =>
+    simp only [remaining, List.flatten_cons, run_append, List.flatten_append,
+      ← encode_chunks, contents, encodeText_append]
+    simp [List.append_assoc]
+  | close => simp [remaining, run]
+  | flush => simp [remaining, List.append_assoc]
+  | finish => simp [remaining]
+
+def eventCost (events : List Text) : Nat :=
+  (events.map (fun c => (Utf16.encode c).length + 2)).sum
 
 def rank (m : Machine) : Nat :=
-  2 * m.events.length + m.pending.length + (if m.closing then 0 else 1) +
+  eventCost m.events + m.pending.length + (if m.closing then 0 else 1) +
     (if m.done then 0 else 1)
 
 theorem step_rank {m n : Machine} (h : Step m n) : rank n < rank m := by
   cases h with
-  | data c cs s q out => simp [rank]; omega
-  | close => simp [rank]
+  | data c cs s q out pieces contents bound => simp [rank, eventCost]; omega
+  | close => simp [rank, eventCost]
   | flush => simp [rank]
   | finish => simp [rank]
 
@@ -139,7 +150,7 @@ theorem next_step (m : Machine) (hw : WellFormed m) (hd : m.done = false) :
   cases events with
   | cons c cs =>
     cases closing with
-    | false => exact Step.data c cs s pending output
+    | false => exact Step.data c cs s pending output [(run s c).2] (by simp) (by simp)
     | true => simp_all
   | nil =>
     cases pending with
@@ -181,7 +192,7 @@ theorem executions_exist (chunks : List Text) : Nonempty (Execution (initial chu
 This allows empty deliveries and arbitrary extra splitting. -/
 def Delivery (buffers : List Bytes) (chunks : List Text) : Prop :=
   chunks.flatten = (Copier.textEvents buffers []).flatten ∧
-  ∀ chunk ∈ chunks, (Utf16.encode chunk).length ≤ 4096
+  ∀ chunk ∈ chunks, (Utf16.encode chunk).length < 2^32
 
 theorem delivery_decode {bytes : Bytes} {buffers : List Bytes} {chunks : List Text}
     (hp : Partition bytes buffers) (hd : Delivery buffers chunks) :

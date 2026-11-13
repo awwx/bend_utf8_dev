@@ -1,4 +1,4 @@
-import WasmCallback
+import WasmOuterProof
 import WasmExecution
 
 namespace PrefixWasm
@@ -7,9 +7,8 @@ namespace PrefixWasm
 algorithm. The representation change is a theorem, not a builtin contract. -/
 theorem scalar_data_correct : DataCorrect := by
   intro s host heap chunk hc hb
-  have h := data_correct s host heap (LinePrefix.Utf16.encode chunk) hb
+  exact outer_data_correct s host heap (LinePrefix.Utf16.encode chunk) hb
     (fun u hu => LinePrefix.Utf16.unit_bound hc hu)
-  simpa only [LinePrefix.Utf16.run_encode s hc, callbackHost, afterDataHost, dataArgs] using h
 
 /-- All callback obligations are discharged for the shipped GC module. -/
 theorem shipped_correct : ShippedCorrect :=

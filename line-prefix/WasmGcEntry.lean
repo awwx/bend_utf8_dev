@@ -21,29 +21,29 @@ def entryCode : Program :=
    .localGet 0, .localGet 2, .const 0, .call 6, .localSet 1]
 
 def dataStart (s : Bool) (host : Host) (heap : List GcObject)
-    (units : List UInt32) (code : Program) : Config Host :=
+    (units : List UInt32) (code : Program) (calls : List CallFrame := []) : Config Host :=
   ⟨.running
     { locals := { params := [.externref (some host.strings.length), .i32 (UInt32.ofNat units.length)]
                   locals := [.anyref none, .anyref none, .i32 0, .i32 0, .i32 0] }
-      code := entryCode ++ code, resultArity := 0, callerRemainder := [] },
+      code := entryCode ++ code, resultArity := 0, callerRemainder := [], calls := calls },
     entryMachine s (prepareHost host units) heap⟩
 
 def dataReady (s : Bool) (host : Host) (heap : List GcObject)
-    (units : List UInt32) (code : Program) : Config Host :=
+    (units : List UInt32) (code : Program) (calls : List CallFrame := []) : Config Host :=
   ⟨.running
     { locals := { params := [.externref (some host.strings.length), .i32 (UInt32.ofNat units.length)]
                   locals := [.anyref (some (.array heap.length)),
                     .anyref (some (.array (heap.length+1))), .i32 0, .i32 0, .i32 0] }
-      code := code, resultArity := 0, callerRemainder := [] },
+      code := code, resultArity := 0, callerRemainder := [], calls := calls },
     entryMachine s (prepareHost host units)
       (arrayHeap heap units (List.replicate (3*units.length) 0))⟩
 
 /-- The callback allocates fresh arrays and faithfully imports the immutable
 input string before entering the transformation loop. -/
 theorem data_entry_copy (s : Bool) (host : Host) (heap : List GcObject)
-    (units : List UInt32) (code : Program) (hb : units.length ≤ 4096) :
-    ∃ trace, Steps (dataStart s host heap units code) trace
-      (dataReady s host heap units code) := by
+    (units : List UInt32) (code : Program) (hb : units.length ≤ 4096) (calls : List CallFrame := []) :
+    ∃ trace, Steps (dataStart s host heap units code calls) trace
+      (dataReady s host heap units code calls) := by
   have hn : (UInt32.ofNat units.length).toNat = units.length :=
     UInt32.toNat_ofNat_of_lt' (by change _ < 4294967296; omega)
   have hm : (3 * UInt32.ofNat units.length).toNat = 3*units.length := by
@@ -87,6 +87,6 @@ theorem data_entry_copy (s : Bool) (host : Host) (heap : List GcObject)
       List.append_assoc, hargs] using hcopy)) ?_
   refine Steps.cons (.localSet rfl) ?_
   simpa [dataReady, entryMachine, store, hn, hm, arrayHeap, List.map_replicate,
-    List.append_assoc, hresults, hargs] using (Steps.refl (dataReady s host heap units code))
+    List.append_assoc, hresults, hargs] using (Steps.refl (dataReady s host heap units code calls))
 
 end PrefixWasm

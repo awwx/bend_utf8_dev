@@ -68,7 +68,7 @@ cat "$T/axioms.txt"
 python3 - "$T/axioms.txt" <<'PY'
 import pathlib, re, sys
 text = pathlib.Path(sys.argv[1]).read_text()
-assert len(re.findall(r'depends on axioms|does not depend', text)) == 8, text
+assert len(re.findall(r'depends on axioms|does not depend', text)) == 10, text
 for names in re.findall(r'depends on axioms:\s*\[([^]]*)\]', text):
     assert set(names.replace(' ', '').replace('\n', '').split(',')) <= {'propext', 'Classical.choice', 'Quot.sound'}, names
 assert 'sorryAx' not in text

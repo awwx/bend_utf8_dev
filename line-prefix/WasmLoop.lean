@@ -32,13 +32,13 @@ def machine (s : Bool) (host : Host) (heap : List GcObject) : MachineStore Host 
   { runtime := { instances := #[{ module := prefixModule, host := env }], entry := ⟨0⟩ }
     wasm := store s host heap }
 def loopHead (s : Bool) (host : Host) (heap : List GcObject)
-    (input written : List UInt32) (cap i n ref : Nat) (c : UInt32) : Config Host :=
+    (input written : List UInt32) (cap i n ref : Nat) (c : UInt32) (calls : List CallFrame := []) : Config Host :=
   ⟨.running
     { locals := { params := [.externref (some ref), .i32 (UInt32.ofNat n)],
                   locals := [.anyref (some (.array heap.length)), .anyref (some (.array (heap.length+1))),
                     .i32 (UInt32.ofNat i), .i32 (UInt32.ofNat written.length), .i32 c] }
       code := loopBody, resultArity := 0, callerRemainder := []
-      control := [loopFrame, blockFrame] },
+      control := [loopFrame, blockFrame], calls := calls },
     machine s host (arrayHeap heap input (padded cap written))⟩
 
 theorem get_eval (s : Bool) (host : Host) (heap : List GcObject) (input output : List UInt32)
@@ -84,10 +84,10 @@ theorem loop_iter (s : Bool) (host : Host) (heap : List GcObject)
     (input written : List UInt32) (cap i n ref : Nat) (c cp : UInt32)
     (hn : n+1 < 2^32) (hi : i+1 < 2^32)
     (hw : written.length + 3 ≤ cap) (hcap : cap < 2^32)
-    (hc : input[i]? = some cp) (hunit : cp.toNat < 65536) :
-    Steps (loopHead s host heap input written cap i (n+1) ref c) (iterTrace s)
+    (hc : input[i]? = some cp) (hunit : cp.toNat < 65536) (calls : List CallFrame := []) :
+    Steps (loopHead s host heap input written cap i (n+1) ref c calls) (iterTrace s)
       (loopHead (cp == 10) host heap input (written ++ LinePrefix.emit s cp)
-        cap (i+1) n ref cp) := by
+        cap (i+1) n ref cp calls) := by
   have hn0 : UInt32.ofNat (n+1) ≠ 0 := by
     intro h
     have h' := congrArg UInt32.toNat h
@@ -139,10 +139,10 @@ theorem loop_iter (s : Bool) (host : Host) (heap : List GcObject)
     exact Steps.single (.br rfl)
 
 theorem loop_exit_steps (s : Bool) (host : Host) (heap : List GcObject)
-    (input written : List UInt32) (cap i ref : Nat) (c : UInt32) :
-    Steps (loopHead s host heap input written cap i 0 ref c)
+    (input written : List UInt32) (cap i ref : Nat) (c : UInt32) (calls : List CallFrame := []) :
+    Steps (loopHead s host heap input written cap i 0 ref c calls)
       [.instruction (.localGet 1), .instruction .eqz, .instruction (.br_if 1)]
-      (loopExit s host heap input written cap i ref c) := by
+      (loopExit s host heap input written cap i ref c calls) := by
   wasm_steps [(.localGet rfl), (.eqz rfl)]
   exact Steps.single (.brIf (by decide) rfl)
 
@@ -163,16 +163,16 @@ theorem loop_correct (rest : List UInt32) (s : Bool) (host : Host) (heap : List 
     (past written : List UInt32) (cap ref : Nat) (c : UInt32)
     (hinput : past.length + rest.length ≤ 4096)
     (hspace : written.length + 3*rest.length ≤ cap) (hcap : cap ≤ 12288)
-    (hunits : ∀ u ∈ rest, u.toNat < 65536) :
+    (hunits : ∀ u ∈ rest, u.toNat < 65536) (calls : List CallFrame := []) :
     ∃ i' c' trace,
-      Steps (loopHead s host heap (past++rest) written cap past.length rest.length ref c) trace
+      Steps (loopHead s host heap (past++rest) written cap past.length rest.length ref c calls) trace
         (loopExit (LinePrefix.run s rest).1 host heap (past++rest)
-          (written++(LinePrefix.run s rest).2) cap i' ref c') := by
+          (written++(LinePrefix.run s rest).2) cap i' ref c' calls) := by
   induction rest generalizing s past written c with
   | nil =>
     refine ⟨past.length, c, [.instruction (.localGet 1), .instruction .eqz, .instruction (.br_if 1)], ?_⟩
     simpa only [LinePrefix.run, List.append_nil, List.length_nil] using
-      (loop_exit_steps s host heap past written cap past.length ref c)
+      (loop_exit_steps s host heap past written cap past.length ref c calls)
   | cons cp rest ih =>
     have hc : (past++cp::rest)[past.length]? = some cp := by
       simp [List.getElem?_append_right]
@@ -182,15 +182,15 @@ theorem loop_correct (rest : List UInt32) (s : Bool) (host : Host) (heap : List 
       (by simp only [List.length_cons] at hinput; omega)
       (by simp only [List.length_cons] at hinput; omega)
       (by simp only [List.length_cons] at hspace; omega)
-      (by omega) hc hcp
+      (by omega) hc hcp calls
     obtain ⟨i', c', trace, ht⟩ := ih (cp == 10) (past++[cp]) (written++LinePrefix.emit s cp) cp
       (by simp_all; omega) (by simp_all; omega) (by intro u hu; exact hunits u (by simp [hu]))
     refine ⟨i', c', iterTrace s ++ trace, ?_⟩
     have ht' : Steps
       (loopHead (cp == 10) host heap (past++cp::rest) (written++LinePrefix.emit s cp)
-        cap (past.length+1) rest.length ref cp) trace
+        cap (past.length+1) rest.length ref cp calls) trace
       (loopExit (LinePrefix.run s (cp::rest)).1 host heap (past++cp::rest)
-        (written++(LinePrefix.run s (cp::rest)).2) cap i' ref c') := by
+        (written++(LinePrefix.run s (cp::rest)).2) cap i' ref c' calls) := by
       simpa [LinePrefix.run, List.append_assoc] using ht
     exact Steps.trans hs ht'
 

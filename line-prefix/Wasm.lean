@@ -80,9 +80,45 @@ def fromCharCodeArray : HostFn Host where
       | _ => .Trap st "not an i16 array"
     | _ => .Trap st "wrong arguments"
 
+/-- Native string length is an unsigned i32 count of UTF-16 units. Reachable
+strings are required to fit that representation, as actual Node strings do. -/
+def stringLength : HostFn Host where
+  params := [.externref]; results := [.i32]
+  invoke := fun st args => match args with
+    | [.externref (some i)] => match st.host.strings[i]? with
+      | some units => .Return [.i32 (UInt32.ofNat units.length)] st
+      | none => .Trap st "not a string"
+    | _ => .Trap st "wrong arguments"
+
+/-- Native substring clamps the stop index and returns empty for reversed or
+out-of-range starts; it does not perform Unicode interpretation. -/
+def substring : HostFn Host where
+  params := [.externref, .i32, .i32]; results := [.ref false .extern]
+  invoke := fun st args => match args with
+    | [.externref (some i), .i32 start, .i32 stop] => match st.host.strings[i]? with
+      | some units =>
+        let result := if stop.toNat < start.toNat ∨ units.length < start.toNat then []
+          else (units.drop start.toNat).take (stop.toNat-start.toNat)
+        .Return [.externref (some st.host.strings.length)]
+          {st with host.strings := st.host.strings ++ [result]}
+      | none => .Trap st "not a string"
+    | _ => .Trap st "wrong arguments"
+
+/-- Native UTF-16 unit access traps outside the string. -/
+def charCodeAt : HostFn Host where
+  params := [.externref, .i32]; results := [.i32]
+  invoke := fun st args => match args with
+    | [.externref (some i), .i32 index] => match st.host.strings[i]? with
+      | some units => match units[index.toNat]? with
+        | some unit => .Return [.i32 unit] st
+        | none => .Trap st "string index out of bounds"
+      | none => .Trap st "not a string"
+    | _ => .Trap st "wrong arguments"
+
 def env : HostEnv Host :=
   { funcs := [createInput, createOutput, binary .onData, binary .onClose,
-      writeOutput, endOutput, intoCharCodeArray, fromCharCodeArray] }
+      writeOutput, endOutput, intoCharCodeArray, fromCharCodeArray,
+      stringLength, substring, charCodeAt] }
 
 def store (start : Bool) (host : Host) (heap : List GcObject) : Store Host :=
   { (prefixModule.initialStore : Store Host) with

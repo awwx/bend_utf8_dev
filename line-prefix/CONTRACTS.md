@@ -13,20 +13,27 @@ Wasm arrays represent these as UTF-16 code units. `Utf16.lean` defines the
 encoding, including supplementary characters' high/low surrogate pairs,
 and proves that processing the code units implements the scalar specification.
 
-The bridge passes an immutable JavaScript string and its UTF-16 length to
-`data`. A delivery contains at most 4096 UTF-16 units and comprises complete
-scalar encodings. The bridge splits longer strings with `slice`, inspecting
-only split boundaries to avoid separating a surrogate pair. Its configurable
-chunk target is between 1 and 4096 units. A target of 1 still delivers a
-surrogate pair together as two units; the absolute 4096-unit limit always
-holds. This also provides a concrete singleton-scalar delivery schedule. Empty strings
-may be omitted; the Wasm callback also supports empty strings.
+The bridge forwards each immutable JavaScript string unchanged to `data(text)`.
+It does not calculate a length, filter empty strings, split text, or inspect
+surrogates. Each delivered string represents complete scalar encodings, as
+supplied by Node's stateful UTF-8 reader. Its UTF-16 length must be representable
+as an unsigned i32, matching the native string-length interface. This is not a
+4096-unit delivery limit: the tested Node runtime's maximum string length is
+536,870,888 units, already below the proof's `2^32` bound. There is no bound on
+the total file length or number of events.
 
-Wasm allocates a mutable i16 input array of that length and a mutable i16
-output array with three times that capacity. Both are local references:
-the module does not retain them after callback return. Prefixing can add at
-most two units per input unit. There is no linear-memory buffer or per-unit
-JavaScript conversion loop.
+Wasm obtains the length from the native builtin. It selects successive slices
+of at most 4096 units, shortening a slice by one when its tentative end falls
+between a surrogate pair. `Chunking.lean` proves that this concrete boundary
+test preserves complete scalar encodings and consumes all input in order.
+Empty deliveries produce no writes. The bridge has no chunk-size setting.
+
+For each internal slice, Wasm allocates a mutable i16 input array and an output
+array with three times that capacity. Both are local references. Prefixing can
+add at most two units per input unit. Wasm computes and proves all substring
+and array bounds, including the absence of i32 arithmetic overflow. The helper
+is exported as `_chunk` for proof entry; the Node bridge calls only `data`.
+There is no linear-memory buffer or JavaScript text conversion loop.
 
 The input string remains immutable. `intoCharCodeArray` copies its units
 into the input array. `fromCharCodeArray` captures the specified output
@@ -54,11 +61,14 @@ reenter Wasm.
 | `write(output, string)` | Append the immutable string's UTF-8 encoding to the output's FIFO queue. |
 | `end(output)` | Request output completion after all queued writes finish. |
 
-The module also imports two native builtins from `wasm:js-string`. The array
+The module also imports five native builtins from `wasm:js-string`. The array
 type is a mutable i16 GC array declared in its own recursion group.
 
 | Builtin | Effect |
 |---|---|
+| `length(string) -> i32` | Return the UTF-16 unit count; preserve the entire store. |
+| `charCodeAt(string, index) -> i32` | Return the unsigned UTF-16 unit at the index; trap outside the string and preserve state. |
+| `substring(string, start, stop) -> string` | Capture a new immutable substring. Clamp stop at the string length; return empty for reversed ranges or a start beyond the string. This operation itself does not protect surrogate pairs. |
 | `intoCharCodeArray(string, array, start) -> count` | Copy all UTF-16 units into the existing array at `start`; return the string length. Preserve all other array elements and state. Trap on invalid references or insufficient space. |
 | `fromCharCodeArray(array, start, stop) -> string` | Capture units in the half-open range `[start, stop)` as a new immutable string. Preserve the array and other Wasm state. Trap on invalid references or an invalid range. |
 
@@ -82,7 +92,7 @@ writes. The proof establishes correct handles and registrations; neither host
 contract assumes the writes contain prefixes. Node's `write` return value is
 ignored: false still accepts the complete write. The Wasm import returns void.
 
-The runtime is instantiated with `{ builtins: ['js-string'] }`; these two
+The runtime is instantiated with `{ builtins: ['js-string'] }`; these five
 imports are supplied by the engine, not JavaScript polyfills. Their agreement
 with the formal operation models is trusted, as is Node's UTF-8 decoding and
 encoding. The builtin definitions are documented in the
@@ -94,8 +104,11 @@ encoding. The builtin definitions are documented in the
 callback runs. The encoded reader decodes UTF-8 statefully across arbitrary
 nonempty raw byte buffers, including boundaries inside multibyte sequences.
 It finalizes decoding before normal input close. String delivery preserves
-scalar order and multiplicity, regardless of subsequent complete-character
-splitting by the bridge.
+scalar order and multiplicity. The bridge forwards those events unchanged;
+all additional splitting occurs within Wasm. The formal delivery abstraction
+permits any faithful sequence of representable Node strings. Existence is
+proved for every such sequence, not by assuming the forwarder manufactures
+a particular grouping.
 
 All callbacks run serially. Between callbacks, pending output may finish in
 FIFO order. Host progress allows arbitrary finite delays but eventually

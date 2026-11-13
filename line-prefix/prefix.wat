@@ -1,6 +1,6 @@
 (module
-  ;; Streaming LF-only line prefixer. The bridge passes complete-character
-  ;; strings of at most 4096 UTF-16 code units to data(text, length).
+  ;; Streaming LF-only line prefixer. The bridge forwards each decoded Node
+  ;; string unchanged to data(text); Wasm owns all length and chunk decisions.
   ;; Empty input emits nothing; a final LF never produces a dangling prefix.
   ;;
   ;; Compile with { builtins: ['js-string'] }. Both conversion imports below
@@ -22,6 +22,12 @@
     (func $into (param externref (ref null $units) i32) (result i32)))
   (import "wasm:js-string" "fromCharCodeArray"
     (func $from (param (ref null $units) i32 i32) (result (ref extern))))
+  (import "wasm:js-string" "length"
+    (func $length (param externref) (result i32)))
+  (import "wasm:js-string" "substring"
+    (func $substring (param externref i32 i32) (result (ref extern))))
+  (import "wasm:js-string" "charCodeAt"
+    (func $charCodeAt (param externref i32) (result i32)))
   ;; Persistent state: prefix the next unit exactly when it begins a line.
   ;; This flag survives chunk boundaries, including a chunk ending in LF.
   (global $line (mut i32) (i32.const 1))
@@ -37,7 +43,7 @@
   ;; length must equal text.length in UTF-16 units and be at most 4096.
   ;; Input and output arrays are local GC objects; no array is retained between
   ;; callbacks. There is no linear memory and no cumulative file-size counter.
-  (func (export "data") (param $text externref) (param $remaining i32)
+  (func $chunk (export "_chunk") (param $text externref) (param $remaining i32)
     (local $in (ref null $units)) (local $out (ref null $units))
     (local $i i32) (local $o i32) (local $unit i32)
     ;; Worst-case expansion is three units per input unit (every unit is LF).
@@ -61,8 +67,8 @@
           local.get $o i32.const 1 i32.add local.set $o
         end
         ;; Preserve each input unit. Surrogate units cannot equal LF, so no
-        ;; prefix is inserted between a high/low pair. The bridge also keeps
-        ;; pairs together at chunk boundaries; each output string is complete.
+        ;; prefix is inserted between a high/low pair. The outer data loop
+        ;; keeps pairs together at chunk boundaries; each write is complete.
         local.get $out local.get $o local.get $unit array.set $units
         local.get $o i32.const 1 i32.add local.set $o
         local.get $unit i32.const 10 i32.eq global.set $line
@@ -79,4 +85,40 @@
 
   ;; Request closure; the bridge reports completion only after queued writes
   ;; finish. Do not emit anything here, even if the final input unit was LF.
-  (func (export "close") global.get $output call $end))
+  (func (export "close") global.get $output call $end)
+
+  ;; The public callback accepts just a string. Its length comes from the
+  ;; native builtin, never from a separately trusted JavaScript argument.
+  ;; Empty strings take no loop iterations and produce no writes.
+  (func (export "data") (param $text externref)
+    (local $length i32) (local $position i32) (local $end i32) (local $unit i32)
+    local.get $text call $length local.set $length
+    block
+      loop
+        local.get $position local.get $length i32.eq br_if 1
+        ;; Compute the remaining count before adding. In this branch a full
+        ;; 4096-unit window fits, so position+4096 cannot wrap.
+        local.get $length local.get $position i32.sub i32.const 4096 i32.gt_u
+        if
+          local.get $position i32.const 4096 i32.add local.set $end
+          ;; A valid UTF-16 string cannot end in an unpaired high surrogate.
+          ;; If the window ends after a high surrogate, leave that unit and its
+          ;; low partner together for the next window (4095 units this time).
+          local.get $text local.get $end i32.const 1 i32.sub
+          call $charCodeAt local.set $unit
+          local.get $unit i32.const 55296 i32.ge_u
+          local.get $unit i32.const 56320 i32.lt_u i32.and
+          if
+            local.get $end i32.const 1 i32.sub local.set $end
+          end
+        else
+          local.get $length local.set $end
+        end
+        ;; The only length sent to the helper is computed from these verified
+        ;; substring bounds, and always lies between 1 and 4096 units.
+        local.get $text local.get $position local.get $end call $substring
+        local.get $end local.get $position i32.sub call $chunk
+        local.get $end local.set $position
+        br 0
+      end
+    end))

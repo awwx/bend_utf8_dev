@@ -22,13 +22,18 @@ whether the next character begins a line, transforms incoming chunks, queues
 writes, and requests output closing. The bridge handles Node API adaptation
 and encoding conversion; it contains no line-prefix algorithm.
 
-Each call passes a JavaScript string of at most 4096 UTF-16 code units.
-The bridge avoids splitting surrogate pairs and passes the string directly
-as an externref. Wasm uses native `intoCharCodeArray` to copy it into an i16
-GC array, transforms the units, and uses `fromCharCodeArray` to capture the
-output string before queuing a single write. The module allocates two local
-arrays per callback and retains only its line-start flag and stream handles.
-There is no linear memory, whole-file size bound, or cumulative i32 counter.
+Each Node `data` event is forwarded unchanged through `data(text)`. Wasm
+obtains the string length, chooses slices of at most 4096 UTF-16 code units,
+and keeps surrogate pairs together. It calls native `intoCharCodeArray` and
+`fromCharCodeArray` around the existing GC-array transformation. Each internal
+slice produces one immutable output string; an empty delivery produces none.
+The bridge contains no text loop, length argument, chunk-size configuration,
+or surrogate checks.
+
+The module's `_chunk` export is a proof entry for the bounded helper; the
+bridge calls only the public `data` callback. Every Node string fitting the
+native unsigned-i32 length interface is covered, without a whole-file limit
+or cumulative i32 file counter. No linear memory is used.
 
 ## Build and verify
 
@@ -54,15 +59,14 @@ supplementary characters, byte splits inside UTF-8 sequences, all raw
 partitions of a small Unicode input, chunk boundaries after LF, worst-case
 output capacity, delayed write completion and immutable string capture, every
 Unicode scalar, and real-file I/O. They also check that the engine supplies
-both native builtin imports and the module exports no linear memory. Tests check the trusted runtime boundary; they are
+all five native builtin imports and the module exports no linear memory. Tests check the trusted runtime boundary; they are
 not substitutes for the universal proofs.
 
-The full GC/builtin verification passed on 2026-11-13 on an m8i.2xlarge:
-2 minutes 54 seconds wall time and approximately 6.9 GiB peak process RSS.
-Independent kernel replay checked 12,614 non-core declarations. All eight
-audited results use only `propext`, `Classical.choice`, and `Quot.sound`.
-Runtime checks passed 463 stream cases, every Unicode scalar, and real-file
-byte-split I/O, using the native builtins.
+Full verification passed on the m8i.2xlarge in 2 minutes 56 seconds, with
+approximately 6.9 GiB peak process RSS. Independent kernel replay checked
+12,838 non-core declarations, and all ten audited results use only Lean's
+standard axioms. Runtime checks passed 123 stream cases, every Unicode scalar,
+real-file byte-split I/O, and direct empty/large full-string callback tests.
 
 ## Specification and proof organization
 
@@ -71,6 +75,9 @@ byte-split I/O, using the native builtins.
   laws and checked decoder facts from the earlier developments.
 - `Utf16.lean`: scalar/UTF-16 representation, surrogate bounds, decoding
   roundtrip, and correctness of processing UTF-16 units.
+- `Chunking.lean`: the concrete surrogate-boundary test, termination, complete
+  character slices, and preservation of the full input.
+- `OuterModel.lean`: the sequence of writes and state changes across internal slices.
 - `GcSupport.lean`: GC heap lookup/update and fixed-capacity output array facts.
 - `WasmGcHosts.lean`: builtin conversion and string-write invocation proofs.
 - `WasmGcEntry.lean` and `WasmGcExit.lean`: allocation, input conversion,
@@ -79,6 +86,9 @@ byte-split I/O, using the native builtins.
 - `Wasm.lean`: individual host operations, initialization and close callbacks.
 - `WasmLoop.lean` and `WasmCallback.lean`: actual Talos execution of the data
   callback and its loop, including array access and host argument bounds.
+- `WasmOuter.lean`, `WasmOuterCall.lean`, and `WasmOuterProof.lean`: actual
+  public-callback execution,
+  including builtin string access and internal helper calls.
 - `Execution.lean`: stream queues, asynchronous completion, progress, universal
   completed-output correctness and a concrete eager execution witness.
 - `WasmExecution.lean`: refinement using persistent Talos stores, GC heaps, immutable
@@ -93,8 +103,9 @@ initialization, terminating callbacks with no alternative trapped outcome,
 complete-scalar writes to the right output, and every permitted fair execution:
 it eventually finishes, and every finished state contains exactly
 `encodeUtf8(prefixLines(decodeUtf8(input)))`, which is valid UTF-8. Existence
-constructs a faithful delivery and a fair execution for every valid input and
-raw partition; it does not assume that such an execution is available.
+constructs a faithful abstract delivery for every valid input and raw partition,
+and an initialized fair execution for **every** allowed delivery, including
+the unchanged strings supplied by Node.
 
 ## Artifact and trust boundary
 

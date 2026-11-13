@@ -2,9 +2,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-// ABI: strings cross as externrefs; Wasm uses the native js-string builtins.
-// The chunk limit counts UTF-16 code units, not Unicode scalars.
-export const MAX_CHUNK = 4096;
+// Node strings cross unchanged as externrefs. Wasm owns all text processing.
 const INPUT_HANDLE = 0;
 const OUTPUT_HANDLE = 1;
 const DATA_CALLBACK = 1;
@@ -13,9 +11,7 @@ const CLOSE_CALLBACK = 2;
 /** Run one instance. Factories are called by Wasm's initialization imports.
  * The reader must supply UTF-8 bytes (setEncoding performs stateful decoding).
  * Resolves on output finish, after accepted writes complete. */
-export async function runWithStreams(makeInput, makeOutput, { chunkSize = MAX_CHUNK } = {}) {
-  if (!Number.isInteger(chunkSize) || chunkSize < 1 || chunkSize > MAX_CHUNK)
-    throw new RangeError('chunkSize must be between 1 and 4096');
+export async function runWithStreams(makeInput, makeOutput) {
   let instance, input, output, ended = false, registeredData = false, registeredClose = false;
   let resolve, reject;
   const completion = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -54,20 +50,7 @@ export async function runWithStreams(makeInput, makeOutput, { chunkSize = MAX_CH
       registeredData = true;
       input.on('data', text => {
         try {
-          // Only inspect potential split boundaries; no per-character copying.
-          // A size-one request still delivers a surrogate pair together.
-          for (let start = 0; start < text.length;) {
-            let end = Math.min(start + chunkSize, text.length);
-            if (end < text.length) {
-              const last = text.charCodeAt(end - 1);
-              const next = text.charCodeAt(end);
-              if (last >= 0xd800 && last <= 0xdbff && next >= 0xdc00 && next <= 0xdfff)
-                end += end - start === 1 ? 1 : -1;
-            }
-            const chunk = text.slice(start, end);
-            instance.exports.data(chunk, chunk.length);
-            start = end;
-          }
+          instance.exports.data(text);
         } catch (error) { fail(error); }
       });
     },
@@ -101,7 +84,7 @@ export async function runWithStreams(makeInput, makeOutput, { chunkSize = MAX_CH
 export function prefixFile(inputPath, outputPath, options = {}) {
   return runWithStreams(
     () => createReadStream(inputPath, { highWaterMark: options.highWaterMark ?? 64 * 1024 }),
-    () => createWriteStream(outputPath, { encoding: 'utf8' }), options);
+    () => createWriteStream(outputPath, { encoding: 'utf8' }));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
