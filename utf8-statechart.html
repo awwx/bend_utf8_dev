@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UTF-8 decoding statechart</title>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; }
+    body { font-family: system-ui, sans-serif; color: #18212b; background: #fff; }
+    pre.mermaid { box-sizing: border-box; width: 100%; height: 100dvh; margin: 0; padding: 1rem; overflow: hidden; font-family: inherit; }
+    /* Override Pele's inline height:auto so the viewBox fits both dimensions. */
+    pre.mermaid svg.pele { display: block; width: 100%; height: 100% !important; }
+  </style>
+</head>
+<body>
+  <pre class="mermaid">
+%% Conceptual decoding states derived from LAWS.bend, not implementation states.
+%% A valid prefix can extend to a shortest UTF-8 encoding of a Unicode scalar.
+%% Continuation-byte shape alone is insufficient: E0 80, ED A0, and F4 90 fail.
+%% On &quot;reconsider byte&quot;, process that same byte from Ready without consuming it twice.
+%% Resolved output is accumulated and returned by the current decode_buffer call.
+stateDiagram-v2
+    [*] --&gt; Ready
+    state &quot;Ready&quot; as Ready
+    state &quot;Pending prefix&quot; as Pending
+    state &quot;Finished&quot; as Finished
+
+    Ready --&gt; Ready: ASCII byte / emit its scalar
+    Ready --&gt; Ready: Byte cannot begin a valid sequence / emit U+FFFD
+    Ready --&gt; Pending: Byte begins a multibyte valid sequence
+
+    Pending --&gt; Pending: Byte extends prefix but leaves it incomplete
+    Pending --&gt; Ready: Byte completes valid sequence / emit its scalar
+    Pending --&gt; Ready: Byte cannot extend prefix / emit U+FFFD and reconsider byte
+
+    Ready --&gt; Ready: Buffer ends / return resolved text
+    Pending --&gt; Pending: Buffer ends / retain prefix and return resolved text
+
+    Ready --&gt; Finished: Input ends / emit nothing further
+    Pending --&gt; Finished: Input ends / emit one U+FFFD
+</pre>
+  <p id="render-error" role="alert" hidden></p>
+  <script src="https://cdn.jsdelivr.net/npm/pele@1/dist/pele.global.js"></script>
+  <script>
+    try {
+      for (const el of document.querySelectorAll('pre.mermaid')) {
+        pele.mount(el, el.textContent, { zoom: false });
+      }
+    } catch (error) {
+      const message = document.getElementById('render-error');
+      message.textContent = 'Unable to render the diagram: ' + error.message;
+      message.hidden = false;
+    }
+  </script>
+</body>
+</html>

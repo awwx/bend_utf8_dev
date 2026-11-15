@@ -1,0 +1,24 @@
+%% Conceptual decoding states derived from LAWS.bend, not implementation states.
+%% A valid prefix can extend to a shortest UTF-8 encoding of a Unicode scalar.
+%% Continuation-byte shape alone is insufficient: E0 80, ED A0, and F4 90 fail.
+%% On "reconsider byte", process that same byte from Ready without consuming it twice.
+%% Resolved output is accumulated and returned by the current decode_buffer call.
+stateDiagram-v2
+    [*] --> Ready
+    state "Ready" as Ready
+    state "Pending prefix" as Pending
+    state "Finished" as Finished
+
+    Ready --> Ready: ASCII byte / emit its scalar
+    Ready --> Ready: Byte cannot begin a valid sequence / emit U+FFFD
+    Ready --> Pending: Byte begins a multibyte valid sequence
+
+    Pending --> Pending: Byte extends prefix but leaves it incomplete
+    Pending --> Ready: Byte completes valid sequence / emit its scalar
+    Pending --> Ready: Byte cannot extend prefix / emit U+FFFD and reconsider byte
+
+    Ready --> Ready: Buffer ends / return resolved text
+    Pending --> Pending: Buffer ends / retain prefix and return resolved text
+
+    Ready --> Finished: Input ends / emit nothing further
+    Pending --> Finished: Input ends / emit one U+FFFD
