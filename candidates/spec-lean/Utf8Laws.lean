@@ -173,8 +173,8 @@ def one_byte_shape (cp : UInt32) : Option UInt8 :=
 -- Capacity includes overlong encodings of 0..127; shortest-form
 -- validity is separate.
 
-def two_byte_shape.bits (bits : Byte4) : Option (UInt8 × UInt8) :=
-  match bits with
+def two_byte_shape (cp : UInt32) : Option (UInt8 × UInt8) :=
+  match u32_byte4 cp with
   | ((false, false, false, false, false, false, false, false),
      (false, false, false, false, false, false, false, false),
      (false, false, false, false, false, x1, x2, x3),
@@ -183,9 +183,6 @@ def two_byte_shape.bits (bits : Byte4) : Option (UInt8 × UInt8) :=
           bit8_value (true, false, y3, y4, z1, z2, z3, z4))
   | _ =>
     none
-
-def two_byte_shape (cp : UInt32) : Option (UInt8 × UInt8) :=
-  two_byte_shape.bits (u32_byte4 cp)
 
 -- UTF-8 three-byte shape
 --
@@ -197,8 +194,8 @@ def two_byte_shape (cp : UInt32) : Option (UInt8 × UInt8) :=
 -- Capacity includes overlong encodings of 0..2047 and encodings of
 -- surrogate code points; validity is separate.
 
-def three_byte_shape.bits (bits : Byte4) : Option (UInt8 × UInt8 × UInt8) :=
-  match bits with
+def three_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8) :=
+  match u32_byte4 cp with
   | ((false, false, false, false, false, false, false, false),
      (false, false, false, false, false, false, false, false),
      (w1, w2, w3, w4, x1, x2, x3, x4),
@@ -208,9 +205,6 @@ def three_byte_shape.bits (bits : Byte4) : Option (UInt8 × UInt8 × UInt8) :=
           bit8_value (true, false, y3, y4, z1, z2, z3, z4))
   | _ =>
     none
-
-def three_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8) :=
-  three_byte_shape.bits (u32_byte4 cp)
 
 -- UTF-8 four-byte shape
 --
@@ -222,8 +216,8 @@ def three_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8) :=
 -- Capacity includes overlong encodings of 0..65535 and encodings of
 -- code point values above U+10FFFF; validity is separate.
 
-def four_byte_shape.bits (bits : Byte4) : Option (UInt8 × UInt8 × UInt8 × UInt8) :=
-  match bits with
+def four_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8 × UInt8) :=
+  match u32_byte4 cp with
   | ((false, false, false, false, false, false, false, false),
      (false, false, false, u, v1, v2, v3, v4),
      (w1, w2, w3, w4, x1, x2, x3, x4),
@@ -234,9 +228,6 @@ def four_byte_shape.bits (bits : Byte4) : Option (UInt8 × UInt8 × UInt8 × UIn
           bit8_value (true, false, y3, y4, z1, z2, z3, z4))
   | _ =>
     none
-
-def four_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8 × UInt8) :=
-  four_byte_shape.bits (u32_byte4 cp)
 
 
 -- ## Encoding
@@ -267,15 +258,12 @@ def encoding.two (cp : UInt32) (shape : Option (UInt8 × UInt8)) : Option (List 
   | some (b1, b2) =>
     some [b1, b2]
 
-def encoding.«if» (cp : UInt32) (one : Option UInt8) : Option (List UInt8) :=
-  match one with
+def encoding (cp : UInt32) : Option (List UInt8) :=
+  match one_byte_shape cp with
   | some b1 =>
     some [b1]
   | none =>
     encoding.two cp (two_byte_shape cp)
-
-def encoding (cp : UInt32) : Option (List UInt8) :=
-  encoding.«if» cp (one_byte_shape cp)
 
 -- `seq` is the UTF-8 encoding of the Unicode scalar `cp`.
 
@@ -577,18 +565,14 @@ def decodes_first_nonempty : Prop :=
 -- `decodes_first` gives followed by the text from decoding the bytes
 -- after it.
 --
--- The recursion is on `text`, which shrinks at each step, so `text`
--- comes first in `decodes.go`.
+-- The recursion is on `text`, which shrinks at each step.
 
-def decodes.go : Text → List UInt8 → Prop
-  | [], bytes =>
+def decodes (bytes : List UInt8) : Text → Prop
+  | [] =>
     decodes_first bytes none
-  | cp :: more, bytes =>
+  | cp :: more =>
     ∃ rest : List UInt8,
-      decodes_first bytes (some (cp, rest)) ∧ decodes.go more rest
-
-def decodes (bytes : List UInt8) (text : Text) : Prop :=
-  decodes.go text bytes
+      decodes_first bytes (some (cp, rest)) ∧ decodes rest more
 
 -- Every buffer decodes to some text.
 

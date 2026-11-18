@@ -98,7 +98,7 @@ theorem one_shape (cp : UInt32) :
 
 theorem two_shape (cp : UInt32) :
     two_byte_shape cp = if cp.toNat < 0x800 then some (UInt8.ofNat (0xC0 + cp.toNat / 64), UInt8.ofNat (0x80 + cp.toNat % 64)) else none := by
-  unfold two_byte_shape two_byte_shape.bits u32_byte4
+  unfold two_byte_shape u32_byte4
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
@@ -116,7 +116,7 @@ theorem two_shape (cp : UInt32) :
 theorem three_shape (cp : UInt32) :
     three_byte_shape cp = if cp.toNat < 0x10000 then some (UInt8.ofNat (0xE0 + cp.toNat / 4096), UInt8.ofNat (0x80 + cp.toNat / 64 % 64),
       UInt8.ofNat (0x80 + cp.toNat % 64)) else none := by
-  unfold three_byte_shape three_byte_shape.bits u32_byte4
+  unfold three_byte_shape u32_byte4
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
@@ -134,7 +134,7 @@ theorem three_shape (cp : UInt32) :
 theorem four_shape (cp : UInt32) :
     four_byte_shape cp = if cp.toNat < 0x200000 then some (UInt8.ofNat (0xF0 + cp.toNat / 262144), UInt8.ofNat (0x80 + cp.toNat / 4096 % 64),
       UInt8.ofNat (0x80 + cp.toNat / 64 % 64), UInt8.ofNat (0x80 + cp.toNat % 64)) else none := by
-  unfold four_byte_shape four_byte_shape.bits u32_byte4
+  unfold four_byte_shape u32_byte4
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
@@ -162,7 +162,7 @@ def enc32 (cp : UInt32) : List UInt8 :=
 
 theorem encoding_eq (cp : UInt32) :
     encoding cp = if cp.toNat < 0x200000 then some (enc32 cp) else none := by
-  unfold encoding encoding.«if» encoding.two encoding.three encoding.four
+  unfold encoding encoding.two encoding.three encoding.four
   rw [one_shape, two_shape, three_shape, four_shape]
   by_cases h1 : cp.toNat < 0x80
   · have : cp.toNat < 0x200000 := by omega

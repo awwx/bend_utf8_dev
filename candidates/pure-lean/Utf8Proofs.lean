@@ -369,7 +369,6 @@ theorem decodes_exists_proved : decodes_exists :=
 theorem decodes_first_exists_proved : decodes_first_exists := by
   intro bytes
   have h := decodes_decodeAll bytes
-  unfold decodes at h
   cases ht : decodeAll bytes with
   | nil => rw [ht] at h; exact ⟨_, h⟩
   | cons cp t => rw [ht] at h; obtain ⟨rest, h1, _⟩ := h; exact ⟨_, h1⟩
@@ -404,7 +403,6 @@ theorem decodes_first_unique_proved : decodes_first_unique := by
 
 theorem decodes_unique_proved : decodes_unique := by
   intro bytes t1 t2 h1 h2
-  unfold decodes at h1 h2
   induction t1 generalizing bytes t2 with
   | nil =>
     cases t2 with
