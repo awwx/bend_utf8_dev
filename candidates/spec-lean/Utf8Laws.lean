@@ -153,8 +153,8 @@ def is_unicode_scalar (cp : UInt32) : Bool :=
 -- Returns some byte if the shape matches, or none if the shape doesn't
 -- match.
 
-def one_byte_shape.bits (bits : Byte4) : Option UInt8 :=
-  match bits with
+def one_byte_shape (cp : UInt32) : Option UInt8 :=
+  match u32_byte4 cp with
   | ((false, false, false, false, false, false, false, false),
      (false, false, false, false, false, false, false, false),
      (false, false, false, false, false, false, false, false),
@@ -162,9 +162,6 @@ def one_byte_shape.bits (bits : Byte4) : Option UInt8 :=
     some (bit8_value (false, y1, y2, y3, z1, z2, z3, z4))
   | _ =>
     none
-
-def one_byte_shape (cp : UInt32) : Option UInt8 :=
-  one_byte_shape.bits (u32_byte4 cp)
 
 -- UTF-8 two-byte shape
 --

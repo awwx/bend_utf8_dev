@@ -81,7 +81,7 @@ theorem getLsbD_eq_testBit (cp : UInt32) (i : Nat) : cp.toBitVec.getLsbD i = cp.
 
 theorem one_shape (cp : UInt32) :
     one_byte_shape cp = if cp.toNat < 0x80 then some (UInt8.ofNat cp.toNat) else none := by
-  unfold one_byte_shape one_byte_shape.bits u32_byte4
+  unfold one_byte_shape u32_byte4
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
