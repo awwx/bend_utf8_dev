@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Build the pure layer under both toolchains, check for forbidden
+# Build the pure layer under the selected toolchains, check for forbidden
 # constructs, and print axioms of the exported theorems; then, on each
 # toolchain, replay every constant of the pure layer in the kernel (step 4).
-# Usage: ./check.sh [--skip-replay]   (the final line then says replay SKIPPED)
+# Usage: ./check.sh [--lean-4.35-only] [--skip-replay]
+# By default both toolchains run; --skip-replay marks replay SKIPPED.
 # CHECK_REPLAY_TIMEOUT (seconds, default 300) bounds each replay.
 set -euo pipefail
 cd "$(dirname "$0")"
 SKIP_REPLAY=no
+TOOLCHAINS=(leanprover/lean4:v4.35.0 leanprover/lean4:v4.36.0-rc2)
 for a in "$@"; do
   case $a in
     --skip-replay) SKIP_REPLAY=yes ;;
-    *) echo "usage: $0 [--skip-replay]"; exit 2 ;;
+    --lean-4.35-only) TOOLCHAINS=(leanprover/lean4:v4.35.0) ;;
+    *) echo "usage: $0 [--lean-4.35-only] [--skip-replay]"; exit 2 ;;
   esac
 done
 REPLAY_TIMEOUT=${CHECK_REPLAY_TIMEOUT:-300}
@@ -42,8 +45,8 @@ maximal_subpart_unique_proved decodes_first_exists_proved decodes_first_unique_p
 decodes_first_empty_proved decodes_first_nonempty_proved decodes_exists_proved
 decodes_unique_proved decodes_examples_proved RefDecoder_correct"
 
-# 3. Build under both toolchains, each into its own output directory.
-for TC in leanprover/lean4:v4.35.0 leanprover/lean4:v4.36.0-rc2; do
+# 3. Build under the selected toolchains, each into its own output directory.
+for TC in "${TOOLCHAINS[@]}"; do
   OUT=$(mktemp -d)
   echo "== $TC"
   for f in $FILES; do
@@ -135,5 +138,5 @@ EOF
   rm -rf "$OUT"
   echo "== $TC OK"
 done
-if [ "$SKIP_REPLAY" = yes ]; then echo "ALL CHECKS PASSED (kernel replay SKIPPED (--skip-replay) on both toolchains)"
+if [ "$SKIP_REPLAY" = yes ]; then echo "ALL CHECKS PASSED (kernel replay SKIPPED (--skip-replay) on selected toolchains: ${TOOLCHAINS[*]})"
 else echo "ALL CHECKS PASSED (kernel replay of all non-core constants, 16 theorem types and recomputed axioms:${REPLAY_NOTES%;})"; fi
