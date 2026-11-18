@@ -21,19 +21,19 @@ REPLAY_NOTES=
 SPEC=../spec-lean/Utf8Laws.lean
 FILES="Utf8Laws Utf8Bits Utf8Ref Utf8Table Utf8Proofs Utf8StepFacts"
 
-# 1. The spec is used unmodified.
-command cp "$SPEC" Utf8Laws.lean
-cmp "$SPEC" Utf8Laws.lean || { echo "FAIL: spec copy differs"; exit 1; }
-echo "spec: Utf8Laws.lean byte-identical to $SPEC"
+# 1. Use the authoritative spec directly.
+echo "spec: using $SPEC directly"
 
 # 2. Forbidden constructs in compiled files (comments included, to be strict).
 for f in $FILES Utf8Eval; do
-  if grep -nE '\b(sorry|axiom|native_decide|unsafe|implemented_by|extern|admit)\b' "$f.lean"; then
-    echo "FAIL: forbidden construct in $f.lean"; exit 1
+  SOURCE="$f.lean"
+  if [ "$f" = Utf8Laws ]; then SOURCE=$SPEC; fi
+  if grep -nE '\b(sorry|axiom|native_decide|unsafe|implemented_by|extern|admit)\b' "$SOURCE"; then
+    echo "FAIL: forbidden construct in $SOURCE"; exit 1
   fi
   # bv_decide is allowed by the brief but trusts native code; this layer avoids it.
-  if grep -nE '^[^-]*\bbv_decide\b' "$f.lean"; then
-    echo "FAIL: bv_decide tactic use in $f.lean"; exit 1
+  if grep -nE '^[^-]*\bbv_decide\b' "$SOURCE"; then
+    echo "FAIL: bv_decide tactic use in $SOURCE"; exit 1
   fi
 done
 echo "no sorry/axiom/native_decide/unsafe/implemented_by/extern/admit/bv_decide"
@@ -50,7 +50,11 @@ for TC in "${TOOLCHAINS[@]}"; do
   OUT=$(mktemp -d)
   echo "== $TC"
   for f in $FILES; do
-    LEAN_PATH=$OUT elan run "$TC" lean -o "$OUT/$f.olean" "$f.lean"
+    if [ "$f" = Utf8Laws ]; then
+      LEAN_PATH=$OUT elan run "$TC" lean --root="$(dirname "$SPEC")" -o "$OUT/$f.olean" "$SPEC"
+    else
+      LEAN_PATH=$OUT elan run "$TC" lean -o "$OUT/$f.olean" "$f.lean"
+    fi
   done
   R=$(LEAN_PATH=$OUT elan run "$TC" lean Utf8Eval.lean)
   [ "$R" = "true" ] || { echo "FAIL: Utf8Eval.lean printed: $R"; exit 1; }

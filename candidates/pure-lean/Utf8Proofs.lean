@@ -1,7 +1,7 @@
 /-
 Utf8Proofs.lean -- main file of the shared pure layer (namespace `Utf8Pure`).
 
-Files (import order): Utf8Laws (the spec, byte-identical copy of
+Files (import order): Utf8Laws (compiled directly from
 ../spec-lean/Utf8Laws.lean) -> Utf8Bits -> Utf8Ref -> Utf8Table -> Utf8Proofs.
 
 EXPORTED DEFINITIONS (Utf8Ref.lean; stable)
