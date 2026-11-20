@@ -1,7 +1,8 @@
 /-
 Utf8Proofs.lean -- main file of the shared pure layer (namespace `Utf8Pure`).
 
-Files (import order): Utf8Laws -> Utf8Bits -> Utf8Ref -> Utf8Table -> Utf8Proofs.
+Specification checks: Utf8Laws -> Utf8Check.
+Implementation proofs: Utf8Bits -> Utf8Ref -> Utf8Table -> Utf8Proofs.
 
 EXPORTED DEFINITIONS (Utf8Ref.lean; stable)
   isCont isLead1 isLead2 isLead3 isLead4 : UInt8 -> Bool   byte-range classes
@@ -21,7 +22,7 @@ EXPORTED DEFINITIONS (Utf8Ref.lean; stable)
  (Utf8Table.lean) completion (bytes completing a pending state)
  Each file's header lists its own exports.
 
-SPEC LAWS (each `<law>_proved : <law>`)
+SPEC LAWS (imported from Utf8Check; each `<law>_proved : <law>`)
   bit8_value_sum_proved bit8_value_word_proved u32_byte4_bits_proved
   is_surrogate_code_point_examples_proved begins_with_scalar_unique_proved
   not_valid_sequence_prefix_extended_proved maximal_subpart_exists_proved
@@ -59,26 +60,10 @@ Arithmetic bridges: Utf8Bits one/two/three/four_shape (tuple-of-bools shapes
 CHECK TIME: about 6 s per Lean version for the whole layer (was 57 s); see
 IMPROVEMENT.txt for what made the first version slow.
 -/
+import Utf8Check
 import Utf8Table
 
 namespace Utf8Pure
-
-/-! ## Spec-internal bit laws -/
-
-theorem bit8_value_sum_proved : bit8_value_sum := by
-  unfold bit8_value_sum; decide
-
-theorem bit8_value_word_proved : bit8_value_word := by
-  unfold bit8_value_word; decide
-
-theorem u32_byte4_bits_proved : u32_byte4_bits := by
-  intro b31 b30 b29 b28 b27 b26 b25 b24 b23 b22 b21 b20 b19 b18 b17 b16 b15 b14 b13 b12 b11 b10 b9 b8
-    b7 b6 b5 b4 b3 b2 b1 b0
-  simp only [u32_byte4, BitVec.getLsbD_ofBoolListLE]
-  rfl
-
-theorem is_surrogate_code_point_examples_proved : is_surrogate_code_point_examples := by
-  unfold is_surrogate_code_point_examples; decide
 
 /-! ## Spec predicates ⇔ table predicates -/
 
@@ -111,46 +96,6 @@ theorem vs_front_eq (s1 s2 r1 r2 : List UInt8) (h1 : isVS s1 = true) (h2 : isVS 
     | cons x e =>
       have := isVS_not_proper s2 x e h2
       rw [← hs, isVS_isVSP _ h1] at this; cases this
-
-theorem begins_with_scalar_unique_proved : begins_with_scalar_unique := by
-  intro bytes cp1 r1 cp2 r2 ⟨s1, e1, h1⟩ ⟨s2, e2, h2⟩
-  rw [encodes_iff] at e1 e2
-  have hs := vs_front_eq s1 s2 r1 r2 e1.1 e2.1 (h1.trans h2.symm)
-  subst hs
-  exact ⟨e1.2.trans e2.2.symm, List.append_cancel_left (h1.trans h2.symm)⟩
-
-theorem not_valid_sequence_prefix_extended_proved : not_valid_sequence_prefix_extended := by
-  intro b1 more extra h hext
-  rw [isVSP_iff] at h hext
-  exact h (isVSP_prefix _ _ (by simp) hext)
-
-theorem maximal_subpart_lt (b1 : UInt8) (more s : List UInt8) (x : UInt8) (e : List UInt8)
-    (h1 : maximal_subpart b1 more s) (h2 : maximal_subpart b1 more (s ++ x :: e)) : False := by
-  obtain ⟨_, v1, m1⟩ := h1
-  obtain ⟨p2, v2, _⟩ := h2
-  have hn := m1 x e p2
-  rcases v2 with v2 | v2
-  · exact hn v2
-  · have : s = [] := by
-      cases s with
-      | nil => rfl
-      | cons y t => simp at v2
-    subst this
-    rcases v1 with v1 | v1
-    · simp [is_valid_sequence_prefix] at v1
-    · cases v1
-
-theorem maximal_subpart_unique_proved : maximal_subpart_unique := by
-  intro b1 more s1 s2 h1 h2
-  obtain ⟨t1, ht1⟩ := h1.1
-  obtain ⟨t2, ht2⟩ := h2.1
-  rcases List.append_eq_append_iff.mp (ht1.trans ht2.symm) with ⟨a, hs, _⟩ | ⟨c, hs, _⟩
-  · cases a with
-    | nil => simpa using hs.symm
-    | cons x e => subst hs; exact (maximal_subpart_lt b1 more s1 x e h1 h2).elim
-  · cases c with
-    | nil => simpa using hs
-    | cons x e => subst hs; exact (maximal_subpart_lt b1 more s2 x e h2 h1).elim
 
 /-! ## The four ways the first code point is decided -/
 
@@ -362,72 +307,9 @@ theorem decodes_decodeAll (bytes : List UInt8) : decodes bytes (decodeAll bytes)
   have := run_decodes bytes [] (Or.inl rfl)
   simpa [decodeAll] using this
 
-theorem decodes_exists_proved : decodes_exists :=
-  fun bytes => ⟨_, decodes_decodeAll bytes⟩
-
-theorem decodes_first_exists_proved : decodes_first_exists := by
-  intro bytes
-  have h := decodes_decodeAll bytes
-  cases ht : decodeAll bytes with
-  | nil => rw [ht] at h; exact ⟨_, h⟩
-  | cons cp t => rw [ht] at h; obtain ⟨rest, h1, _⟩ := h; exact ⟨_, h1⟩
-
-theorem decodes_first_empty_proved : decodes_first_empty :=
-  fun _ h => h
-
-theorem decodes_first_nonempty_proved : decodes_first_nonempty := by
-  intro b1 more result h
-  rcases h with ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩ <;> rfl
-
-theorem maximal_subpart_exists_proved : maximal_subpart_exists := by
-  intro b1 more hno
-  obtain ⟨r, h⟩ := decodes_first_exists_proved (b1 :: more)
-  rcases h with ⟨cp, rest, hb, _⟩ | ⟨_, s, _, hs, _, _⟩
-  · exact (hno cp rest hb).elim
-  · exact ⟨s, hs⟩
-
-theorem decodes_first_unique_proved : decodes_first_unique := by
-  intro bytes r1 r2 h1 h2
-  cases bytes with
-  | nil => exact h1.trans h2.symm
-  | cons b1 more =>
-    rcases h1 with ⟨cp1, rest1, hb1, rfl⟩ | ⟨hn1, s1, rest1, hs1, he1, rfl⟩ <;>
-    rcases h2 with ⟨cp2, rest2, hb2, rfl⟩ | ⟨hn2, s2, rest2, hs2, he2, rfl⟩
-    · obtain ⟨rfl, rfl⟩ := begins_with_scalar_unique_proved _ _ _ _ _ hb1 hb2; rfl
-    · exact (hn2 _ _ hb1).elim
-    · exact (hn1 _ _ hb2).elim
-    · have := maximal_subpart_unique_proved _ _ _ _ hs1 hs2
-      subst this
-      rw [List.append_cancel_left (he1.trans he2.symm)]
-
-theorem decodes_unique_proved : decodes_unique := by
-  intro bytes t1 t2 h1 h2
-  induction t1 generalizing bytes t2 with
-  | nil =>
-    cases t2 with
-    | nil => rfl
-    | cons c t2 =>
-      obtain ⟨_, h, _⟩ := h2
-      cases decodes_first_unique_proved _ _ _ h1 h
-  | cons c t1 ih =>
-    obtain ⟨rest1, d1, g1⟩ := h1
-    cases t2 with
-    | nil => cases decodes_first_unique_proved _ _ _ d1 h2
-    | cons c2 t2 =>
-      obtain ⟨rest2, d2, g2⟩ := h2
-      have e := decodes_first_unique_proved _ _ _ d1 d2
-      simp only [Option.some.injEq, Prod.mk.injEq] at e
-      obtain ⟨rfl, rfl⟩ := e
-      rw [ih rest1 t2 g1 g2]
-
 theorem decodes_iff (bytes : List UInt8) (t : Text) : decodes bytes t ↔ t = decodeAll bytes :=
   ⟨fun h => decodes_unique_proved _ _ _ h (decodes_decodeAll bytes),
    fun h => h ▸ decodes_decodeAll bytes⟩
-
-theorem decodes_examples_proved : decodes_examples := by
-  unfold decodes_examples
-  simp only [decodes_iff]
-  decide
 
 /-! ## The streaming laws for `RefDecoder` -/
 

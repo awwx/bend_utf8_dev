@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 if [ "$#" -ne 0 ]; then echo "usage: $0"; exit 2; fi
 TC=leanprover/lean4:v4.35.0
 REPLAY_TIMEOUT=${CHECK_REPLAY_TIMEOUT:-300}
-FILES="Utf8Laws Utf8Bits Utf8Ref Utf8Table Utf8Proofs Utf8StepFacts"
+FILES="Utf8Laws Utf8Check Utf8Bits Utf8Ref Utf8Table Utf8Proofs Utf8StepFacts"
 
 # Check forbidden constructs in compiled files (comments included, to be strict).
 for f in $FILES Utf8Eval; do
@@ -63,7 +63,7 @@ if [ -n "$BAD" ]; then echo "FAIL: unexpected axioms: $BAD"; exit 1; fi
 N=$(grep -cE "depends on axioms|does not depend" "$OUT/axioms.txt")
 [ "$N" = 16 ] || { echo "FAIL: expected 16 #print axioms results, got $N"; exit 1; }
 # Kernel replay: re-check, in a fresh environment importing only Init/Lean/Std,
-# every other constant of Utf8StepFacts' import closure (all six files above), so a
+# every other constant of Utf8StepFacts' import closure (all proof and specification modules above), so a
 # declaration added by metaprogramming without kernel checking is rejected.  Then,
 # on the replayed environment: each of the 16 theorems has exactly the law's type,
 # and its axioms, recomputed from the replayed constants (#print axioms above
