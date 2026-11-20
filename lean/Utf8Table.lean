@@ -229,33 +229,64 @@ theorem secondOk_secondLo (a : UInt8) : secondOk a (secondLo a) = true := by
   · subst h2; decide
   simp only [secondLo, h1, h2, ite_false]; exact secondOk_80 a h1 h2
 
+-- Ending in 0x80 makes the code point divisible by 64, unlike U+FFFD.
+-- Keep this arithmetic separate from the byte-class case analysis so external
+-- kernels can check each certificate within their reduction budgets.
+private theorem two_end80 (a : UInt8) : cpOf [a, 0x80] ≠ 0xFFFD := by
+  intro h
+  have h := congrArg UInt32.toNat h
+  simp only [cpOf_two, UInt8.toNat_ofNat, UInt32.toNat_ofNat] at h
+  omega
+
+private theorem three_end80 (a b : UInt8) : cpOf [a, b, 0x80] ≠ 0xFFFD := by
+  intro h
+  have h := congrArg UInt32.toNat h
+  simp only [cpOf_three, UInt8.toNat_ofNat, UInt32.toNat_ofNat] at h
+  omega
+
+private theorem four_end80 (a b c : UInt8) : cpOf [a, b, c, 0x80] ≠ 0xFFFD := by
+  intro h
+  have h := congrArg UInt32.toNat h
+  simp only [cpOf_four, UInt8.toNat_ofNat, UInt32.toNat_ofNat] at h
+  omega
+
+private theorem completion_1 (a : UInt8)
+    (h1 : isVSP [a] = true) (h2 : isVS [a] = false) :
+    isVS ([a] ++ completion [a]) = true ∧ cpOf ([a] ++ completion [a]) ≠ 0xFFFD := by
+  have c80 : isCont 0x80 = true := rfl
+  simp only [isVS, isVSP] at h1 h2
+  by_cases l2 : isLead2 a = true
+  · have e0 : a ≠ 0xE0 := by rintro rfl; exact absurd l2 (by decide)
+    have f0 : a ≠ 0xF0 := by rintro rfl; exact absurd l2 (by decide)
+    simpa [completion, l2, isVS, secondOk_80 a e0 f0] using two_end80 a
+  by_cases l3 : isLead3 a = true
+  · simpa [completion, l2, l3, isVS, secondOk_secondLo, c80] using three_end80 a (secondLo a)
+  · have l4 : isLead4 a = true := by simp_all
+    simpa [completion, l2, l3, l4, isVS, secondOk_secondLo, c80] using four_end80 a (secondLo a) 0x80
+
+private theorem completion_2 (a b : UInt8)
+    (h1 : isVSP [a, b] = true) (h2 : isVS [a, b] = false) :
+    isVS ([a, b] ++ completion [a, b]) = true ∧ cpOf ([a, b] ++ completion [a, b]) ≠ 0xFFFD := by
+  have c80 : isCont 0x80 = true := rfl
+  simp only [isVS, isVSP, Bool.and_eq_true, Bool.or_eq_true] at h1 h2
+  cases l2 : isLead2 a <;> cases l3 : isLead3 a <;> cases l4 : isLead4 a <;>
+    simp_all [completion, isVS, three_end80, four_end80]
+
+private theorem completion_3 (a b c : UInt8)
+    (h1 : isVSP [a, b, c] = true) (h2 : isVS [a, b, c] = false) :
+    isVS ([a, b, c] ++ completion [a, b, c]) = true ∧ cpOf ([a, b, c] ++ completion [a, b, c]) ≠ 0xFFFD := by
+  have c80 : isCont 0x80 = true := rfl
+  simp only [isVS, isVSP, Bool.and_eq_true, Bool.or_eq_true] at h1 h2
+  cases l3 : isLead3 a <;> cases l4 : isLead4 a <;> simp_all [completion, isVS, four_end80]
+
 /-- Every completion ends in the byte 0x80, so the completed code point is
 `0 mod 64`, while U+FFFD is `61 mod 64`. -/
 theorem completion_spec (p : List UInt8) (h1 : isVSP p = true) (h2 : isVS p = false) :
     isVS (p ++ completion p) = true ∧ cpOf (p ++ completion p) ≠ 0xFFFD := by
-  have c80 : isCont 0x80 = true := rfl
-  rw [ne_eq, ← UInt32.toNat_inj]
   match p, h1, h2 with
-  | [a], h1, h2 =>
-    simp only [isVS, isVSP] at h1 h2
-    simp only [completion]
-    by_cases l2 : isLead2 a = true
-    · have e0 : a ≠ 0xE0 := by rintro rfl; exact absurd l2 (by decide)
-      have f0 : a ≠ 0xF0 := by rintro rfl; exact absurd l2 (by decide)
-      simp [l2, isVS, secondOk_80 a e0 f0, cpOf_two]; omega
-    by_cases l3 : isLead3 a = true
-    · simp [l2, l3, isVS, secondOk_secondLo, c80, cpOf_three]; omega
-    · have l4 : isLead4 a = true := by simp_all
-      simp [l2, l3, l4, isVS, secondOk_secondLo, c80, cpOf_four]; omega
-  | [a, b], h1, h2 =>
-    simp only [isVS, isVSP, Bool.and_eq_true, Bool.or_eq_true] at h1 h2
-    simp only [completion]
-    cases l2 : isLead2 a <;> cases l3 : isLead3 a <;> cases l4 : isLead4 a <;>
-      simp_all [isVS, cpOf_three, cpOf_four] <;> omega
-  | [a, b, c], h1, h2 =>
-    simp only [isVS, isVSP, Bool.and_eq_true, Bool.or_eq_true] at h1 h2
-    simp only [completion]
-    cases l3 : isLead3 a <;> cases l4 : isLead4 a <;> simp_all [isVS, cpOf_four] <;> omega
+  | [a], h1, h2 => exact completion_1 a h1 h2
+  | [a, b], h1, h2 => exact completion_2 a b h1 h2
+  | [a, b, c], h1, h2 => exact completion_3 a b c h1 h2
   | [_, _, _, _], h1, h2 => simp_all [isVS, isVSP]
   | [], h1, _ | _ :: _ :: _ :: _ :: _ :: _, h1, _ => simp [isVSP] at h1
 

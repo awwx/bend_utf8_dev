@@ -1,125 +1,33 @@
 #!/usr/bin/env bash
-# Check the UTF-8 spec and proofs with Lean v4.35.0, including kernel replay.
+# Validate untrusted proofs against the reviewed challenge with Lean v4.35.0.
+# Requires elan, bubblewrap with working Linux namespaces, and a non-root user.
 # Usage: ./check
-# Requires elan with leanprover/lean4:v4.35.0, and GNU timeout.
-# CHECK_REPLAY_TIMEOUT (seconds, default 300) bounds kernel replay.
 set -euo pipefail
 cd "$(dirname "$0")"
-if [ "$#" -ne 0 ]; then echo "usage: $0"; exit 2; fi
+if [ "$#" -ne 0 ]; then echo "usage: $0" >&2; exit 2; fi
+if [ "$(id -u)" -eq 0 ]; then
+  echo "Run this checker as a non-root user: comparator's sandbox must not run privileged." >&2
+  exit 2
+fi
 TC=leanprover/lean4:v4.35.0
-REPLAY_TIMEOUT=${CHECK_REPLAY_TIMEOUT:-300}
-FILES="Utf8Laws Utf8Check Utf8Bits Utf8Ref Utf8Table Utf8Proofs Utf8StepFacts"
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
 
-# Check forbidden constructs in compiled files (comments included, to be strict).
-for f in $FILES Utf8Eval; do
-  SOURCE="$f.lean"
-  if grep -nE '\b(sorry|axiom|native_decide|unsafe|implemented_by|extern|admit)\b' "$SOURCE"; then
-    echo "FAIL: forbidden construct in $SOURCE"; exit 1
-  fi
-  # Avoid tactics that trust native code.
-  if grep -nE '^[^-]*\bbv_decide\b' "$SOURCE"; then
-    echo "FAIL: bv_decide tactic use in $SOURCE"; exit 1
-  fi
-done
-echo "no sorry/axiom/native_decide/unsafe/implemented_by/extern/admit/bv_decide"
+# Start with only the spec and its checks. The sandbox hides the rest of the
+# repository, so Utf8Check cannot import implementation modules. No cached builds
+# are copied. Challenge, configuration, Lake metadata and toolchain are trusted.
+command cp Utf8Laws.lean Utf8Challenge.lean Utf8Check.lean \
+  lakefile.toml lake-manifest.json lean-toolchain spec-comparator.json "$WORK/"
+echo "== Independent specification checks ($TC)"
+elan run "$TC" lake -d "$WORK" comparator --config="$WORK/spec-comparator.json" --paranoid
 
-THMS="bit8_value_sum_proved bit8_value_word_proved u32_byte4_bits_proved
-is_surrogate_code_point_examples_proved begins_with_scalar_unique_proved
-not_valid_sequence_prefix_extended_proved maximal_subpart_exists_proved
-maximal_subpart_unique_proved decodes_first_exists_proved decodes_first_unique_proved
-decodes_first_empty_proved decodes_first_nonempty_proved decodes_exists_proved
-decodes_unique_proved decodes_examples_proved RefDecoder_correct"
-
-# Build local modules into a temporary directory.
-OUT=$(mktemp -d)
-trap 'rm -rf "$OUT"' EXIT
-echo "== $TC"
-for f in $FILES; do
-  LEAN_PATH=$OUT elan run "$TC" lean -o "$OUT/$f.olean" "$f.lean"
-done
-R=$(LEAN_PATH=$OUT elan run "$TC" lean Utf8Eval.lean)
-[ "$R" = "true" ] || { echo "FAIL: Utf8Eval.lean printed: $R"; exit 1; }
-echo "evaluation sanity test: true"
-AX="$OUT/Axioms.lean"
-{
-  echo "import Utf8StepFacts"
-  echo "open Utf8Pure"
-  for t in $THMS; do echo "#print axioms $t"; done
-  # Each theorem must have exactly the type of the spec's law.
-  for t in $THMS; do
-    case $t in
-      RefDecoder_correct) echo "example : Decoder.Correct RefDecoder := RefDecoder_correct" ;;
-      *) echo "example : ${t%_proved} := $t" ;;
-    esac
-  done
-} > "$AX"
-LEAN_PATH=$OUT elan run "$TC" lean "$AX" > "$OUT/axioms.txt" 2>&1 \
-  || { cat "$OUT/axioms.txt"; echo "FAIL: theorem types / axioms check"; exit 1; }
-cat "$OUT/axioms.txt"
-if grep -q sorryAx "$OUT/axioms.txt"; then echo "FAIL: sorryAx"; exit 1; fi
-BAD=$(tr -d '\n' < "$OUT/axioms.txt" | grep -o '\[[^]]*\]' | tr -d '[] ' | tr ',' '\n' \
-    | grep -vE '^(propext|Classical\.choice|Quot\.sound)$' || true)
-if [ -n "$BAD" ]; then echo "FAIL: unexpected axioms: $BAD"; exit 1; fi
-N=$(grep -cE "depends on axioms|does not depend" "$OUT/axioms.txt")
-[ "$N" = 16 ] || { echo "FAIL: expected 16 #print axioms results, got $N"; exit 1; }
-# Kernel replay: re-check, in a fresh environment importing only Init/Lean/Std,
-# every other constant of Utf8StepFacts' import closure (all proof and specification modules above), so a
-# declaration added by metaprogramming without kernel checking is rejected.  Then,
-# on the replayed environment: each of the 16 theorems has exactly the law's type,
-# and its axioms, recomputed from the replayed constants (#print axioms above
-# uses per-module lists stored in the .olean files), are within the standard three.
-{ cat <<'EOF'
-import Lean
-open Lean
-
-def main : IO Unit := do
-  initSearchPath (← findSysroot)
-  let full ← importModules #[{module := `Utf8StepFacts}] {} (loadExts := false)
-  let base ← importModules #[{module := `Init}, {module := `Lean}, {module := `Std}] {} (loadExts := false)
-  let mut news : Std.HashMap Name ConstantInfo := {}
-  for (n, ci) in full.constants.map₁.toList do
-    if !base.contains n then news := news.insert n ci
-  IO.println s!"replaying {news.size} constants (all of Utf8StepFacts' imports except Init/Lean/Std)"
-  let kenv ← base.toKernelEnv.replay news
-  let axiomsOf (c : Name) : Except String (Array Name) := Id.run do
-    let mut seen : NameSet := {}
-    let mut todo := #[c]
-    let mut axs : NameSet := {}
-    while h : todo.size > 0 do
-      let d := todo.back; todo := todo.pop
-      if seen.contains d then continue
-      seen := seen.insert d
-      let some ci := kenv.find? d | return .error s!"{d} (used by {c}) missing from the replayed environment"
-      if ci matches .axiomInfo _ then axs := axs.insert d
-      let mut es := #[ci.type]
-      if let some v := ci.value? (allowOpaque := true) then es := es.push v
-      for e in es do
-        for u in e.getUsedConstants do todo := todo.push u
-      if let .inductInfo v := ci then todo := todo ++ v.ctors.toArray
-    return .ok (axs.toArray.qsort Name.lt)
-  let check (thm : Name) (ty : Expr) : IO Unit := do
-    unless news.contains thm do throw <| IO.userError s!"{thm} not among the replayed constants"
-    match kenv.find? thm with
-    | some (.thmInfo t) =>
-      unless t.type == ty do throw <| IO.userError s!"replayed {thm} does not have type {ty}"
-    | _ => throw <| IO.userError s!"{thm} is not a theorem in the replayed environment"
-    match axiomsOf thm with
-    | .error e => throw <| IO.userError e
-    | .ok axs =>
-      unless axs.all ([`propext, `Classical.choice, `Quot.sound].contains ·) do
-        throw <| IO.userError s!"replayed {thm} depends on axioms {axs.toList}"
-  check `Utf8Pure.RefDecoder_correct (.app (.const `Decoder.Correct []) (.const `Utf8Pure.RefDecoder []))
-  for law in LAWS do
-    check (Name.mkStr `Utf8Pure (law ++ "_proved")) (.const (Name.mkStr .anonymous law) [])
-  IO.println "replay OK"
-EOF
-} | sed "s/LAWS/[$(for t in $THMS; do [ "$t" = RefDecoder_correct ] || printf '"%s", ' "${t%_proved}"; done | sed 's/, $//')]/" > "$OUT/Replay.lean"
-rc=0; LEAN_PATH=$OUT timeout --kill-after=20 "$REPLAY_TIMEOUT" elan run "$TC" lean --run "$OUT/Replay.lean" \
-  > "$OUT/replay.txt" 2>&1 || rc=$?
-cat "$OUT/replay.txt"
-if [ "$rc" = 124 ] || [ "$rc" = 137 ]; then echo "FAIL: TIMEOUT: kernel replay ($TC) exceeded $REPLAY_TIMEOUT s"; exit 1; fi
-[ "$rc" = 0 ] && [ "$(tail -1 "$OUT/replay.txt")" = "replay OK" ] \
-  || { echo "FAIL: kernel replay rejected the environment ($TC)"; exit 1; }
-n=$(sed -n 's/^replaying \([0-9]*\) .*/\1/p' "$OUT/replay.txt")
-echo "== $TC OK"
-echo "ALL CHECKS PASSED (kernel replay of $n non-core constants, 16 theorem types and recomputed axioms)"
+# Use a second clean project for the implementation, avoiding reuse of artifacts
+# created by the first untrusted build.
+SOLUTION="$WORK/solution"
+mkdir "$SOLUTION"
+command cp Utf8Laws.lean Utf8Challenge.lean Utf8Check.lean Utf8Bits.lean \
+  Utf8Ref.lean Utf8Table.lean Utf8Proofs.lean Utf8StepFacts.lean Utf8Eval.lean \
+  Utf8Solution.lean lakefile.toml lake-manifest.json lean-toolchain comparator.json "$SOLUTION/"
+echo "== Implementation correctness ($TC)"
+elan run "$TC" lake -d "$SOLUTION" comparator --config="$SOLUTION/comparator.json" --paranoid
+echo "ALL CHECKS PASSED"
