@@ -2,7 +2,7 @@
 # Validate untrusted proofs against the reviewed challenge with Lean v4.35.0.
 # Requires elan, bubblewrap with working Linux namespaces, and a non-root user.
 # Usage: ./check
-set -euo pipefail
+set -veuo pipefail
 cd "$(dirname "$0")"
 if [ "$#" -ne 0 ]; then echo "usage: $0" >&2; exit 2; fi
 if [ "$(id -u)" -eq 0 ]; then
