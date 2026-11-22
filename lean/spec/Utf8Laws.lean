@@ -1,29 +1,8 @@
--- Lean 4 translation of /root/bend/utf8/LAWS.bend (core Lean only).
---
--- This file is the specification only: each Bend `law` is a `def` of
--- type `Prop` stating the law, with no proof.  The proofs live
--- elsewhere.
---
--- Translation conventions (see TRANSLATION.txt for the full record):
---
--- * A byte is a `UInt8`.  LAWS.bend uses `U32` values with a separate
---   proof that they are 0..255; with `UInt8` that proof is not needed,
---   so `all_bytes` and everything that uses it are dropped.
---
--- * A code point is a `UInt32`, a 32-bit value like Bend's `U32`, with
---   no restriction to Unicode scalar values.
---
--- * Text (Bend's `String`, a list of `Chr{U32}`) is `Text`, a list of
---   code points.  Lean's `String` and `Char` are not used.
---
--- * Bend's `Type`-valued propositions become `Prop`: `Exists` is `∃`,
---   `Or` is `∨`, `&` is `∧`, `-> Empty` is `¬`, and `{a == b : T}` is
---   `a = b`.
---
--- * The streaming laws are about an abstract `Decoder` rather than the
---   Bend implementation `UTF8.*`.
+-- UTF-8 specification in core Lean. Laws are definitions of type `Prop`.
+-- Bytes are `UInt8` values. Code points are `UInt32` values, including
+-- values outside the Unicode scalar range.
 
--- Bend's `String`: a list of code points.
+-- Text is a list of code points.
 abbrev Text : Type := List UInt32
 
 -- ## Bits to bytes helper
@@ -645,22 +624,15 @@ def decodes_examples : Prop :=
 
 -- ### Stream decoding
 
--- A stream decoder `D : Decoder` (in LAWS.bend, the functions of the
--- implementation module `UTF8`):
+-- `D.start` is the decoder state before any input.
 --
--- `D.start` (`UTF8.decode_start_state()`) is the decoder state before
--- any input.
+-- `D.decode_buffer state buffer` takes the next buffer of bytes and
+-- returns the new state and the text that is now fully resolved.
 --
--- `D.decode_buffer state buffer` (`UTF8.decode_buffer`) takes the next
--- buffer of bytes and returns the new state and the text that is now
--- fully resolved.
+-- `D.decode_done state` returns the remaining text at the end of input.
 --
--- `D.decode_done state` (`UTF8.decode_done`) returns the text that ends
--- the input.
---
--- The state type, `D.State` (`UTF8.DecodeState()`), is the
--- implementation's choice: the laws below only describe the text that
--- comes out.
+-- The implementation chooses `D.State`. The laws describe the text
+-- returned by the decoder.
 
 structure Decoder where
   State : Type
@@ -679,14 +651,6 @@ structure Decoder where
 -- (Otherwise, for example, an implementation could keep all the input
 -- buffers in the state and then deliver the entire decoded text from
 -- the call to `decode_done`.)
-
--- ## all_bytes
---
--- Dropped.  In LAWS.bend, buffers are lists of U32 that are not
--- restricted to 0..255, so `all_bytes` and the law
--- `utf8_decode_buffer_all_bytes` state that restriction.  Here a byte
--- is a `UInt8`, so there is nothing to state.
-
 
 -- ## Running the decoder
 
@@ -747,9 +711,6 @@ def decoded (D : Decoder) (buffers : List (List UInt8)) : Text :=
 -- In whatever way the input is split into buffers, giving them in
 -- order to `D.decode_buffer` and then calling `D.decode_done`
 -- gives what their concatenation decodes to.
---
--- (`List.flatten` is Bend's `List.concat`: the concatenation of a list
--- of lists.  Lean's `List.concat` is a different function.)
 
 def utf8_decodes (D : Decoder) : Prop :=
   ∀ buffers : List (List UInt8),
@@ -784,8 +745,7 @@ def utf8_decode_buffer_prompt (D : Decoder) : Prop :=
         decodes (List.flatten buffers ++ rest) full ∧
         ¬ is_text_prefix (decoded_so_far D buffers ++ code_point_to_string c) full
 
--- Not in LAWS.bend: the three streaming laws together, for
--- convenience.
+-- A correct decoder satisfies all three streaming laws.
 
 def Decoder.Correct (D : Decoder) : Prop :=
   utf8_decodes D ∧
