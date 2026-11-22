@@ -1,8 +1,0 @@
-name = "utf8"
-version = "0.1.0"
-defaultTargets = ["Utf8"]
-
-[[lean_lib]]
-name = "Utf8"
-roots = ["Utf8Laws", "Utf8Challenge", "Utf8Check", "Utf8Solution",
-  "Utf8Bits", "Utf8Ref", "Utf8Table", "Utf8Proofs", "Utf8StepFacts", "Utf8Eval"]

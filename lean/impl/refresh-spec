@@ -1,0 +1,4 @@
+# Sourced from the implementation project root.
+rm -rf -- ./spec
+mkdir ./spec
+command cp -- ../spec/*.lean ./spec/

@@ -1,0 +1,7 @@
+name = "utf8spec"
+version = "0.1.0"
+defaultTargets = ["Utf8Spec"]
+
+[[lean_lib]]
+name = "Utf8Spec"
+roots = ["Utf8Laws", "Utf8Challenge", "Utf8Check"]
