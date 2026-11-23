@@ -7,7 +7,7 @@ a check failure; the script has no unsandboxed fallback.
 
 Reviewed inputs
 ---------------
-Utf8Laws.lean is the specification. Utf8Challenge.lean declares the 15
+Utf8Laws.lean is the specification. Utf8Challenge.lean declares the 16
 specification obligations and a Decoder-valued implementation hole with
 its correctness obligation. The challenge's proof holes are intentional;
 they are never accepted as solution proofs. Review the challenge and the
@@ -36,7 +36,7 @@ The build scripts run incremental Lake builds and accept Lake build
 targets, such as +Utf8Proofs for the implementation.
 
 The specification project in spec/ contains Utf8Laws, Utf8Challenge, and
-Utf8Check. Its comparator checks all 15 properties. The challenge's decoder
+Utf8Check. Its comparator checks all 16 properties. The challenge's decoder
 hole is outside that run's targets. In a checkout under /home, /root,
 /run/user, or /tmp, comparator masks the containing directory and mounts
 the selected project back into the sandbox. This keeps implementation
@@ -47,7 +47,7 @@ impl/spec/ with copies of the Lean sources from spec/ before running Lake.
 The copy is git ignored and stays on disk after each run so diagnostic
 paths remain available. Edit the originals in spec/.
 
-The implementation comparator checks the 15 properties and
+The implementation comparator checks the 16 properties and
 RefDecoder_correct, with RefDecoder designated as a definition supplied
 by the solution. Each project keeps its own .lake build directory.
 

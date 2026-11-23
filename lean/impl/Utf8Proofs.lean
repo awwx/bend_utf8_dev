@@ -10,6 +10,7 @@ EXPORTED DEFINITIONS (Utf8Ref.lean; stable)
   isVS  : List UInt8 -> Bool  whole valid sequence (Unicode Table 3-7)
   isVSP : List UInt8 -> Bool  valid sequence prefix
   cpOf  : List UInt8 -> UInt32  code point of a valid sequence, shift/mask form
+  charOf : List UInt8 -> Char   character of a valid sequence
   State := List UInt8         pending bytes ([] or a VSP that is not a VS)
   stepFresh, step : State -> UInt8 -> State x Text
   stepAcc, decodeBuffer (List.foldl stepAcc), decodeDone
@@ -111,11 +112,19 @@ theorem df_replaced (b1 : UInt8) (more s rest : List UInt8) (hs : s ++ rest = b1
   · rw [isVSP_iff]; exact hv
   · intro c extra hp; rw [isVSP_iff, hlong c extra hp]; simp
 
+theorem charOf_val_of_isVS (q : List UInt8) (h : isVS q = true) :
+    (charOf q).val = cpOf q := by
+  let c : Char := ⟨cpOf q, (is_unicode_scalar_matches_char_proved _).mp (encodes_of_isVS q h).1⟩
+  exact congrArg Char.val (Char.ofNat_toNat c)
+
 theorem df_scalar (q r : List UInt8) (h : isVS q = true) :
-    decodes_first (q ++ r) (some (cpOf q, r)) := by
+    decodes_first (q ++ r) (some (charOf q, r)) := by
   cases q with
   | nil => cases h
-  | cons a q' => exact Or.inl ⟨cpOf (a :: q'), r, ⟨a :: q', encodes_of_isVS _ h, rfl⟩, rfl⟩
+  | cons a q' =>
+    refine Or.inl ⟨charOf (a :: q'), r, ⟨a :: q', ?_, rfl⟩, rfl⟩
+    rw [charOf_val_of_isVS _ h]
+    exact encodes_of_isVS _ h
 
 theorem df_fresh_bad (b : UInt8) (r : List UInt8) (h : isVSP [b] = false) :
     decodes_first (b :: r) (some (replacement_char, r)) := by
@@ -249,7 +258,7 @@ theorem decodeDone_pending (p : State) (hne : p ≠ []) : decodeDone p = [replac
 
 /-! ## The decoder output satisfies `decodes` -/
 
-theorem decodes_cons (cp : UInt32) (t : Text) (bytes rest : List UInt8)
+theorem decodes_cons (cp : Char) (t : Text) (bytes rest : List UInt8)
     (h1 : decodes_first bytes (some (cp, rest))) (h2 : decodes rest t) :
     decodes bytes (cp :: t) := ⟨rest, h1, h2⟩
 
@@ -340,7 +349,7 @@ theorem utf8_decode_buffer_safe_RefDecoder : utf8_decode_buffer_safe RefDecoder 
 /-- From a pending state, feeding the rest of a valid sequence emits
 exactly its code point and returns to the empty state. -/
 theorem run_complete (r : List UInt8) : ∀ p : State, r ≠ [] → isVS (p ++ r) = true →
-    run p r = ([], [cpOf (p ++ r)]) := by
+    run p r = ([], [charOf (p ++ r)]) := by
   induction r with
   | nil => intro p h; exact absurd rfl h
   | cons b r ih =>
@@ -361,7 +370,7 @@ theorem run_complete (r : List UInt8) : ∀ p : State, r ≠ [] → isVS (p ++ r
       show ((run (step p b).1 (x :: e)).1, (step p b).2 ++ (run (step p b).1 (x :: e)).2) = _
       rw [hs, this]; simp
 
-theorem not_prefix_longer (o : Text) (c : UInt32) : ¬ is_text_prefix (o ++ [c]) o := by
+theorem not_prefix_longer (o : Text) (c : Char) : ¬ is_text_prefix (o ++ [c]) o := by
   intro ⟨m, h⟩
   have := congrArg List.length h
   (simp at this) <;> omega
@@ -376,7 +385,7 @@ theorem utf8_decode_buffer_prompt_RefDecoder : utf8_decode_buffer_prompt RefDeco
   · subst hP
     refine ⟨[], _, decodes_decodeAll _, ?_⟩
     rw [decodeAll_append, hO]
-    simpa [run, decodeDone, code_point_to_string] using not_prefix_longer O c
+    simpa [run, decodeDone] using not_prefix_longer O c
   have hne : P ≠ [] := by rintro rfl; cases hP
   by_cases hc : c = replacement_char
   · subst hc
@@ -387,13 +396,15 @@ theorem utf8_decode_buffer_prompt_RefDecoder : utf8_decode_buffer_prompt RefDeco
       intro h; rw [h] at hv; simp at hv; rw [hv] at hPv; cases hPv
     simp only [run_complete _ P hcne hv]
     intro ⟨m, h⟩
-    simp [code_point_to_string, decodeDone] at h
-    exact hcp h.1.symm
+    simp [decodeDone] at h
+    have he := congrArg Char.val h.1.symm
+    rw [charOf_val_of_isVS _ hv] at he
+    exact hcp he
   · refine ⟨[], _, decodes_decodeAll _, ?_⟩
     rw [decodeAll_append, hO]
     simp only [run, decodeDone_pending P hne]
     intro ⟨m, h⟩
-    simp [code_point_to_string] at h
+    simp at h
     exact hc h.1
 
 theorem RefDecoder_correct : Decoder.Correct RefDecoder :=
@@ -405,7 +416,7 @@ theorem RefDecoder_correct : Decoder.Correct RefDecoder :=
 /-! ### Equations for `step` -/
 
 theorem step_complete (p : State) (b : UInt8) (h : isVS (p ++ [b]) = true) :
-    step p b = ([], [cpOf (p ++ [b])]) := by simp [step, h]
+    step p b = ([], [charOf (p ++ [b])]) := by simp [step, h]
 
 theorem step_extend (p : State) (b : UInt8) (h1 : isVS (p ++ [b]) = false)
     (h2 : isVSP (p ++ [b]) = true) : step p b = (p ++ [b], []) := by simp [step, h1, h2]
@@ -485,49 +496,27 @@ theorem isVS_length (seq : List UInt8) (h : isVS seq = true) : 1 ≤ seq.length 
 
 /-! ### Every output code point is a Unicode scalar (so UTF-16-encodable) -/
 
-theorem replacement_char_scalar : is_unicode_scalar replacement_char = true := by decide
+theorem replacement_char_scalar : is_unicode_scalar replacement_char.val = true :=
+  (is_unicode_scalar_matches_char_proved _).mpr replacement_char.valid
 
 theorem step_out_scalar (p : State) (b : UInt8) :
-    ∀ c ∈ (step p b).2, is_unicode_scalar c = true := by
-  have hq : ∀ q : List UInt8, isVS q = true → is_unicode_scalar (cpOf q) = true :=
-    fun q h => (encodes_of_isVS q h).1
-  unfold step stepFresh
-  by_cases h1 : isVS (p ++ [b]) = true
-  · simp [h1, hq _ h1]
-  by_cases h2 : isVSP (p ++ [b]) = true
-  · simp [h1, h2]
-  by_cases h3 : p.isEmpty = true
-  · simp [h1, h2, h3, replacement_char_scalar]
-  by_cases g1 : isVS [b] = true
-  · simp [h1, h2, h3, g1, replacement_char_scalar, hq _ g1]
-  by_cases g2 : isVSP [b] = true
-  · simp [h1, h2, h3, g1, g2, replacement_char_scalar]
-  · simp [h1, h2, h3, g1, g2, replacement_char_scalar]
+    ∀ c ∈ (step p b).2, is_unicode_scalar c.val = true :=
+  fun c _ => (is_unicode_scalar_matches_char_proved _).mpr c.valid
 
-theorem run_out_scalar (bs : List UInt8) : ∀ (p : State),
-    ∀ c ∈ (run p bs).2, is_unicode_scalar c = true := by
-  induction bs with
-  | nil => intro p c h; simp [run] at h
-  | cons b bs ih =>
-    intro p c h
-    simp only [run, List.mem_append] at h
-    rcases h with h | h
-    · exact step_out_scalar p b c h
-    · exact ih _ c h
+theorem run_out_scalar (bs : List UInt8) (p : State) :
+    ∀ c ∈ (run p bs).2, is_unicode_scalar c.val = true :=
+  fun c _ => (is_unicode_scalar_matches_char_proved _).mpr c.valid
 
 theorem decodeBuffer_out_scalar (s : State) (buf : List UInt8) :
-    ∀ c ∈ (decodeBuffer s buf).2, is_unicode_scalar c = true := by
-  rw [decodeBuffer_eq]; exact run_out_scalar buf s
+    ∀ c ∈ (decodeBuffer s buf).2, is_unicode_scalar c.val = true :=
+  fun c _ => (is_unicode_scalar_matches_char_proved _).mpr c.valid
 
-theorem decodeDone_out_scalar (s : State) : ∀ c ∈ decodeDone s, is_unicode_scalar c = true := by
-  intro c h; unfold decodeDone at h; split at h <;> simp_all [replacement_char_scalar]
+theorem decodeDone_out_scalar (s : State) :
+    ∀ c ∈ decodeDone s, is_unicode_scalar c.val = true :=
+  fun c _ => (is_unicode_scalar_matches_char_proved _).mpr c.valid
 
 theorem decoded_scalar (bufs : List (List UInt8)) :
-    ∀ c ∈ decoded RefDecoder bufs, is_unicode_scalar c = true := by
-  rw [decoded_eq]; intro c h
-  simp only [decodeAll, List.mem_append] at h
-  rcases h with h | h
-  · exact run_out_scalar _ [] c h
-  · exact decodeDone_out_scalar _ c h
+    ∀ c ∈ decoded RefDecoder bufs, is_unicode_scalar c.val = true :=
+  fun c _ => (is_unicode_scalar_matches_char_proved _).mpr c.valid
 
 end Utf8Pure

@@ -58,6 +58,10 @@ def cpOf : List UInt8 → UInt32
       ((b3.toUInt32 &&& 0x3F) <<< 6) ||| (b4.toUInt32 &&& 0x3F)
   | _ => 0
 
+/-- The character encoded by a sequence accepted by `isVS`. -/
+def charOf (seq : List UInt8) : Char :=
+  Char.ofNat (cpOf seq).toNat
+
 /-! ## The streaming decoder -/
 
 /-- Pending bytes: empty, or a valid sequence prefix that is not a
@@ -66,13 +70,13 @@ abbrev State : Type := List UInt8
 
 /-- Process one byte with no pending bytes. -/
 def stepFresh (b : UInt8) : State × Text :=
-  if isVS [b] then ([], [cpOf [b]])
+  if isVS [b] then ([], [charOf [b]])
   else if isVSP [b] then ([b], [])
   else ([], [replacement_char])
 
 /-- Process one byte `b` with pending bytes `p`. -/
 def step (p : State) (b : UInt8) : State × Text :=
-  if isVS (p ++ [b]) then ([], [cpOf (p ++ [b])])
+  if isVS (p ++ [b]) then ([], [charOf (p ++ [b])])
   else if isVSP (p ++ [b]) then (p ++ [b], [])
   else if p.isEmpty then ([], [replacement_char])
   else ((stepFresh b).1, replacement_char :: (stepFresh b).2)

@@ -10,6 +10,7 @@ theorem bit8_value_sum_proved : bit8_value_sum := by sorry
 theorem bit8_value_word_proved : bit8_value_word := by sorry
 theorem u32_byte4_bits_proved : u32_byte4_bits := by sorry
 theorem is_surrogate_code_point_examples_proved : is_surrogate_code_point_examples := by sorry
+theorem is_unicode_scalar_matches_char_proved : is_unicode_scalar_matches_char := by sorry
 theorem begins_with_scalar_unique_proved : begins_with_scalar_unique := by sorry
 theorem not_valid_sequence_prefix_extended_proved : not_valid_sequence_prefix_extended := by sorry
 theorem maximal_subpart_unique_proved : maximal_subpart_unique := by sorry

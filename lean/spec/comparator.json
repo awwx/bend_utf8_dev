@@ -6,6 +6,7 @@
     "Utf8Pure.bit8_value_word_proved",
     "Utf8Pure.u32_byte4_bits_proved",
     "Utf8Pure.is_surrogate_code_point_examples_proved",
+    "Utf8Pure.is_unicode_scalar_matches_char_proved",
     "Utf8Pure.begins_with_scalar_unique_proved",
     "Utf8Pure.not_valid_sequence_prefix_extended_proved",
     "Utf8Pure.maximal_subpart_unique_proved",

@@ -1,9 +1,6 @@
 -- UTF-8 specification in core Lean. Laws are definitions of type `Prop`.
--- Bytes are `UInt8` values. Code points are `UInt32` values, including
--- values outside the Unicode scalar range.
-
--- Text is a list of code points.
-abbrev Text : Type := List UInt32
+-- Bytes are `UInt8` values. Byte shapes operate on `UInt32` values,
+-- including values outside the Unicode scalar range.
 
 -- ## Bits to bytes helper
 
@@ -111,11 +108,28 @@ def is_surrogate_code_point_examples : Prop :=
 
 -- A Unicode scalar is any code point from U+0000 to U+10FFFF excluding
 -- surrogate code points.
+--
+-- This is what *we* think a Unicode scalar is.  After this we'll
+-- check that our definition matches Lean's own definition for valid
+-- Lean `Char` values.
 
 def is_unicode_scalar (cp : UInt32) : Bool :=
   decide (cp ≥ 0x000000) &&
   decide (cp ≤ 0x10FFFF) &&
   !(is_surrogate_code_point cp)
+
+-- The scalar test accepts exactly the values that can inhabit Lean's
+-- `Char`.
+
+def is_unicode_scalar_matches_char : Prop :=
+  ∀ cp : UInt32, is_unicode_scalar cp = true ↔ cp.isValidChar
+
+-- We'll use `Char` now.
+
+-- Lean strings are UTF-8, which kind of defeats the purpose of having
+-- our own independent spec, so we'll use a list of Char values.
+
+abbrev Text : Type := List Char
 
 
 -- ## Byte shapes
@@ -435,18 +449,15 @@ def maximal_subpart_unique : Prop :=
 -- longest run of bytes that is a valid sequence prefix or else a single
 -- byte, becomes one U+FFFD.
 
-def code_point_to_string (cp : UInt32) : Text :=
-  [cp]
-
 -- U+FFFD REPLACEMENT CHARACTER.
 
-def replacement_char : UInt32 :=
-  0xFFFD
+def replacement_char : Char :=
+  '\uFFFD'
 
 -- U+FFFD REPLACEMENT CHARACTER, as a one-character text.
 
 def replacement_char_string : Text :=
-  code_point_to_string replacement_char
+  [replacement_char]
 
 
 -- ## Decoding the first code point of a complete buffer
@@ -466,7 +477,7 @@ def replacement_char_string : Text :=
 -- * `result` is the Unicode replacement character and `rest`.
 
 def decodes_first.replaced (b1 : UInt8) (more : List UInt8)
-    (result : Option (UInt32 × List UInt8)) : Prop :=
+    (result : Option (Char × List UInt8)) : Prop :=
   ∃ subpart : List UInt8, ∃ rest : List UInt8,
     maximal_subpart b1 more subpart ∧
     subpart ++ rest = b1 :: more ∧
@@ -476,10 +487,10 @@ def decodes_first.replaced (b1 : UInt8) (more : List UInt8)
 -- it encodes and the bytes after it.
 
 def decodes_first.scalar (bytes : List UInt8)
-    (result : Option (UInt32 × List UInt8)) : Prop :=
-  ∃ cp : UInt32, ∃ rest : List UInt8,
-    begins_with_scalar bytes cp rest ∧
-    result = some (cp, rest)
+    (result : Option (Char × List UInt8)) : Prop :=
+  ∃ c : Char, ∃ rest : List UInt8,
+    begins_with_scalar bytes c.val rest ∧
+    result = some (c, rest)
 
 -- Decoding the first code point of the non-empty buffer `b1 :: more`
 -- gives `result`: the scalar of the valid sequence at the front of the
@@ -487,7 +498,7 @@ def decodes_first.scalar (bytes : List UInt8)
 -- a valid sequence, the replaced result.
 
 def decodes_first.nonempty (b1 : UInt8) (more : List UInt8)
-    (result : Option (UInt32 × List UInt8)) : Prop :=
+    (result : Option (Char × List UInt8)) : Prop :=
   decodes_first.scalar (b1 :: more) result ∨
     (no_valid_sequence (b1 :: more) ∧ decodes_first.replaced b1 more result)
 
@@ -495,7 +506,7 @@ def decodes_first.nonempty (b1 : UInt8) (more : List UInt8)
 -- `result`: none if `bytes` is empty, otherwise the code point and the
 -- bytes that follow it.
 
-def decodes_first : List UInt8 → Option (UInt32 × List UInt8) → Prop
+def decodes_first : List UInt8 → Option (Char × List UInt8) → Prop
   | [], result =>
     result = none
   | b1 :: more, result =>
@@ -511,13 +522,13 @@ def decodes_first : List UInt8 → Option (UInt32 × List UInt8) → Prop
 
 def decodes_first_exists : Prop :=
   ∀ bytes : List UInt8,
-    ∃ result : Option (UInt32 × List UInt8), decodes_first bytes result
+    ∃ result : Option (Char × List UInt8), decodes_first bytes result
 
 -- We also check for uniqueness: for any buffer, there is only one
 -- `result` value which satisfies our definition.
 
 def decodes_first_unique : Prop :=
-  ∀ (bytes : List UInt8) (r1 r2 : Option (UInt32 × List UInt8)),
+  ∀ (bytes : List UInt8) (r1 r2 : Option (Char × List UInt8)),
     decodes_first bytes r1 →
     decodes_first bytes r2 →
     r1 = r2
@@ -527,7 +538,7 @@ def decodes_first_unique : Prop :=
 -- include for completeness.
 
 def decodes_first_empty : Prop :=
-  ∀ result : Option (UInt32 × List UInt8),
+  ∀ result : Option (Char × List UInt8),
     decodes_first [] result →
     result = none
 
@@ -535,7 +546,7 @@ def decodes_first_empty : Prop :=
 -- always gives some.
 
 def decodes_first_nonempty : Prop :=
-  ∀ (b1 : UInt8) (more : List UInt8) (result : Option (UInt32 × List UInt8)),
+  ∀ (b1 : UInt8) (more : List UInt8) (result : Option (Char × List UInt8)),
     decodes_first (b1 :: more) result →
     result.isSome = true
 
@@ -549,9 +560,9 @@ def decodes_first_nonempty : Prop :=
 def decodes (bytes : List UInt8) : Text → Prop
   | [] =>
     decodes_first bytes none
-  | cp :: more =>
+  | c :: more =>
     ∃ rest : List UInt8,
-      decodes_first bytes (some (cp, rest)) ∧ decodes rest more
+      decodes_first bytes (some (c, rest)) ∧ decodes rest more
 
 -- Every buffer decodes to some text.
 
@@ -572,44 +583,41 @@ def decodes_unique : Prop :=
 -- 160 = 0xA0, 169 = 0xA9, 172 = 0xAC, 192 = 0xC0, 194 = 0xC2,
 -- 224 = 0xE0, 226 = 0xE2, 237 = 0xED, 240 = 0xF0, 244 = 0xF4,
 -- 255 = 0xFF.
---
--- A text literal such as "AB" is written as its list of code points,
--- [65, 66].
 
 def decodes_examples : Prop :=
   -- Nothing to decode.
-  decodes [] [] ∧                                            -- ""
+  decodes [] [] ∧
   -- One-byte sequences.
-  decodes [65, 66] [65, 66] ∧                                -- "AB"
+  decodes [65, 66] ['A', 'B'] ∧
   -- A two-byte sequence: C2 A9 is U+00A9.
-  decodes [194, 169] (code_point_to_string 169) ∧
+  decodes [194, 169] ['©'] ∧
   -- A lead byte followed by a byte that cannot continue it: the lead
   -- byte is replaced, and "A" decodes afresh.
-  decodes [194, 65] (replacement_char_string ++ [65]) ∧      -- "A"
+  decodes [194, 65] (replacement_char_string ++ ['A']) ∧
   -- C0 is not a valid sequence prefix (it would be overlong), nor is
   -- a lone continuation byte: each is replaced separately.
   decodes [192, 128] (replacement_char_string ++ replacement_char_string) ∧
   -- A sequence left unfinished at the end of the buffer is replaced.
   decodes [194] replacement_char_string ∧
   -- The second C2 cannot continue the first; it then begins C2 A9.
-  decodes [194, 194, 169] (replacement_char_string ++ code_point_to_string 169) ∧
+  decodes [194, 194, 169] (replacement_char_string ++ ['©']) ∧
   -- Valid sequences around a byte that never appears in UTF-8.
   decodes [72, 194, 169, 255]
-    ([72] ++ code_point_to_string 169 ++ replacement_char_string) ∧  -- "H"
+    (['H', '©'] ++ replacement_char_string) ∧
   -- A three-byte sequence: E2 82 AC is U+20AC.
-  decodes [226, 130, 172] (code_point_to_string 8364) ∧
+  decodes [226, 130, 172] ['€'] ∧
   -- A four-byte sequence: F0 9F 98 80 is U+1F600.
-  decodes [240, 159, 152, 128] (code_point_to_string 128512) ∧
+  decodes [240, 159, 152, 128] ['😀'] ∧
   -- The two bytes of an unfinished three-byte sequence are one maximal
   -- subpart, so they give one replacement character.
   decodes [226, 130] replacement_char_string ∧
   -- The same subpart when the next byte cannot continue it.
-  decodes [226, 130, 65] (replacement_char_string ++ [65]) ∧  -- "A"
+  decodes [226, 130, 65] (replacement_char_string ++ ['A']) ∧
   -- Three bytes of an unfinished four-byte sequence are also one
   -- maximal subpart.
   decodes [240, 159, 152] replacement_char_string ∧
   -- The same subpart when the next byte cannot continue it.
-  decodes [240, 159, 152, 65] (replacement_char_string ++ [65]) ∧  -- "A"
+  decodes [240, 159, 152, 65] (replacement_char_string ++ ['A']) ∧
   -- E0 80 would be overlong: E0 must be followed by A0..BF.
   decodes [224, 128, 128]
     (replacement_char_string ++ replacement_char_string ++ replacement_char_string) ∧
@@ -733,17 +741,16 @@ def utf8_decode_buffer_safe (D : Decoder) : Prop :=
     decodes (List.flatten buffers ++ rest) full →
     is_text_prefix (decoded_so_far D buffers) full
 
--- Prompt: nothing is held back.  No longer text is safe: for any code
--- point `c`, some bytes could follow for which the whole input does not
--- decode to text beginning with the text returned so far followed by
--- `c`.
+-- Prompt: nothing is held back. For every Unicode scalar `c`, there is
+-- a continuation for which the decoded text does not begin with the text
+-- returned so far followed by `c`.
 
 def utf8_decode_buffer_prompt (D : Decoder) : Prop :=
-  ∀ (buffers : List (List UInt8)) (c : UInt32),
+  ∀ (buffers : List (List UInt8)) (c : Char),
     ∃ rest : List UInt8,
       ∃ full : Text,
         decodes (List.flatten buffers ++ rest) full ∧
-        ¬ is_text_prefix (decoded_so_far D buffers ++ code_point_to_string c) full
+        ¬ is_text_prefix (decoded_so_far D buffers ++ [c]) full
 
 -- A correct decoder satisfies all three streaming laws.
 

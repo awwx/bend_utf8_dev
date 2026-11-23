@@ -272,6 +272,14 @@ theorem maximal_subpart_exists_proved : maximal_subpart_exists := by
   simp only [List.length_append, List.length_cons] at this
   omega
 
+theorem is_unicode_scalar_matches_char_proved : is_unicode_scalar_matches_char := by
+  intro cp
+  simp only [is_unicode_scalar, is_surrogate_code_point, UInt32.isValidChar,
+    Bool.and_eq_true, Bool.not_eq_true', Bool.and_eq_false_iff,
+    decide_eq_true_eq, decide_eq_false_iff_not, ge_iff_le,
+    UInt32.le_iff_toNat_le, UInt32.toNat_ofNat, Nat.reducePow, Nat.reduceMod]
+  omega
+
 theorem decodes_first_exists_proved : decodes_first_exists := by
   classical
   intro bytes
@@ -279,8 +287,9 @@ theorem decodes_first_exists_proved : decodes_first_exists := by
   | nil => exact ⟨none, rfl⟩
   | cons b more =>
     by_cases h : ∃ cp rest, begins_with_scalar (b :: more) cp rest
-    · obtain ⟨cp, rest, hp⟩ := h
-      exact ⟨some (cp, rest), Or.inl ⟨cp, rest, hp, rfl⟩⟩
+    · obtain ⟨cp, rest, seq, he, hs⟩ := h
+      let c : Char := ⟨cp, (is_unicode_scalar_matches_char_proved cp).mp he.1⟩
+      exact ⟨some (c, rest), Or.inl ⟨c, rest, ⟨seq, he, hs⟩, rfl⟩⟩
     · have hn : no_valid_sequence (b :: more) := fun cp rest hp => h ⟨cp, rest, hp⟩
       obtain ⟨s, hs⟩ := maximal_subpart_exists_proved b more hn
       obtain ⟨rest, hr⟩ := hs.1
@@ -291,14 +300,14 @@ private theorem encoding_nonempty (cp : UInt32) (s : List UInt8)
   have := Utf8SpecCheck.encoding_cases cp s h
   rcases this with ⟨_, rfl⟩ | ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩ <;> simp
 
-private theorem first_progress (bytes : List UInt8) (cp : UInt32) (rest : List UInt8)
+private theorem first_progress (bytes : List UInt8) (cp : Char) (rest : List UInt8)
     (h : decodes_first bytes (some (cp, rest))) : rest.length < bytes.length := by
   cases bytes with
   | nil => cases h
   | cons b more =>
     rcases h with ⟨c, r, ⟨s, he, hs⟩, hr⟩ | ⟨_, s, r, hmax, hs, hr⟩
     · cases hr
-      have hn := encoding_nonempty cp s he.2
+      have hn := encoding_nonempty cp.val s he.2
       have hl := congrArg List.length hs
       have : 0 < s.length := List.length_pos_iff.mpr hn
       simp only [List.length_append, List.length_cons] at hl ⊢
@@ -339,7 +348,8 @@ theorem decodes_first_unique_proved : decodes_first_unique := by
   | cons b1 more =>
     rcases h1 with ⟨cp1, rest1, hb1, rfl⟩ | ⟨hn1, s1, rest1, hs1, he1, rfl⟩ <;>
     rcases h2 with ⟨cp2, rest2, hb2, rfl⟩ | ⟨hn2, s2, rest2, hs2, he2, rfl⟩
-    · obtain ⟨rfl, rfl⟩ := begins_with_scalar_unique_proved _ _ _ _ _ hb1 hb2; rfl
+    · obtain ⟨hc, rfl⟩ := begins_with_scalar_unique_proved _ _ _ _ _ hb1 hb2
+      rw [Char.ext hc]
     · exact (hn2 _ _ hb1).elim
     · exact (hn1 _ _ hb2).elim
     · have := maximal_subpart_unique_proved _ _ _ _ hs1 hs2
@@ -388,8 +398,8 @@ macro "exclude_encoding" he:ident : tactic => `(tactic| (
 
 
 
-private theorem scalar_certificate (cp : UInt32) (seq rest : List UInt8)
-    (hne : seq ≠ []) (he : encodes seq cp) :
+private theorem scalar_certificate (cp : Char) (seq rest : List UInt8)
+    (hne : seq ≠ []) (he : encodes seq cp.val) :
     decodes_first (seq ++ rest) (some (cp, rest)) := by
   cases seq with
   | nil => exact (hne rfl).elim
@@ -401,12 +411,12 @@ private theorem replacement_certificate (b : UInt8) (more s rest : List UInt8)
     decodes_first (b :: more) (some (replacement_char, rest)) :=
   Or.inr ⟨hn, s, rest, hs, heq, rfl⟩
 
-private theorem example_ascii_A_B : decodes_first [65, 66] (some (65, [66])) := by
-  exact scalar_certificate 65 [65] [66] (by decide) (by unfold encodes; decide)
-private theorem example_ascii_B : decodes_first [66] (some (66, [])) := by
-  exact scalar_certificate 66 [66] [] (by decide) (by unfold encodes; decide)
-private theorem example_copyright : decodes_first [194, 169] (some (169, [])) := by
-  exact scalar_certificate 169 [194, 169] [] (by decide) (by unfold encodes; decide)
+private theorem example_ascii_A_B : decodes_first [65, 66] (some ('A', [66])) := by
+  exact scalar_certificate 'A' [65] [66] (by decide) (by unfold encodes; decide)
+private theorem example_ascii_B : decodes_first [66] (some ('B', [])) := by
+  exact scalar_certificate 'B' [66] [] (by decide) (by unfold encodes; decide)
+private theorem example_copyright : decodes_first [194, 169] (some ('©', [])) := by
+  exact scalar_certificate '©' [194, 169] [] (by decide) (by unfold encodes; decide)
 private theorem example_lead_then_ascii : decodes_first [194, 65] (some (replacement_char, [65])) := by
   apply replacement_certificate 194 [65] [194] [65] rfl
   · refine ⟨⟨[65], rfl⟩, ?_, ?_⟩
@@ -415,8 +425,8 @@ private theorem example_lead_then_ascii : decodes_first [194, 65] (some (replace
       exclude_encoding he
   · intro cp rest ⟨seq, he, hseq⟩
     exclude_encoding he
-private theorem example_ascii_A : decodes_first [65] (some (65, [])) := by
-  exact scalar_certificate 65 [65] [] (by decide) (by unfold encodes; decide)
+private theorem example_ascii_A : decodes_first [65] (some ('A', [])) := by
+  exact scalar_certificate 'A' [65] [] (by decide) (by unfold encodes; decide)
 private theorem example_overlong_lead : decodes_first [192, 128] (some (replacement_char, [128])) := by
   apply replacement_certificate 192 [128] [192] [128] rfl
   · refine ⟨⟨[128], rfl⟩, ?_, ?_⟩
@@ -449,10 +459,10 @@ private theorem example_restarted_two : decodes_first [194, 194, 169] (some (rep
       exclude_encoding he
   · intro cp rest ⟨seq, he, hseq⟩
     exclude_encoding he
-private theorem example_ascii_H : decodes_first [72, 194, 169, 255] (some (72, [194, 169, 255])) := by
-  exact scalar_certificate 72 [72] [194, 169, 255] (by decide) (by unfold encodes; decide)
-private theorem example_copyright_then_bad : decodes_first [194, 169, 255] (some (169, [255])) := by
-  exact scalar_certificate 169 [194, 169] [255] (by decide) (by unfold encodes; decide)
+private theorem example_ascii_H : decodes_first [72, 194, 169, 255] (some ('H', [194, 169, 255])) := by
+  exact scalar_certificate 'H' [72] [194, 169, 255] (by decide) (by unfold encodes; decide)
+private theorem example_copyright_then_bad : decodes_first [194, 169, 255] (some ('©', [255])) := by
+  exact scalar_certificate '©' [194, 169] [255] (by decide) (by unfold encodes; decide)
 private theorem example_bad_byte : decodes_first [255] (some (replacement_char, [])) := by
   apply replacement_certificate 255 [] [255] [] rfl
   · refine ⟨⟨[], rfl⟩, ?_, ?_⟩
@@ -461,10 +471,10 @@ private theorem example_bad_byte : decodes_first [255] (some (replacement_char, 
       exclude_encoding he
   · intro cp rest ⟨seq, he, hseq⟩
     exclude_encoding he
-private theorem example_euro : decodes_first [226, 130, 172] (some (8364, [])) := by
-  exact scalar_certificate 8364 [226, 130, 172] [] (by decide) (by unfold encodes; decide)
-private theorem example_grinning_face : decodes_first [240, 159, 152, 128] (some (128512, [])) := by
-  exact scalar_certificate 128512 [240, 159, 152, 128] [] (by decide) (by unfold encodes; decide)
+private theorem example_euro : decodes_first [226, 130, 172] (some ('€', [])) := by
+  exact scalar_certificate '€' [226, 130, 172] [] (by decide) (by unfold encodes; decide)
+private theorem example_grinning_face : decodes_first [240, 159, 152, 128] (some ('😀', [])) := by
+  exact scalar_certificate '😀' [240, 159, 152, 128] [] (by decide) (by unfold encodes; decide)
 private theorem example_unfinished_three : decodes_first [226, 130] (some (replacement_char, [])) := by
   apply replacement_certificate 226 [130] [226, 130] [] rfl
   · refine ⟨⟨[], rfl⟩, ?_, ?_⟩
