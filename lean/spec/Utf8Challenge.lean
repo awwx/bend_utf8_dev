@@ -21,6 +21,7 @@ theorem decodes_first_empty_proved : decodes_first_empty := by sorry
 theorem decodes_first_nonempty_proved : decodes_first_nonempty := by sorry
 theorem decodes_first_unique_proved : decodes_first_unique := by sorry
 theorem decodes_unique_proved : decodes_unique := by sorry
+theorem decodes_matches_lean_proved : decodes_matches_lean := by sorry
 theorem decodes_examples_proved : decodes_examples := by sorry
 
 -- The solution supplies this definition; no implementation is trusted here.

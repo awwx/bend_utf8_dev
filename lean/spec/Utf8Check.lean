@@ -382,6 +382,50 @@ theorem decodes_unique_proved : decodes_unique := by
       rw [ih rest1 t2 g1 g2]
 
 
+/-! ## Agreement with Lean's decoder on complete, valid buffers -/
+
+private theorem encoding_eq_utf8EncodeChar (c : Char) (seq : List UInt8)
+    (h : encoding c.val = some seq) : seq = String.utf8EncodeChar c := by
+  obtain ⟨h, rfl⟩ | ⟨h, h₂, rfl⟩ | ⟨h, h₃, rfl⟩ | ⟨h, h₄, rfl⟩ :=
+    Utf8SpecCheck.encoding_cases c.val seq h
+  · rw [String.utf8EncodeChar, ite_eq_left (by omega)]
+  · rw [String.utf8EncodeChar, ite_eq_right (by omega), ite_eq_left (by omega),
+      Nat.mod_eq_of_lt (by omega : c.val.toNat / 64 < 32), Nat.add_comm 192]
+    simp only [Nat.add_comm 128]
+  · rw [String.utf8EncodeChar, ite_eq_right (by omega), ite_eq_right (by omega),
+      ite_eq_left (by omega),
+      Nat.mod_eq_of_lt (by omega : c.val.toNat / 4096 < 16), Nat.add_comm 224]
+    simp only [Nat.add_comm 128]
+  · rw [String.utf8EncodeChar, ite_eq_right (by omega), ite_eq_right (by omega),
+      ite_eq_right (by omega),
+      Nat.mod_eq_of_lt (by omega : c.val.toNat / 262144 < 8), Nat.add_comm 240]
+    simp only [Nat.add_comm 128]
+
+private theorem encodes_text_agrees (bytes : List UInt8) (text : Text)
+    (h : encodes_text bytes text) : decodes bytes text ∧ bytes.toByteArray = text.utf8Encode := by
+  induction text generalizing bytes with
+  | nil =>
+    change bytes = [] at h
+    subst bytes
+    exact ⟨rfl, rfl⟩
+  | cons c more ih =>
+    obtain ⟨seq, rest, hseq, rfl, hrest⟩ := h
+    obtain ⟨hdecodes, hencode⟩ := ih rest hrest
+    have hfirst : decodes_first (seq ++ rest) (some (c, rest)) := by
+      cases seq with
+      | nil => exact (encoding_nonempty c.val [] hseq.2 rfl).elim
+      | cons b tail =>
+        exact Or.inl ⟨c, rest, ⟨b :: tail, hseq, rfl⟩, rfl⟩
+    refine ⟨⟨rest, hfirst, hdecodes⟩, ?_⟩
+    rw [List.toByteArray_append, hencode, List.utf8Encode_cons, List.utf8Encode_singleton,
+      encoding_eq_utf8EncodeChar c seq hseq.2]
+
+theorem decodes_matches_lean_proved : decodes_matches_lean := by
+  intro bytes text h
+  obtain ⟨hdecodes, hencode⟩ := encodes_text_agrees bytes text h
+  exact ⟨hdecodes, by simp [hencode]⟩
+
+
 /-! ## Explicit certificates for the decoding examples -/
 
 -- Discharge a concrete impossible encoding using the four specified shapes.

@@ -17,6 +17,7 @@
     "Utf8Pure.decodes_first_nonempty_proved",
     "Utf8Pure.decodes_first_unique_proved",
     "Utf8Pure.decodes_unique_proved",
+    "Utf8Pure.decodes_matches_lean_proved",
     "Utf8Pure.decodes_examples_proved"
   ],
   "permitted_axioms": [

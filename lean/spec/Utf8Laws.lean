@@ -629,6 +629,35 @@ def decodes_examples : Prop :=
      replacement_char_string ++ replacement_char_string)
 
 
+-- ## Lean's UTF-8 decoder
+
+-- Lean has a UTF-8 decoder!  Does Lean's implementation agree with
+-- our spec?
+--
+-- Lean's `String.fromUTF8Lossy` handles invalid sequences but doesn't
+-- follow Unicode's maximal-subpart recommendation for generating
+-- replacement characters.
+--
+-- We can however show that our spec agrees with Lean's implementation
+-- for valid buffers.
+
+-- A complete, valid encoding consists of one valid byte sequence per
+-- character, in order, with no bytes left over.
+
+def encodes_text (bytes : List UInt8) : Text → Prop
+  | [] => bytes = []
+  | c :: more =>
+    ∃ seq rest : List UInt8,
+      encodes seq c.val ∧ seq ++ rest = bytes ∧ encodes_text rest more
+
+-- Lean's decoder and our specification agree on complete, valid buffers.
+
+def decodes_matches_lean : Prop :=
+  ∀ (bytes : List UInt8) (text : Text),
+    encodes_text bytes text →
+    decodes bytes text ∧ (bytes.toByteArray.utf8Decode?).map Array.toList = some text
+
+
 -- ### Stream decoding
 
 -- `D.start` is the decoder state before any input.
