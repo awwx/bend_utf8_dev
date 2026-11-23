@@ -1,5 +1,5 @@
 /-
-Utf8Bits.lean -- bit-level bridge from the spec's tuple-of-Bool byte shapes
+Utf8Bits.lean -- bit-level bridge from the spec's byte shapes
 to `Nat` arithmetic on `cp.toNat`.  The only file that looks at bits; later
 files use `encoding_eq`.
 
@@ -12,7 +12,7 @@ EXPORTS
     getLsbD_eq_testBit; tactic macros high_bits_clear, byte_value (local use)
 
 METHOD (why it is fast)
-  `u32_byte4` reads bit i as `cp.toNat.testBit i` (definitionally).  Each
+  `u32_byte4` wraps `cp.toNat.testBit i` in a one-bit vector.  Each
   shape lemma splits on the spec's match:
   - match fails: if `cp.toNat < 2^w` all bits >= w are clear (`testBit_high`),
     so the match would succeed with the low bits -- contradiction; no omega.
@@ -26,7 +26,7 @@ import Utf8Laws
 namespace Utf8Pure
 
 /-- The spec's `bit8_value` as a weighted sum (256 cases, `decide`). -/
-theorem bit8_toNat (b7 b6 b5 b4 b3 b2 b1 b0 : Bool) :
+theorem bit8_toNat (b7 b6 b5 b4 b3 b2 b1 b0 : Bit) :
     (bit8_value (b7, b6, b5, b4, b3, b2, b1, b0)).toNat =
       b7.toNat * 128 + b6.toNat * 64 + b5.toNat * 32 + b4.toNat * 16 +
       b3.toNat * 8 + b2.toNat * 4 + b1.toNat * 2 + b0.toNat := by
@@ -72,12 +72,15 @@ macro "byte_value" cp:term:max k:num b:num : tactic => `(tactic| (
   rw [← UInt8.toNat_inj]
   have hl := lowBits_eq (($cp).toNat / 2 ^ $k) $b
   simp only [lowBits, Nat.div_div_eq_div_mul, Nat.reducePow, Nat.reduceMul] at hl
-  simp only [bit8_toNat, testBit_toNat, Bool.toNat_false, Bool.toNat_true, UInt8.toNat_ofNat',
-    Nat.reducePow]
+  simp only [bit8_toNat, BitVec.toNat_ofBool, testBit_toNat, UInt8.toNat_ofNat', Nat.reducePow,
+    show (0 : Bit).toNat = 0 from rfl, show (1 : Bit).toNat = 1 from rfl]
   omega))
 
 /-- `u32_byte4` reads bit `i` of `cp` as `cp.toNat.testBit i`. -/
 theorem getLsbD_eq_testBit (cp : UInt32) (i : Nat) : cp.toBitVec.getLsbD i = cp.toNat.testBit i := rfl
+
+private theorem ofBool_eq_zero (b : Bool) : BitVec.ofBool b = 0#1 ↔ b = false := by
+  cases b <;> decide
 
 theorem one_shape (cp : UInt32) :
     one_byte_shape cp = if cp.toNat < 0x80 then some (UInt8.ofNat cp.toNat) else none := by
@@ -85,7 +88,7 @@ theorem one_shape (cp : UInt32) :
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
-    simp only [Prod.mk.injEq] at heq
+    simp only [Prod.mk.injEq, ofBool_eq_zero] at heq
     obtain ⟨⟨h31,h30,h29,h28,h27,h26,h25,h24⟩,⟨h23,h22,h21,h20,h19,h18,h17,h16⟩,
       ⟨h15,h14,h13,h12,h11,h10,h9,h8⟩,⟨h7,rfl,rfl,rfl,rfl,rfl,rfl,rfl⟩⟩ := heq
     have h : cp.toNat < 0x80 := lt_of_testBit 7 cp.toNat_lt (by high_bits_clear)
@@ -102,7 +105,7 @@ theorem two_shape (cp : UInt32) :
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
-    simp only [Prod.mk.injEq] at heq
+    simp only [Prod.mk.injEq, ofBool_eq_zero] at heq
     obtain ⟨⟨h31,h30,h29,h28,h27,h26,h25,h24⟩,⟨h23,h22,h21,h20,h19,h18,h17,h16⟩,
       ⟨h15,h14,h13,h12,h11,rfl,rfl,rfl⟩,⟨rfl,rfl,rfl,rfl,rfl,rfl,rfl,rfl⟩⟩ := heq
     have h : cp.toNat < 0x800 := lt_of_testBit 11 cp.toNat_lt (by high_bits_clear)
@@ -120,7 +123,7 @@ theorem three_shape (cp : UInt32) :
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
-    simp only [Prod.mk.injEq] at heq
+    simp only [Prod.mk.injEq, ofBool_eq_zero] at heq
     obtain ⟨⟨h31,h30,h29,h28,h27,h26,h25,h24⟩,⟨h23,h22,h21,h20,h19,h18,h17,h16⟩,
       ⟨rfl,rfl,rfl,rfl,rfl,rfl,rfl,rfl⟩,⟨rfl,rfl,rfl,rfl,rfl,rfl,rfl,rfl⟩⟩ := heq
     have h : cp.toNat < 0x10000 := lt_of_testBit 16 cp.toNat_lt (by high_bits_clear)
@@ -138,7 +141,7 @@ theorem four_shape (cp : UInt32) :
   simp only [getLsbD_eq_testBit]
   split
   · rename_i heq
-    simp only [Prod.mk.injEq] at heq
+    simp only [Prod.mk.injEq, ofBool_eq_zero] at heq
     obtain ⟨⟨h31,h30,h29,h28,h27,h26,h25,h24⟩,⟨h23,h22,h21,rfl,rfl,rfl,rfl,rfl⟩,⟨rfl,rfl,rfl,rfl,rfl,rfl,rfl,rfl⟩,⟨rfl,rfl,rfl,rfl,rfl,rfl,rfl,rfl⟩⟩ := heq
     have h : cp.toNat < 0x200000 := lt_of_testBit 21 cp.toNat_lt (by high_bits_clear)
     simp only [h, ↓reduceIte, Option.some.injEq, Prod.mk.injEq]

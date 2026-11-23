@@ -4,41 +4,40 @@
 
 -- ## Bits to bytes helper
 
--- Type alias for a tuple of eight bools.
-abbrev Bit8 : Type :=
-  Bool × Bool × Bool × Bool × Bool × Bool × Bool × Bool
+-- A bit is a one-bit vector. A byte shape uses eight bits.
+abbrev Bit := BitVec 1
 
--- Given a tuple of eight bools, return the byte value of the binary
--- integer, most significant bit first.
---
--- `BitVec.ofBoolListLE` takes its bits least significant bit first.
+abbrev Bit8 : Type :=
+  Bit × Bit × Bit × Bit × Bit × Bit × Bit × Bit
+
+-- Join eight bits, most significant first, into a byte.
 def bit8_value (bit8 : Bit8) : UInt8 :=
   match bit8 with
   | (b7, b6, b5, b4, b3, b2, b1, b0) =>
-    UInt8.ofBitVec (BitVec.ofBoolListLE [b0, b1, b2, b3, b4, b5, b6, b7])
+    UInt8.ofBitVec (b7 ++ b6 ++ b5 ++ b4 ++ b3 ++ b2 ++ b1 ++ b0)
 
--- Given 8 booleans used as bits, most significant bit first, convert
--- to its byte value 0..255.
+-- The byte value is the weighted sum of its bits, most significant first.
 
 def bit8_value_sum : Prop :=
-  ∀ (b7 b6 b5 b4 b3 b2 b1 b0 : Bool),
+  ∀ (b7 b6 b5 b4 b3 b2 b1 b0 : Bit),
     bit8_value (b7, b6, b5, b4, b3, b2, b1, b0) =
-      (b7.toUInt8 * 128 +
-       b6.toUInt8 * 64 +
-       b5.toUInt8 * 32 +
-       b4.toUInt8 * 16 +
-       b3.toUInt8 * 8 +
-       b2.toUInt8 * 4 +
-       b1.toUInt8 * 2 +
-       b0.toUInt8 * 1 : UInt8)
+      (UInt8.ofNat b7.toNat * 128 +
+       UInt8.ofNat b6.toNat * 64 +
+       UInt8.ofNat b5.toNat * 32 +
+       UInt8.ofNat b4.toNat * 16 +
+       UInt8.ofNat b3.toNat * 8 +
+       UInt8.ofNat b2.toNat * 4 +
+       UInt8.ofNat b1.toNat * 2 +
+       UInt8.ofNat b0.toNat * 1 : UInt8)
 
--- Provide an independent check of `bit8_value`: convert the booleans
--- to a `BitVec 8`, then to a Nat, and then to a byte.
+-- Provide an independent check of `bit8_value`: build a `BitVec 8`
+-- from the bits in least-significant-first order and convert via `Nat`.
 
 def bit8_value_word : Prop :=
-  ∀ (b7 b6 b5 b4 b3 b2 b1 b0 : Bool),
+  ∀ (b7 b6 b5 b4 b3 b2 b1 b0 : Bit),
     -- `BitVec.ofBoolListLE` takes the least significant bit first.
-    let word : BitVec 8 := BitVec.ofBoolListLE [b0, b1, b2, b3, b4, b5, b6, b7]
+    let word : BitVec 8 := BitVec.ofBoolListLE
+      ([b0, b1, b2, b3, b4, b5, b6, b7].map (fun b => b.getLsbD 0))
     bit8_value (b7, b6, b5, b4, b3, b2, b1, b0) =
       UInt8.ofNat word.toNat
 
@@ -50,21 +49,21 @@ abbrev Byte4 : Type :=
   Bit8 × Bit8 × Bit8 × Bit8
 
 -- Split a UInt32 into its four bytes, most significant byte first, each
--- as eight bools, most significant bit first.
+-- as eight bits, most significant bit first.
 --
 -- `getLsbD i` is bit `i`, counting from the least significant bit 0.
 def u32_byte4 (value : UInt32) : Byte4 :=
-  let w := value.toBitVec
-  ((w.getLsbD 31, w.getLsbD 30, w.getLsbD 29, w.getLsbD 28,
-    w.getLsbD 27, w.getLsbD 26, w.getLsbD 25, w.getLsbD 24),
-   (w.getLsbD 23, w.getLsbD 22, w.getLsbD 21, w.getLsbD 20,
-    w.getLsbD 19, w.getLsbD 18, w.getLsbD 17, w.getLsbD 16),
-   (w.getLsbD 15, w.getLsbD 14, w.getLsbD 13, w.getLsbD 12,
-    w.getLsbD 11, w.getLsbD 10, w.getLsbD 9, w.getLsbD 8),
-   (w.getLsbD 7, w.getLsbD 6, w.getLsbD 5, w.getLsbD 4,
-    w.getLsbD 3, w.getLsbD 2, w.getLsbD 1, w.getLsbD 0))
+  let bit i := BitVec.ofBool (value.toBitVec.getLsbD i)
+  ((bit 31, bit 30, bit 29, bit 28,
+    bit 27, bit 26, bit 25, bit 24),
+   (bit 23, bit 22, bit 21, bit 20,
+    bit 19, bit 18, bit 17, bit 16),
+   (bit 15, bit 14, bit 13, bit 12,
+    bit 11, bit 10, bit 9, bit 8),
+   (bit 7, bit 6, bit 5, bit 4,
+    bit 3, bit 2, bit 1, bit 0))
 
--- Bit 31 is the first bool of the first byte, and bit 0 the last bool
+-- Bit 31 is the first bit of the first byte, and bit 0 the last bit
 -- of the last byte.
 --
 -- The UInt32 is built from its 32 bits, least significant bit first.
@@ -73,12 +72,12 @@ def u32_byte4_bits : Prop :=
   ∀ (b31 b30 b29 b28 b27 b26 b25 b24
      b23 b22 b21 b20 b19 b18 b17 b16
      b15 b14 b13 b12 b11 b10 b9 b8
-     b7 b6 b5 b4 b3 b2 b1 b0 : Bool),
+     b7 b6 b5 b4 b3 b2 b1 b0 : Bit),
     u32_byte4 (UInt32.ofBitVec (BitVec.ofBoolListLE
-      [b0, b1, b2, b3, b4, b5, b6, b7,
-       b8, b9, b10, b11, b12, b13, b14, b15,
-       b16, b17, b18, b19, b20, b21, b22, b23,
-       b24, b25, b26, b27, b28, b29, b30, b31])) =
+      ([b0, b1, b2, b3, b4, b5, b6, b7,
+        b8, b9, b10, b11, b12, b13, b14, b15,
+        b16, b17, b18, b19, b20, b21, b22, b23,
+        b24, b25, b26, b27, b28, b29, b30, b31].map (fun b => b.getLsbD 0)))) =
       ((b31, b30, b29, b28, b27, b26, b25, b24),
        (b23, b22, b21, b20, b19, b18, b17, b16),
        (b15, b14, b13, b12, b11, b10, b9, b8),
@@ -148,11 +147,11 @@ abbrev Text : Type := List Char
 
 def one_byte_shape (cp : UInt32) : Option UInt8 :=
   match u32_byte4 cp with
-  | ((false, false, false, false, false, false, false, false),
-     (false, false, false, false, false, false, false, false),
-     (false, false, false, false, false, false, false, false),
-     (false, y1, y2, y3, z1, z2, z3, z4)) =>
-    some (bit8_value (false, y1, y2, y3, z1, z2, z3, z4))
+  | (( 0,  0,  0,  0,  0,  0,  0,  0),
+     ( 0,  0,  0,  0,  0,  0,  0,  0),
+     ( 0,  0,  0,  0,  0,  0,  0,  0),
+     ( 0, y1, y2, y3, z1, z2, z3, z4)) =>
+    some (bit8_value (0, y1, y2, y3, z1, z2, z3, z4))
   | _ =>
     none
 
@@ -168,12 +167,12 @@ def one_byte_shape (cp : UInt32) : Option UInt8 :=
 
 def two_byte_shape (cp : UInt32) : Option (UInt8 × UInt8) :=
   match u32_byte4 cp with
-  | ((false, false, false, false, false, false, false, false),
-     (false, false, false, false, false, false, false, false),
-     (false, false, false, false, false, x1, x2, x3),
+  | (( 0,  0,  0,  0,  0,  0,  0,  0),
+     ( 0,  0,  0,  0,  0,  0,  0,  0),
+     ( 0,  0,  0,  0,  0, x1, x2, x3),
      (y1, y2, y3, y4, z1, z2, z3, z4)) =>
-    some (bit8_value (true, true, false, x1, x2, x3, y1, y2),
-          bit8_value (true, false, y3, y4, z1, z2, z3, z4))
+    some (bit8_value (1, 1,  0, x1, x2, x3, y1, y2),
+          bit8_value (1, 0, y3, y4, z1, z2, z3, z4))
   | _ =>
     none
 
@@ -189,13 +188,13 @@ def two_byte_shape (cp : UInt32) : Option (UInt8 × UInt8) :=
 
 def three_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8) :=
   match u32_byte4 cp with
-  | ((false, false, false, false, false, false, false, false),
-     (false, false, false, false, false, false, false, false),
+  | (( 0,  0,  0,  0,  0,  0,  0,  0),
+     ( 0,  0,  0,  0,  0,  0,  0,  0),
      (w1, w2, w3, w4, x1, x2, x3, x4),
      (y1, y2, y3, y4, z1, z2, z3, z4)) =>
-    some (bit8_value (true, true, true, false, w1, w2, w3, w4),
-          bit8_value (true, false, x1, x2, x3, x4, y1, y2),
-          bit8_value (true, false, y3, y4, z1, z2, z3, z4))
+    some (bit8_value (1, 1,  1,  0, w1, w2, w3, w4),
+          bit8_value (1, 0, x1, x2, x3, x4, y1, y2),
+          bit8_value (1, 0, y3, y4, z1, z2, z3, z4))
   | _ =>
     none
 
@@ -211,14 +210,14 @@ def three_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8) :=
 
 def four_byte_shape (cp : UInt32) : Option (UInt8 × UInt8 × UInt8 × UInt8) :=
   match u32_byte4 cp with
-  | ((false, false, false, false, false, false, false, false),
-     (false, false, false, u, v1, v2, v3, v4),
+  | (( 0,  0,  0,  0,  0,  0,  0,  0),
+     ( 0,  0,  0,  u, v1, v2, v3, v4),
      (w1, w2, w3, w4, x1, x2, x3, x4),
      (y1, y2, y3, y4, z1, z2, z3, z4)) =>
-    some (bit8_value (true, true, true, true, false, u, v1, v2),
-          bit8_value (true, false, v3, v4, w1, w2, w3, w4),
-          bit8_value (true, false, x1, x2, x3, x4, y1, y2),
-          bit8_value (true, false, y3, y4, z1, z2, z3, z4))
+    some (bit8_value (1, 1,  1,  1,  0,  u, v1, v2),
+          bit8_value (1, 0, v3, v4, w1, w2, w3, w4),
+          bit8_value (1, 0, x1, x2, x3, x4, y1, y2),
+          bit8_value (1, 0, y3, y4, z1, z2, z3, z4))
   | _ =>
     none
 
