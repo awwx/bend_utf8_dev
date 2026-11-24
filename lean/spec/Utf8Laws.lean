@@ -847,7 +847,7 @@ def utf8_decode_buffer_prompt_with_delay_zero : Prop :=
 -- already returned, the remaining bytes cannot begin with a complete
 -- valid sequence (because if it did, it should have been returned
 -- already).
-
+--
 -- This applies at the start of the stream and after a replacement has
 -- been returned.  For example, with F5 41 the decoder may delay the
 -- replacement and 'A' together. Once it returns the replacement, it
@@ -857,6 +857,29 @@ def utf8_decode_buffer_prompt_for_next_valid_sequence (D : Decoder) : Prop :=
   ∀ (buffers : List (List UInt8)) (remaining : List UInt8),
     decodes_prefix (List.flatten buffers) (decoded_so_far D buffers) remaining →
     no_valid_sequence remaining
+
+
+-- ## Characterizing Node's promptness
+
+-- From inspection, it looks like Node v26.13.1 promptly emits a
+-- character from a valid sequence once all preceding characters have
+-- been emitted.  It emits any determined character within three more
+-- input bytes, or at EOF if that comes first.
+--
+-- Note that Node is actually more prompt than this in various corner
+-- cases, here we're saying "Node is at least this prompt", not that
+-- we're completely characterizing Node's promptness.
+--
+-- And also note that nothing has been proved!  This characterizes
+-- that I think Node is at least this prompt, not a proof that Node
+-- actually is always this prompt.
+
+
+def node_characterization (D : Decoder) : Prop :=
+  utf8_decodes D ∧
+  utf8_decode_buffer_safe D ∧
+  utf8_decode_buffer_prompt_for_next_valid_sequence D ∧
+  utf8_decode_buffer_prompt_with_delay D 3
 
 
 -- ## Correct implementation
