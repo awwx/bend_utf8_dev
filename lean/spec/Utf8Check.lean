@@ -626,4 +626,9 @@ theorem decodes_examples_proved : decodes_examples := by
   · exact ⟨[160, 128], example_surrogate, ⟨[128], example_surrogate_tail, ⟨[], example_continuation, rfl⟩⟩⟩
   · exact ⟨[144, 128, 128], example_above_unicode, ⟨[128, 128], example_above_unicode_tail, ⟨[128], example_two_continuations, ⟨[], example_continuation, rfl⟩⟩⟩⟩
 
+theorem utf8_decode_buffer_prompt_with_delay_zero_proved :
+    utf8_decode_buffer_prompt_with_delay_zero := by
+  simp only [utf8_decode_buffer_prompt_with_delay_zero, utf8_decode_buffer_prompt,
+    utf8_decode_buffer_prompt_with_delay, Nat.sub_zero, List.take_length, iff_self, implies_true]
+
 end Utf8Pure

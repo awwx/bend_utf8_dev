@@ -18,7 +18,8 @@
     "Utf8Pure.decodes_first_unique_proved",
     "Utf8Pure.decodes_unique_proved",
     "Utf8Pure.decodes_matches_lean_proved",
-    "Utf8Pure.decodes_examples_proved"
+    "Utf8Pure.decodes_examples_proved",
+    "Utf8Pure.utf8_decode_buffer_prompt_with_delay_zero_proved"
   ],
   "permitted_axioms": [
     "propext",

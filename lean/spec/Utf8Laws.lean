@@ -820,3 +820,9 @@ def utf8_decode_buffer_prompt_with_delay (D : Decoder) (delay : Nat) : Prop :=
     ¬ (∃ c : Char,
       ∀ rest : List UInt8,
         next_char_to_be_decoded_is earlier rest (decoded_so_far D buffers) c)
+
+-- A delay of zero gives the original promptness law.
+
+def utf8_decode_buffer_prompt_with_delay_zero : Prop :=
+  ∀ D : Decoder,
+    utf8_decode_buffer_prompt D ↔ utf8_decode_buffer_prompt_with_delay D 0

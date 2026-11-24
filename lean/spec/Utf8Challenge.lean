@@ -23,6 +23,8 @@ theorem decodes_first_unique_proved : decodes_first_unique := by sorry
 theorem decodes_unique_proved : decodes_unique := by sorry
 theorem decodes_matches_lean_proved : decodes_matches_lean := by sorry
 theorem decodes_examples_proved : decodes_examples := by sorry
+theorem utf8_decode_buffer_prompt_with_delay_zero_proved :
+    utf8_decode_buffer_prompt_with_delay_zero := by sorry
 
 -- The solution supplies this definition; no implementation is trusted here.
 def RefDecoder : Decoder := by sorry
