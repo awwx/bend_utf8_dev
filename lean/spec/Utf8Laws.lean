@@ -563,6 +563,16 @@ def decodes (bytes : List UInt8) : Text → Prop
     ∃ rest : List UInt8,
       decodes_first bytes (some (c, rest)) ∧ decodes rest more
 
+-- Decoding the first characters of `bytes` gives `text` and leaves
+-- `remaining` bytes. Decode each character with the following bytes
+-- still present, so they can determine where a maximal subpart ends.
+
+def decodes_prefix (bytes : List UInt8) : Text → List UInt8 → Prop
+  | [], remaining => bytes = remaining
+  | c :: more, remaining =>
+    ∃ rest : List UInt8,
+      decodes_first bytes (some (c, rest)) ∧ decodes_prefix rest more remaining
+
 -- Every buffer decodes to some text.
 
 def decodes_exists : Prop :=
@@ -825,6 +835,28 @@ def utf8_decode_buffer_prompt_with_delay (D : Decoder) (delay : Nat) : Prop :=
 def utf8_decode_buffer_prompt_with_delay_zero : Prop :=
   ∀ D : Decoder,
     utf8_decode_buffer_prompt D ↔ utf8_decode_buffer_prompt_with_delay D 0
+
+
+-- ## Promptness for the next valid sequence
+
+-- Here we specify that after the previous character has been
+-- delivered, the next character will be delivered promptly if it
+-- will be generated from a valid sequence.
+--
+-- The way we write that is that after accounting for the characters
+-- already returned, the remaining bytes cannot begin with a complete
+-- valid sequence (because if it did, it should have been returned
+-- already).
+
+-- This applies at the start of the stream and after a replacement has
+-- been returned.  For example, with F5 41 the decoder may delay the
+-- replacement and 'A' together. Once it returns the replacement, it
+-- must also return 'A'.
+
+def utf8_decode_buffer_prompt_for_next_valid_sequence (D : Decoder) : Prop :=
+  ∀ (buffers : List (List UInt8)) (remaining : List UInt8),
+    decodes_prefix (List.flatten buffers) (decoded_so_far D buffers) remaining →
+    no_valid_sequence remaining
 
 
 -- ## Correct implementation
