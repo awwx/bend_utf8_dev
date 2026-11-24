@@ -376,21 +376,27 @@ theorem not_prefix_longer (o : Text) (c : Char) : ¬ is_text_prefix (o ++ [c]) o
   (simp at this) <;> omega
 
 theorem utf8_decode_buffer_prompt_RefDecoder : utf8_decode_buffer_prompt RefDecoder := by
-  intro bufs c
+  intro bufs agreed
+  obtain ⟨c, agreed⟩ := agreed
+  suffices ∃ rest : List UInt8,
+      ¬ is_text_prefix (decoded_so_far RefDecoder bufs ++ [c])
+        (decodeAll (bufs.flatten ++ rest)) by
+    obtain ⟨rest, notPrefix⟩ := this
+    exact notPrefix (agreed rest ⟨_, decodes_decodeAll _⟩)
   rw [decoded_so_far_eq]
   have hP := run_pending bufs.flatten [] (Or.inl rfl)
   generalize hO : run [] bufs.flatten = R at hP
   obtain ⟨P, O⟩ := R
   rcases hP with hP | ⟨hP, hPv⟩
   · subst hP
-    refine ⟨[], _, decodes_decodeAll _, ?_⟩
+    refine ⟨[], ?_⟩
     rw [decodeAll_append, hO]
     simpa [run, decodeDone] using not_prefix_longer O c
   have hne : P ≠ [] := by rintro rfl; cases hP
   by_cases hc : c = replacement_char
   · subst hc
     obtain ⟨hv, hcp⟩ := completion_spec P hP hPv
-    refine ⟨completion P, _, decodes_decodeAll _, ?_⟩
+    refine ⟨completion P, ?_⟩
     rw [decodeAll_append, hO]
     have hcne : completion P ≠ [] := by
       intro h; rw [h] at hv; simp at hv; rw [hv] at hPv; cases hPv
@@ -400,7 +406,7 @@ theorem utf8_decode_buffer_prompt_RefDecoder : utf8_decode_buffer_prompt RefDeco
     have he := congrArg Char.val h.1.symm
     rw [charOf_val_of_isVS _ hv] at he
     exact hcp he
-  · refine ⟨[], _, decodes_decodeAll _, ?_⟩
+  · refine ⟨[], ?_⟩
     rw [decodeAll_append, hO]
     simp only [run, decodeDone_pending P hne]
     intro ⟨m, h⟩
