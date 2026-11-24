@@ -788,6 +788,11 @@ def next_char_to_be_decoded_is (D : Decoder) (buffers : List (List UInt8))
 -- "prompt" when there is no such character: the decoder immediately
 -- returns all characters as soon as they are fixed and future input
 -- can't change them.
+--
+-- Note that this is a really strict definition of promptness.  For
+-- example Node's UTF-8 decoder will return characters promptly for
+-- valid inputs, but has some cases where it can delay returning
+-- replacements characters.
 
 def utf8_decode_buffer_prompt (D : Decoder) : Prop :=
   ∀ buffers : List (List UInt8),
