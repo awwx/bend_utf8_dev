@@ -769,6 +769,13 @@ def utf8_decode_buffer_safe (D : Decoder) : Prop :=
     decodes (List.flatten buffers ++ rest) full →
     is_text_prefix (decoded_so_far D buffers) full
 
+-- ## Strictly prompt
+
+-- We start with a strict definition of promptness: the decoder always
+-- immediately returns a character as soon as it's settled, both for
+-- valid input sequences and for generating replacement chars for
+-- invalid sequences.
+
 -- For the bytes `bytes` followed by `rest`, every complete decoding
 -- agrees that `c` comes immediately after the text returned so far.
 --
@@ -788,11 +795,6 @@ def next_char_to_be_decoded_is (bytes rest : List UInt8)
 -- "prompt" when there is no such character: the decoder immediately
 -- returns all characters as soon as they are fixed and future input
 -- can't change them.
---
--- Note that this is a really strict definition of promptness.  For
--- example Node's UTF-8 decoder will return characters promptly for
--- valid inputs, but has some cases where it can delay returning
--- replacements characters.
 
 def utf8_decode_buffer_prompt (D : Decoder) : Prop :=
   ∀ buffers : List (List UInt8),
@@ -800,18 +802,15 @@ def utf8_decode_buffer_prompt (D : Decoder) : Prop :=
       ∀ rest : List UInt8,
         next_char_to_be_decoded_is (List.flatten buffers) rest (decoded_so_far D buffers) c)
 
--- A correct decoder satisfies all three streaming laws.
-
-def Decoder.Correct (D : Decoder) : Prop :=
-  utf8_decodes D ∧
-  utf8_decode_buffer_safe D ∧
-  utf8_decode_buffer_prompt D
 
 -- ## Promptness with a bounded delay
 
--- Require the decoder to have returned all text determined by the
--- input before its last `delay` bytes. There is no next character that
--- every continuation of that earlier input agrees on.
+-- Here's a looser definition of promptness: a character will have
+-- been delivered after at most N additional bytes have been seen, or
+-- the end of input.
+--
+-- Note that this doesn't require that delivery be delayed!  It simply
+-- states that there is a maximum delay.
 
 def utf8_decode_buffer_prompt_with_delay (D : Decoder) (delay : Nat) : Prop :=
   ∀ buffers : List (List UInt8),
@@ -821,8 +820,19 @@ def utf8_decode_buffer_prompt_with_delay (D : Decoder) (delay : Nat) : Prop :=
       ∀ rest : List UInt8,
         next_char_to_be_decoded_is earlier rest (decoded_so_far D buffers) c)
 
--- A delay of zero gives the original promptness law.
+-- Here we check that a delay of zero gives the original promptness law.
 
 def utf8_decode_buffer_prompt_with_delay_zero : Prop :=
   ∀ D : Decoder,
     utf8_decode_buffer_prompt D ↔ utf8_decode_buffer_prompt_with_delay D 0
+
+
+-- ## Correct implementation
+
+-- For our decoder implementation, a correct decoder satisfies all
+-- three streaming laws.
+
+def Decoder.Correct (D : Decoder) : Prop :=
+  utf8_decodes D ∧
+  utf8_decode_buffer_safe D ∧
+  utf8_decode_buffer_prompt D
