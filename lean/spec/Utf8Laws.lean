@@ -769,18 +769,18 @@ def utf8_decode_buffer_safe (D : Decoder) : Prop :=
     decodes (List.flatten buffers ++ rest) full →
     is_text_prefix (decoded_so_far D buffers) full
 
--- For this continuation `rest`, every complete decoding agrees that `c`
--- comes immediately after the text returned so far.
+-- For the bytes `bytes` followed by `rest`, every complete decoding
+-- agrees that `c` comes immediately after the text returned so far.
 --
 -- (For UTF-8, every complete input has exactly one decoding, as we
 -- stated by `decodes_exists` and `decodes_unique` above. Our
 -- definition of "promptness" doesn't depend on this, so our
 -- promptness law will quantify over all possible decodings.)
 
-def next_char_to_be_decoded_is (D : Decoder) (buffers : List (List UInt8))
-    (rest : List UInt8) (c : Char) : Prop :=
-  ∀ (full : { text : Text // decodes (List.flatten buffers ++ rest) text }),
-    is_text_prefix (decoded_so_far D buffers ++ [c]) full.val
+def next_char_to_be_decoded_is (bytes rest : List UInt8)
+    (returned : Text) (c : Char) : Prop :=
+  ∀ (full : { text : Text // decodes (bytes ++ rest) text }),
+    is_text_prefix (returned ++ [c]) full.val
 
 -- Suppose every complete decoding of every possible continuation has
 -- `c` immediately after the text returned so far.  This means that the
@@ -797,7 +797,8 @@ def next_char_to_be_decoded_is (D : Decoder) (buffers : List (List UInt8))
 def utf8_decode_buffer_prompt (D : Decoder) : Prop :=
   ∀ buffers : List (List UInt8),
     ¬ (∃ c : Char,
-      ∀ rest : List UInt8, next_char_to_be_decoded_is D buffers rest c)
+      ∀ rest : List UInt8,
+        next_char_to_be_decoded_is (List.flatten buffers) rest (decoded_so_far D buffers) c)
 
 -- A correct decoder satisfies all three streaming laws.
 
@@ -806,17 +807,16 @@ def Decoder.Correct (D : Decoder) : Prop :=
   utf8_decode_buffer_safe D ∧
   utf8_decode_buffer_prompt D
 
--- ## Promptness with a three-byte delay
+-- ## Promptness with a bounded delay
 
 -- Require the decoder to have returned all text determined by the
--- input before its last three bytes. For each candidate next character,
--- some continuation of that earlier input disagrees with returning it.
+-- input before its last `delay` bytes. There is no next character that
+-- every continuation of that earlier input agrees on.
 
-def utf8_decode_buffer_prompt_with_delay (D : Decoder) : Prop :=
-  ∀ (buffers : List (List UInt8)) (c : Char),
+def utf8_decode_buffer_prompt_with_delay (D : Decoder) (delay : Nat) : Prop :=
+  ∀ buffers : List (List UInt8),
     let bytes := List.flatten buffers
-    let earlier := bytes.take (bytes.length - 3)
-    ∃ rest : List UInt8,
-      ∃ full : Text,
-        decodes (earlier ++ rest) full ∧
-        ¬ is_text_prefix (decoded_so_far D buffers ++ [c]) full
+    let earlier := bytes.take (bytes.length - delay)
+    ¬ (∃ c : Char,
+      ∀ rest : List UInt8,
+        next_char_to_be_decoded_is earlier rest (decoded_so_far D buffers) c)
