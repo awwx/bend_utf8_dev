@@ -1,8 +1,13 @@
 import Utf16
-import StreamModel
 
 namespace LinePrefix
-open Utf8Pure Copier
+open Utf8Pure
+
+abbrev Bytes := List UInt8
+
+/-- Ordered nonempty buffers, including the unique empty partition. -/
+def Partition (bytes : Bytes) (buffers : List Bytes) : Prop :=
+  buffers.flatten = bytes ∧ ∀ b ∈ buffers, b ≠ []
 
 /-- The scheduler state between atomic, nonreentrant exported calls. The persistent
 line-start bit is the Wasm global; queue entries are complete text writes. -/
@@ -191,13 +196,13 @@ theorem executions_exist (chunks : List Text) : Nonempty (Execution (initial chu
 /-- A bridge delivery is any grouping into complete scalars in the same order.
 This allows empty deliveries and arbitrary extra splitting. -/
 def Delivery (buffers : List Bytes) (chunks : List Text) : Prop :=
-  chunks.flatten = (Copier.textEvents buffers []).flatten ∧
+  chunks.flatten = decodeAll buffers.flatten ∧
   ∀ chunk ∈ chunks, (Utf16.encode chunk).length < 2^32
 
 theorem delivery_decode {bytes : Bytes} {buffers : List Bytes} {chunks : List Text}
     (hp : Partition bytes buffers) (hd : Delivery buffers chunks) :
     chunks.flatten = decodeAll bytes := by
-  rw [hd.1, Copier.textEvents_decode, hp.1]
+  rw [hd.1, hp.1]
 
 /-- Every completed outcome, not just the first successful outcome. -/
 theorem all_completed_outputs {bytes : Bytes} {buffers : List Bytes} {chunks : List Text}
@@ -219,7 +224,7 @@ theorem file_correct {bytes : Bytes} {buffers : List Bytes} {chunks : List Text}
 theorem permitted_delivery_exists (buffers : List Bytes) :
     ∃ chunks, Delivery buffers chunks ∧ Nonempty (Execution (initial chunks)) :=
 by
-  let chunks := ((Copier.textEvents buffers []).flatten).map (fun c => [c])
+  let chunks := (decodeAll buffers.flatten).map (fun c => [c])
   refine ⟨chunks, ⟨?_, ?_⟩, executions_exist _⟩
   · exact List.flatMap_singleton' _
   · intro chunk hc
@@ -234,8 +239,7 @@ theorem delivery_scalars {buffers : List Bytes} {chunks : List Text}
   intro chunk hc cp hp
   have hm : cp ∈ chunks.flatten := List.mem_flatten.mpr ⟨chunk, hc, hp⟩
   rw [hd.1] at hm
-  obtain ⟨t, ht, hcp⟩ := List.mem_flatten.mp hm
-  exact Copier.textEvents_scalar buffers [] t ht cp hcp
+  exact decode_scalar buffers.flatten cp hm
 
 /-- Completion, correctness and output UTF-8 validity in one statement. -/
 theorem file_correct_valid {bytes : Bytes} (_valid : Valid bytes)

@@ -32,7 +32,6 @@ command cp "$ROOT/candidates/spec-lean/Utf8Laws.lean" "$T/"
 for f in Utf8Bits Utf8Ref Utf8Table Utf8Proofs; do
   command cp "$ROOT/candidates/pure-lean/$f.lean" "$T/"
 done
-command cp "$ROOT/copier/Utf8Roundtrip.lean" "$ROOT/copier/StreamModel.lean" "$T/"
 command cp "$HERE/"*.lean "$T/"
 # Obtain a topological order for project-local imports; imported Talos modules
 # remain at the pinned checkout, whose build freshness is checked below.

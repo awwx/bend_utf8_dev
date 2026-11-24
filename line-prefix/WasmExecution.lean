@@ -70,7 +70,7 @@ inductive RuntimeStep : Runtime → Runtime → Prop where
       (actual : Runs "data" (store s (prepareHost host (LinePrefix.Utf16.encode c)) heap)
         (dataArgs host c) (store t host' heap')) :
       RuntimeStep ⟨⟨c::cs,s,q,out,false,false⟩,host,heap⟩
-        ⟨⟨cs,t,q++(payloads.map LinePrefix.Utf16.decode).map Copier.encodeText,out,false,false⟩,host',heap'⟩
+        ⟨⟨cs,t,q++(payloads.map LinePrefix.Utf16.decode).map LinePrefix.encodeText,out,false,false⟩,host',heap'⟩
   | close (s : Bool) (q : List (List UInt8)) (out : List UInt8) (host : Host) (heap heap' : List GcObject)
       (actual : Runs "close" (store s host heap) []
         (store s { host with log := host.log++[.end 1] } heap')) :
@@ -151,13 +151,13 @@ theorem runtime_initial_admissible {buffers : List (List UInt8)} {chunks : List 
   exact ⟨LinePrefix.delivery_scalars hd c hc, hd.2 c hc⟩
 
 theorem runtime_file_correct (correct : DataCorrect) {bytes : List UInt8}
-    (valid : Copier.Valid bytes) {buffers : List (List UInt8)} {chunks : List (List UInt32)}
-    (partition : Copier.Partition bytes buffers) (delivery : LinePrefix.Delivery buffers chunks)
+    (valid : LinePrefix.Valid bytes) {buffers : List (List UInt8)} {chunks : List (List UInt32)}
+    (partition : LinePrefix.Partition bytes buffers) (delivery : LinePrefix.Delivery buffers chunks)
     (e : RuntimeExecution (runtimeInitial chunks)) :
     (∃ i, (e.state i).scheduler.done = true) ∧
     (∀ i, (e.state i).scheduler.done = true →
-      (e.state i).scheduler.output = Copier.encodeText (LinePrefix.prefixLines (Utf8Pure.decodeAll bytes)) ∧
-      Copier.Valid (e.state i).scheduler.output) :=
+      (e.state i).scheduler.output = LinePrefix.encodeText (LinePrefix.prefixLines (Utf8Pure.decodeAll bytes)) ∧
+      LinePrefix.Valid (e.state i).scheduler.output) :=
   LinePrefix.file_correct_valid valid partition delivery
     (e.project correct (runtime_initial_admissible delivery))
 
@@ -168,7 +168,7 @@ def runtimeNext (r : Runtime) : Runtime :=
   | c::cs =>
     let result := dataResult r.scheduler.atStart r.host r.heap c
     let payloads := wholeWrites r.scheduler.atStart (LinePrefix.Utf16.encode c)
-    ⟨⟨cs,result.atStart,r.scheduler.pending++(payloads.map LinePrefix.Utf16.decode).map Copier.encodeText,
+    ⟨⟨cs,result.atStart,r.scheduler.pending++(payloads.map LinePrefix.Utf16.decode).map LinePrefix.encodeText,
       r.scheduler.output,false,false⟩,result.host,result.heap⟩
   | [] => match r.scheduler.pending with
     | b::q => ⟨⟨[],r.scheduler.atStart,q,r.scheduler.output++b,r.scheduler.closing,false⟩,r.host,r.heap⟩
@@ -309,14 +309,14 @@ def ShippedCorrect : Prop :=
     ∃ output, Scalars output ∧
       (LinePrefix.run s (LinePrefix.Utf16.encode chunk)).2 = LinePrefix.Utf16.encode output) ∧
   (∀ {chunks}, ∀ e : RuntimeExecution (runtimeInitial chunks), ∀ i, HistorySafe (e.state i).host) ∧
-  (∀ {bytes : List UInt8}, Copier.Valid bytes →
+  (∀ {bytes : List UInt8}, LinePrefix.Valid bytes →
     ∀ {buffers : List (List UInt8)} {chunks : List (List UInt32)},
-    Copier.Partition bytes buffers → LinePrefix.Delivery buffers chunks →
+    LinePrefix.Partition bytes buffers → LinePrefix.Delivery buffers chunks →
     ∀ e : RuntimeExecution (runtimeInitial chunks),
     (∃ i, (e.state i).scheduler.done = true) ∧
     (∀ i, (e.state i).scheduler.done = true →
-      (e.state i).scheduler.output = Copier.encodeText (LinePrefix.prefixLines (Utf8Pure.decodeAll bytes)) ∧
-      Copier.Valid (e.state i).scheduler.output))
+      (e.state i).scheduler.output = LinePrefix.encodeText (LinePrefix.prefixLines (Utf8Pure.decodeAll bytes)) ∧
+      LinePrefix.Valid (e.state i).scheduler.output))
 
 theorem shipped_correct_of_data (correct : DataCorrect) : ShippedCorrect := by
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -337,8 +337,8 @@ theorem shipped_correct_of_data (correct : DataCorrect) : ShippedCorrect := by
 A faithful abstract delivery also exists for each raw partition; the forwarder
 is not assumed to emit that particular witness's singleton events. -/
 def ShippedExecutionsExist : Prop :=
-  (∀ {bytes : List UInt8}, Copier.Valid bytes →
-    ∀ {buffers : List (List UInt8)}, Copier.Partition bytes buffers →
+  (∀ {bytes : List UInt8}, LinePrefix.Valid bytes →
+    ∀ {buffers : List (List UInt8)}, LinePrefix.Partition bytes buffers →
     ∃ chunks, LinePrefix.Delivery buffers chunks ∧
       TotalExact "init" (initial {}) [] (runtimeInitial chunks).wasm ∧
       Nonempty (RuntimeExecution (runtimeInitial chunks))) ∧

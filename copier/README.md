@@ -7,38 +7,34 @@ verify Node itself.
 
 ## Checking
 
-Install [elan](https://github.com/leanprover/elan), then run from this directory:
+With [elan](https://github.com/leanprover/elan) and `bubblewrap` installed,
+run from this directory as a non-root user:
 
 ```sh
 elan toolchain install leanprover/lean4:v4.35.0
 ./check.sh
 ```
 
-The checker pins Lean 4.35.0, copies the dependency sources into a new
-`mktemp` directory, compiles them there in dependency order, and removes
-the temporary files on exit. Existing repository `.olean` files are never
-used. It rejects proof holes, added axioms, native decision procedures,
-and unsafe/external escape hatches in the compiled sources. It also
-prints and checks the target theorems' axiom dependencies, permitting only
-Lean's standard `propext`, `Classical.choice`, and `Quot.sound`.
+The checker refreshes its local copies of `Utf8Laws.lean` and
+`Utf8Check.lean` from `lean/spec` and runs Lean's sandboxed comparator.
+The comparator checks the statements against `CopierChallenge.lean`,
+checks the proofs in Lean's kernel, and permits only `propext`,
+`Classical.choice`, and `Quot.sound`. Pass `--paranoid` to also run the
+bundled external checkers.
 
 ## Foundation
 
-This development reuses the repository's pure Lean UTF-8 decoder proofs.
-The specification is copied directly from
-[`candidates/spec-lean/Utf8Laws.lean`](../candidates/spec-lean/Utf8Laws.lean),
-the accepted translation of `LAWS.bend`. The executable reference decoder
-and its checked correctness proof come from
-[`candidates/pure-lean`](../candidates/pure-lean).
-This keeps the UTF-8 foundation and stream reasoning in one proof
-assistant, without introducing a second cross-language translation or
-assuming the desired copying property.
+Both results apply to any decoder satisfying `node_characterization`
+in [`Utf8Laws.lean`](../lean/spec/Utf8Laws.lean). The only clause needed
+is `utf8_decodes`, which specifies the complete text after finalization.
+The copier imports the UTF-8 specification and its mathematical proofs
+from [`lean/spec`](../lean/spec).
 
 [`Utf8Roundtrip.lean`](Utf8Roundtrip.lean) defines valid files as finite
-concatenations of sequences that satisfy the encoding specification.
-The empty file is valid. Its `valid_roundtrip` theorem proves that decoding
-and re-encoding any valid file recovers its bytes; this is a mathematical
-lemma proved from the decoder laws, not an API premise.
+concatenations of sequences that satisfy the encoding specification,
+including the empty file. In [`CopierCheck.lean`](CopierCheck.lean),
+`valid_roundtrip` proves that encoding any text related to a valid file
+by `decodes` recovers the file's bytes.
 
 ## Shared program and API model
 
@@ -58,7 +54,8 @@ extra Lean axioms. Their agreement with Node is an environmental premise:
 * An encoded reader carries decoder state between buffers and finalizes
   the decoder before normal input close. Empty decoder emissions remain
   as harmless empty delivery/write placeholders in the model. A raw reader delivers buffers,
-  whose `toString` operation starts and finalizes a fresh decoder.
+  whose `toString` operation has the result specified for a fresh decoder
+  fed that buffer and finalized. The model uses the equivalence of the results.
 * Read encoding defaults to buffers; write encoding defaults to UTF-8.
   UTF-8 is the only supported write encoding.
 * Each callback runs atomically, and callbacks enqueue writes in delivery
@@ -100,6 +97,5 @@ is nonvacuous. `bad_counterexample` establishes the valid input
 `EF BF BD EF BF BD`, unequal to the input. It uses the same stream
 machine and progress condition as `good_copy`.
 
-The axiom audit covers `valid_roundtrip`, `textEvents_scalar`, `good_copy`,
-`executions_exist`, and `bad_counterexample`. The successful final line is
-`ALL COPIER CHECKS PASSED`.
+The comparator checks `valid_roundtrip`, `textEvents_scalar`, `good_copy`,
+`executions_exist`, and `bad_counterexample`.

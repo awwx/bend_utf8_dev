@@ -9,8 +9,7 @@ equality of the input and completed output.
 The goal is to prove that a model of [good.mjs](good.mjs) meets this
 requirement and to prove a counterexample for a model of
 [bad.mjs](bad.mjs), using the same semantics and API specifications.
-This document frames the work; it does not claim that these proofs exist
-yet.
+See [README.md](README.md) for the checked proofs and how to run them.
 
 ## Programs and the decoding mistake
 
@@ -76,13 +75,11 @@ find or write specifications for the language features and APIs used by
 the modeled programs, and assume those specifications correctly describe
 their behavior within this scenario.
 
-We assume Node's UTF-8 decoding agrees with the specification in
-[LAWS.bend](../LAWS.bend). The existing translations in
-[Utf8Laws.lean](../candidates/spec-lean/Utf8Laws.lean) and
-[Utf8Laws.v](../candidates/spec-rocq/Utf8Laws.v) may be treated as correct
-translations. Auditing those specifications is not this demo's focus.
-Report any discrepancy noticed incidentally, without making a full
-specification audit a prerequisite.
+We assume Node's UTF-8 stream decoder satisfies `node_characterization`
+in [Utf8Laws.lean](../lean/spec/Utf8Laws.lean), and that a buffer's
+`toString('utf8')` gives the result of decoding that buffer as a
+complete input. The copying results depend on the completed decoding
+and are independent of when intermediate text is delivered.
 
 There are no input or output errors, memory exhaustion, or other resource
 constraints. Successful pending I/O and scheduled callbacks eventually

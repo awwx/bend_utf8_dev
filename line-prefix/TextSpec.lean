@@ -1,7 +1,29 @@
-import Utf8Roundtrip
+import Utf8Proofs
 
 namespace LinePrefix
 open Utf8Pure
+
+/-- Encoding each complete scalar separately models a UTF-8 string write. -/
+def encodeText (text : Text) : List UInt8 :=
+  text.flatMap (fun cp => (encoding cp).getD [])
+
+theorem encodeText_append (left right : Text) :
+    encodeText (left ++ right) = encodeText left ++ encodeText right := by
+  simp [encodeText, List.flatMap_append]
+
+/-- Valid files consist of consecutive encoded Unicode scalars. -/
+inductive Valid : List UInt8 → Prop where
+  | nil : Valid []
+  | cons {seq rest : List UInt8} {cp : UInt32} :
+      encodes seq cp → Valid rest → Valid (seq ++ rest)
+
+private theorem decodeAll_scalar_append {seq : List UInt8} {cp : UInt32}
+    (h : encodes seq cp) (rest : List UInt8) :
+    decodeAll (seq ++ rest) = cp :: decodeAll rest := by
+  obtain ⟨hv, hc⟩ := (encodes_iff seq cp).mp h
+  have hd := decodes_cons cp (decodeAll rest) (seq ++ rest) rest
+    (hc ▸ df_scalar seq rest hv) (decodes_decodeAll rest)
+  exact ((decodes_iff _ _).mp hd).symm
 
 /-- Specification: pair every scalar with its actual predecessor, using `none`
     only for the first position. This construction does not carry a line bit. -/
@@ -114,41 +136,39 @@ theorem scalar_encoding {cp : UInt32} (h : is_unicode_scalar cp = true) :
   have hl : cp.toNat < 0x200000 := by omega
   exact ⟨h, by simp [encoding_eq, hl]⟩
 
-theorem encode_valid {text : Text} (h : Scalars text) :
-    Copier.Valid (Copier.encodeText text) := by
+theorem encode_valid {text : Text} (h : Scalars text) : Valid (encodeText text) := by
   induction text with
   | nil => exact .nil
   | cons cp rest ih =>
       have hp := h cp (by simp)
       have hr : Scalars rest := fun c hc => h c (by simp [hc])
-      exact Copier.Valid.cons (scalar_encoding hp) (ih hr)
+      exact Valid.cons (scalar_encoding hp) (ih hr)
 
 theorem decode_encode {text : Text} (h : Scalars text) :
-    decodeAll (Copier.encodeText text) = text := by
+    decodeAll (encodeText text) = text := by
   induction text with
   | nil => rfl
   | cons cp rest ih =>
       have hp := h cp (by simp)
       have hr : Scalars rest := fun c hc => h c (by simp [hc])
-      change decodeAll (((encoding cp).getD []) ++ Copier.encodeText rest) = _
-      rw [Copier.decodeAll_scalar_append (scalar_encoding hp), ih hr]
+      change decodeAll (((encoding cp).getD []) ++ encodeText rest) = _
+      rw [decodeAll_scalar_append (scalar_encoding hp), ih hr]
 
 theorem output_valid (bytes : List UInt8) :
-    Copier.Valid (Copier.encodeText (prefixLines (decodeAll bytes))) :=
+    Valid (encodeText (prefixLines (decodeAll bytes))) :=
   encode_valid (prefix_scalar (decode_scalar bytes))
 
 theorem output_roundtrip (bytes : List UInt8) :
-    decodeAll (Copier.encodeText (prefixLines (decodeAll bytes))) =
+    decodeAll (encodeText (prefixLines (decodeAll bytes))) =
       prefixLines (decodeAll bytes) :=
   decode_encode (prefix_scalar (decode_scalar bytes))
 
 /-- Buffered scalar writes encode compositionally, including empty buffers. -/
 theorem encode_chunks (chunks : List Text) :
-    Copier.encodeText chunks.flatten =
-      (chunks.map Copier.encodeText).flatten := by
+    encodeText chunks.flatten = (chunks.map encodeText).flatten := by
   induction chunks with
   | nil => rfl
-  | cons chunk rest ih => simp [Copier.encodeText_append, ih]
+  | cons chunk rest ih => simp [encodeText_append, ih]
 
 /-- Every scalar fits the unsigned i32 callback/array representation. -/
 theorem scalar_i32_bound {cp : UInt32} (h : is_unicode_scalar cp = true) :

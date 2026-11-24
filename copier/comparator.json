@@ -1,0 +1,16 @@
+{
+  "challenge_module": "CopierChallenge",
+  "solution_module": "CopierCheck",
+  "theorem_names": [
+    "Copier.valid_roundtrip",
+    "Copier.textEvents_scalar",
+    "Copier.good_copy",
+    "Copier.executions_exist",
+    "Copier.bad_counterexample"
+  ],
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ]
+}
